@@ -205,6 +205,7 @@ if ($Project) {
     $resolvedProject = (Resolve-Path -LiteralPath $Project).Path
     $targetClaudeMd = Join-Path $resolvedProject "CLAUDE.md"
     $targetAgentsDir = Join-Path (Join-Path $resolvedProject ".claude") "agents"
+    $targetSkillsDir = Join-Path (Join-Path $resolvedProject ".claude") "skills"
     $markerRoot = $resolvedProject
     $mode = "Project"
     Write-Host "Mode: Project ($resolvedProject)"
@@ -212,6 +213,7 @@ if ($Project) {
     $homeClaude = Join-Path $env:USERPROFILE ".claude"
     $targetClaudeMd = Join-Path $homeClaude "CLAUDE.md"
     $targetAgentsDir = Join-Path $homeClaude "agents"
+    $targetSkillsDir = Join-Path $homeClaude "skills"
     $markerRoot = $homeClaude
     $mode = "Global"
     Write-Host "Mode: Global ($homeClaude)"
@@ -222,6 +224,7 @@ if ($DryRun) { Write-Host "DryRun: yes" }
 $templatesRoot = Join-Path $KitRoot "templates"
 $sourceClaudeMd = Join-Path $templatesRoot "CLAUDE.md"
 $sourceAgentsDir = Join-Path $templatesRoot "agents"
+$sourceSkillsDir = Join-Path $templatesRoot "skills"
 
 $appliedFiles = @()
 
@@ -237,6 +240,22 @@ foreach ($agentFile in $agentFiles) {
     $null = Copy-Template -SourceFile $agentFile.FullName -DestFile $destAgent `
         -ModelsConfig $modelsConfig -IsDryRun:$DryRun
     $appliedFiles += $destAgent
+}
+
+# Copy skills/<name>/SKILL.md
+# Each skill source lives at templates/skills/<name>/SKILL.md. We deploy it to
+# <target>/skills/<name>/SKILL.md, preserving the parent directory name as the
+# skill name. Substitution is applied via Copy-Template so future role
+# placeholders inside a SKILL.md are resolved consistently with other templates.
+if (Test-Path $sourceSkillsDir) {
+    $skillFiles = Get-ChildItem -LiteralPath $sourceSkillsDir -Recurse -Filter "SKILL.md" -File
+    foreach ($skillFile in $skillFiles) {
+        $skillName = $skillFile.Directory.Name
+        $destSkill = Join-Path (Join-Path $targetSkillsDir $skillName) "SKILL.md"
+        $null = Copy-Template -SourceFile $skillFile.FullName -DestFile $destSkill `
+            -ModelsConfig $modelsConfig -IsDryRun:$DryRun
+        $appliedFiles += $destSkill
+    }
 }
 
 # Write marker file
