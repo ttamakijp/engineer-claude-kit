@@ -1,0 +1,29 @@
+# Bedrock model registry (Phase 1 measured values, t-tamaki-todo §3.1/§8.1)
+# This is the single source of truth for model IDs.
+# apply-claude-kit.ps1 reads this to generate ~/.claude/settings.json.
+
+models:
+  main:
+    id: us.anthropic.claude-sonnet-4-5-20250929-v1:0
+    family: sonnet-4-5
+    cache_1h_supported: true
+  small-fast:
+    id: us.anthropic.claude-haiku-4-5-20251001-v1:0
+    family: haiku-4-5
+    cache_1h_supported: false  # TBD: measured in Phase 3
+
+# Role mapping for sub-agents
+# These resolve to model IDs above via "role-of"
+roles:
+  architect:
+    role-of: main
+  review:
+    role-of: main
+  debug-analyze:
+    role-of: main
+  commit-msg:
+    role-of: small-fast
+  lint-helper:
+    role-of: small-fast
+  log-summary:
+    role-of: small-fast
