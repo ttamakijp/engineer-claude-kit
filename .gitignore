@@ -45,3 +45,6 @@ GoogleService-Info.plist
 __pycache__/
 .pytest_cache/
 *.pyc
+
+# Generated rules build output (run scripts/build-rules.ps1 to regenerate)
+dist/

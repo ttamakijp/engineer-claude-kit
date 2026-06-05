@@ -1,0 +1,9 @@
+# Default environment variables for Bedrock-based Claude Code
+# bootstrap.ps1 sets these in ~/.claude/settings.json if not already defined.
+
+env:
+  ANTHROPIC_BEDROCK: "1"
+  ENABLE_PROMPT_CACHING_1H_BEDROCK: "1"
+  AWS_MAX_ATTEMPTS: "2"
+  AWS_REGION: us-east-1     # override at user level if needed
+  AWS_PROFILE: default      # override at user level if needed
