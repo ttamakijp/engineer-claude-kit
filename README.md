@@ -139,30 +139,20 @@ engineer-claude-kit/
 ### 3.1 ADO repo から bootstrap (推奨、業務環境)
 
 ```powershell
-# 配布元 URL を環境変数で指定 (org / proj は所属環境に置き換え)
-$env:ENGINEER_CLAUDE_KIT_GIT_URL = "https://dev.azure.com/<your-org>/<your-proj>/_git/engineer-claude-kit"
-
-# 1 行で clone + bootstrap (Phase 2 で実装予定)
-git clone $env:ENGINEER_CLAUDE_KIT_GIT_URL "$env:USERPROFILE\.claude-kit"
+# 1 行で clone + bootstrap (Phase 2.2 で実装予定)
+# 配布元 URL は git clone 時点で .git/config に保存されるため、別途環境変数の手動設定は不要
+git clone https://dev.azure.com/<your-org>/<your-proj>/_git/engineer-claude-kit `
+  "$env:USERPROFILE\.claude-kit"
 & "$env:USERPROFILE\.claude-kit\scripts\bootstrap.ps1"
 ```
 
-`bootstrap.ps1` が以下を順に実行する:
+`bootstrap.ps1` は以下を順に実行する:
 
-1. `~/.claude/CLAUDE.md` / `settings.json` / `agents/` / `skills/` / `commands/` を配置
-2. (任意) 現在いる project dir に対して `apply-claude-kit.ps1 -Project <path>` を提案
+1. clone した repo の `git remote get-url origin` から配布元 URL を取得 → ユーザ環境変数 `ENGINEER_CLAUDE_KIT_GIT_URL` に永続保存 (以降の自動更新の起点)
+2. `~/.claude/CLAUDE.md` / `settings.json` / `agents/` / `skills/` / `commands/` を配置
+3. (任意) 現在の cwd が git repo なら、その project にも `.claude/` を配置するか提案 (yes なら `apply-claude-kit.ps1 -Project (Get-Location)` を内部呼出)
 
-### 3.2 GitHub mirror (開発・review 用)
-
-development mirror として GitHub 上にも公開されている (ADR-0001 §H / ADR-0003 §E):
-
-```powershell
-git clone https://github.com/ttamakijp/engineer-claude-kit.git "$env:USERPROFILE\.claude-kit"
-```
-
-業務での canonical は ADO の `_git` 形式が前提。GitHub は OSS / レビュー用。
-
-### 3.3 新規プロジェクトでの利用
+### 3.2 新規プロジェクトでの利用
 
 bootstrap 完了後、任意のプロジェクトディレクトリで `claude` 起動時に skill / agent が自動で利用可能。
 
