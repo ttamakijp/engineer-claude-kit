@@ -99,6 +99,14 @@ SMALL_FAST_MODEL として補助に置く。
 opt-in で、対応モデル (Sonnet 4.5) とセットで初めて 1h bucket が効く。
 `AWS_MAX_ATTEMPTS=2` は Cloud Proxy 起因の boto3 retry storm を緩和 (10 → 2 回)。
 
+**注記** (2026-06-05): 上記 model ID は Bedrock 実測値 (t-tamaki-todo Phase 1 検証
+`docs/2026-06-04-bedrock-1h-cache-investigation-complete.md` §3.1 / §8.1) に
+基づく。Anthropic API 形式 (`claude-sonnet-4-5-XXX`) ではなく Bedrock 形式
+(`us.anthropic.claude-sonnet-4-5-XXX-v1:0`) を採用。Haiku 4.5 の `-v1:0` suffix も
+同検証で確認済み。将来モデル更新時は本 ADR ではなく `config/models.yaml`
+(ADR-0003 で確定予定) を SSoT として更新する設計とし、本 §G の値はその初期値の
+根拠記録として残す。
+
 ### G-2. CLAUDE.md による Haiku / Sonnet 4.5 自動使い分け
 
 main = Sonnet 4.5、small fast = Haiku 4.5 の 2 段構成だけでは「全作業が main で
