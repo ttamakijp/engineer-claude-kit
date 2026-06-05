@@ -1,0 +1,47 @@
+# OS metadata
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.sublime-workspace
+*.sublime-project
+
+# Editor backups
+*~
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.bak
+
+# Git worktrees
+.worktrees/
+worktrees/
+
+# Local environment / secrets
+.env
+.env.local
+*.pem
+*.key
+*.jks
+*.keystore
+*.p12
+local.properties
+google-services.json
+GoogleService-Info.plist
+
+# Claude Code local state
+.claude/state/
+
+# Python caches (Phase 2 以降の scripts/ 向け)
+__pycache__/
+.pytest_cache/
+*.pyc
