@@ -80,7 +80,7 @@ engineer-claude-kit/
 
 ## 2. ファイル機能表 (Phase status 付き)
 
-凡例: ✅ Phase 1 実装済 / ⏳ Phase 2 計画 / ⏳ Phase 3 計画 / ⏳ Phase 4 計画
+凡例: ✅ 実装済 / ⏳ 計画 (未着手)。Phase 1 (foundation) + Phase 3.1 (共通 skills) + Phase 3.2 (Bedrock cost 観測) が実装済、Phase 2 系 (bootstrap / apply / model 配布) と Phase 4 系 (ADO CI 等) は計画段階。
 
 ### 2.1 グローバル側 `~/.claude/`
 
