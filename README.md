@@ -6,9 +6,13 @@
 
 ## 1. 完成形の配置構成
 
+**目的**: engineer-claude-kit が完成時にどこへ何を配置するかを 3 視点 (グローバル / プロジェクト / SSoT) で示す。bootstrap 実行後の状態を理解する起点。
+
 bootstrap 実行後、以下の 2 層構造で配置される。
 
 ### 1.1 グローバル (`~/.claude/`)
+
+**目的**: 全プロジェクト共通の Claude 設定の配置場所。Claude Code が起動時に必ず読み込む。`bootstrap.ps1` 実行で kit の `templates/` から配布される。
 
 全プロジェクトで共通する Claude Code 設定。bootstrap.ps1 が配置する。
 
@@ -37,6 +41,8 @@ bootstrap 実行後、以下の 2 層構造で配置される。
 
 ### 1.2 プロジェクト (`<project>/`)
 
+**目的**: プロジェクト個別の Claude 設定の配置場所。当該プロジェクト内でのみ有効で、グローバルより優先される。`apply-claude-kit.ps1 -Project <path>` で配布される。
+
 apply-claude-kit によって個別プロジェクトに配置されるファイル群。
 
 ```
@@ -59,6 +65,8 @@ apply-claude-kit によって個別プロジェクトに配置されるファイ
 ```
 
 ### 1.3 SSoT (kit 内部、配布元)
+
+**目的**: kit リポジトリ内のマスターファイル群 (Single Source of Truth)。ここを編集し `bootstrap.ps1` / `apply-claude-kit.ps1` / `build-rules.ps1` で配布先 (§1.1 / §1.2) へ反映する。配布先の直接編集は次回 apply で上書きされるため禁止。
 
 engineer-claude-kit リポ内の single source of truth (ADR-0003):
 
@@ -91,9 +99,13 @@ engineer-claude-kit/
 
 ## 2. ファイル機能表 (Phase status 付き)
 
+**目的**: §1 の配置内にある各ファイルの機能を表形式で説明。Phase status (✅ 実装済 / ⏳ 計画) で実装状況も示す。
+
 凡例: ✅ 実装済 / ⏳ 計画 (未着手)。Phase 1 (foundation) + Phase 3.1 (共通 skills) + Phase 3.2 (Bedrock cost 観測) が実装済 (Pester テスト群は PS 5.1 / Pester 3.4 互換、手動検証ドキュメントも整備済)、Phase 2 系 (bootstrap / apply / model 配布) と Phase 4 系 (ADO CI 等) は計画段階。
 
 ### 2.1 グローバル側 `~/.claude/`
+
+**目的**: §1.1 グローバル配置の各ファイルが何のためにあるかを示す。
 
 | 配置 | 機能 | Phase |
 |---|---|---|
@@ -116,6 +128,8 @@ engineer-claude-kit/
 
 ### 2.2 プロジェクト側 `<project>/`
 
+**目的**: §1.2 プロジェクト配置の各ファイルが何のためにあるかを示す。
+
 | 配置 | 機能 | Phase |
 |---|---|---|
 | `CLAUDE.md` | プロジェクト固有指示 (技術スタック / ビルドコマンド) | ⏳ Phase 2 |
@@ -132,6 +146,8 @@ engineer-claude-kit/
 | `azure-pipelines.yml` | ADO CI (quality gates / leak scan) | ⏳ Phase 4 |
 
 ### 2.3 SSoT (kit 内部)
+
+**目的**: §1.3 SSoT (kit 内部) の各ファイルが何のためにあるかを示す。kit のソースコード理解の起点。
 
 | 配置 | 機能 | Phase |
 |---|---|---|
