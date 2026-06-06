@@ -110,14 +110,14 @@ engineer-claude-kit/
 
 | 配置 | 機能 | Phase |
 |---|---|---|
-| `CLAUDE.md` | 全プロジェクト共通の指示、Haiku/Sonnet 4.5 自動使い分けルール (ADR-0004) | ⏳ Phase 2 |
+| `CLAUDE.md` | 全プロジェクト共通の指示、Haiku/Sonnet 4.5 自動使い分けルール (ADR-0004) | ✅ Phase 2 |
 | `settings.json` | Bedrock 接続 + model 設定 (`config/models.yaml` から generate) | ⏳ Phase 2 |
-| `agents/commit-msg.md` | コミットメッセージ生成 (Haiku 委譲) | ⏳ Phase 2 |
-| `agents/lint-helper.md` | 軽微修正 (Haiku 委譲) | ⏳ Phase 2 |
-| `agents/log-summary.md` | ビルド/テストログ要約 (Haiku 委譲) | ⏳ Phase 2 |
-| `agents/review.md` | コードレビュー (Sonnet 4.5) | ⏳ Phase 2 |
-| `agents/architect.md` | 設計判断・ADR 起票 (Sonnet 4.5) | ⏳ Phase 2 |
-| `agents/debug-analyze.md` | 因果推論・根本原因分析 (Sonnet 4.5) | ⏳ Phase 2 |
+| `agents/commit-msg.md` | コミットメッセージ生成 (Haiku 委譲) | ✅ Phase 2 |
+| `agents/lint-helper.md` | 軽微修正 (Haiku 委譲) | ✅ Phase 2 |
+| `agents/log-summary.md` | ビルド/テストログ要約 (Haiku 委譲) | ✅ Phase 2 |
+| `agents/review.md` | コードレビュー (Sonnet 4.5) | ✅ Phase 2 |
+| `agents/architect.md` | 設計判断・ADR 起票 (Sonnet 4.5) | ✅ Phase 2 |
+| `agents/debug-analyze.md` | 因果推論・根本原因分析 (Sonnet 4.5) | ✅ Phase 2 |
 | `skills/apply-claude-kit/` | プロジェクトへ kit を配布する skill | ✅ Phase 2 |
 | `skills/commit-helper/` | Conventional Commits 補助 (Haiku 委譲) | ✅ Phase 3.1 |
 | `skills/leak-check/` | PII / credentials / 機密ファイル 検出 | ✅ Phase 3.1 |
@@ -133,7 +133,7 @@ engineer-claude-kit/
 
 | 配置 | 機能 | Phase |
 |---|---|---|
-| `CLAUDE.md` | プロジェクト固有指示 (技術スタック / ビルドコマンド) | ⏳ Phase 2 |
+| `CLAUDE.md` | プロジェクト固有指示 (技術スタック / ビルドコマンド) | ✅ Phase 2 |
 | `.claude/rules/<rule-id>.md` | `source/rules/` から build された Claude rules | ⏳ Phase 2 |
 | `.claude/skills/` | プロジェクト固有 skill (android-build / web-test 等) | ⏳ Phase 3 |
 | `.claude/agents/` | プロジェクト固有 sub-agent | ⏳ Phase 3 |
@@ -143,7 +143,7 @@ engineer-claude-kit/
 | `.gitignore` | `.claude/state/` / `*.keystore` / `local.properties` / `.env*` | ⏳ Phase 3 |
 | `.gitleaks.toml` | gitleaks 設定 | ⏳ Phase 3 |
 | `.mailmap` | identity normalization | ⏳ Phase 3 |
-| `.engineer-claude-kit-applied` | 適用 marker JSON | ⏳ Phase 2 |
+| `.engineer-claude-kit-applied` | 適用 marker JSON | ✅ Phase 2 |
 | `azure-pipelines.yml` | ADO CI (quality gates / leak scan) | ⏳ Phase 4 |
 
 ### 2.3 SSoT (kit 内部)
@@ -152,17 +152,17 @@ engineer-claude-kit/
 
 | 配置 | 機能 | Phase |
 |---|---|---|
-| `config/models.yaml` | Bedrock model ID + role mapping (Sonnet 4.5 / Haiku 4.5) | ⏳ Phase 2 |
-| `config/distribution.yaml` | 配布元 URL (env `ENGINEER_CLAUDE_KIT_GIT_URL` override 可能) | ⏳ Phase 2 |
-| `config/env-defaults.yaml` | AWS region / profile / cache flag 既定値 | ⏳ Phase 2 |
-| `source/rules/` | Claude rules の single source (multi-AI 出力なし) | ⏳ Phase 2 |
-| `scripts/bootstrap.ps1` | ADO clone + `~/.claude` 配布 (entry point) | ⏳ Phase 2 |
-| `scripts/apply-claude-kit.ps1` | 配布実装 | ⏳ Phase 2 |
-| `scripts/build-rules.ps1` | `source/rules/` -> `.claude/rules/` build | ⏳ Phase 2 |
+| `config/models.yaml` | Bedrock model ID + role mapping (Sonnet 4.5 / Haiku 4.5) | ✅ Phase 2 |
+| `config/distribution.yaml` | 配布元 URL (env `ENGINEER_CLAUDE_KIT_GIT_URL` override 可能) | ✅ Phase 2 |
+| `config/env-defaults.yaml` | AWS region / profile / cache flag 既定値 | ✅ Phase 2 |
+| `source/rules/` | Claude rules の single source (multi-AI 出力なし) | ✅ Phase 2 |
+| `scripts/bootstrap.ps1` | ADO clone + `~/.claude` 配布 (entry point) | ✅ Phase 2 |
+| `scripts/apply-claude-kit.ps1` | 配布実装 | ✅ Phase 2 |
+| `scripts/build-rules.ps1` | `source/rules/` -> `.claude/rules/` build | ✅ Phase 2 |
 | `scripts/cost-observe-bedrock.ps1` | AWS Cost Explorer から Bedrock コストを取得し markdown report 生成 | ✅ Phase 3.2 |
 | `config/cost-budget.yaml` | Bedrock コスト予算しきい値 | ✅ Phase 3.2 |
 | `reports/bedrock-cost-<date>.md` | weekly cost report (auto-generated, gitignored) | ✅ Phase 3.2 |
-| `templates/` | `~/.claude` 配布素材 (CLAUDE.md / agents / skills / commands) | ✅ Phase 3.1 (skills) / ⏳ Phase 2 (agents) |
+| `templates/` | `~/.claude` 配布素材 (CLAUDE.md / agents / skills / commands) | ✅ Phase 3.1 (skills) / ✅ Phase 2 (agents) |
 | `templates/skills/apply-claude-kit/SKILL.md` | kit を再適用する skill (技能) のソース | ✅ Phase 2 |
 | `templates/commands/apply.md` | `/apply` slash command のソース | ✅ Phase 2 |
 | `tests/*.tests.ps1` | Pester 単体テスト (bootstrap / apply / build-rules / cost-observe、PS 5.1 + Pester 3.4 互換) | ✅ |
