@@ -213,6 +213,8 @@ if ($Project) {
     $targetAgentsDir = Join-Path (Join-Path $resolvedProject ".claude") "agents"
     $targetSkillsDir = Join-Path (Join-Path $resolvedProject ".claude") "skills"
     $targetCommandsDir = Join-Path (Join-Path $resolvedProject ".claude") "commands"
+    $targetSettings = Join-Path (Join-Path $resolvedProject ".claude") "settings.json"
+    $targetRulesDir = Join-Path (Join-Path $resolvedProject ".claude") "rules"
     $markerRoot = $resolvedProject
     $mode = "Project"
     Write-Host "Mode: Project ($resolvedProject)"
@@ -222,6 +224,9 @@ if ($Project) {
     $targetAgentsDir = Join-Path $homeClaude "agents"
     $targetSkillsDir = Join-Path $homeClaude "skills"
     $targetCommandsDir = Join-Path $homeClaude "commands"
+    $targetSettings = Join-Path $homeClaude "settings.json"
+    # Rules are project-specific (Claude Code convention) and are not deployed in Global mode.
+    $targetRulesDir = $null
     $markerRoot = $homeClaude
     $mode = "Global"
     Write-Host "Mode: Global ($homeClaude)"
@@ -234,6 +239,7 @@ $sourceClaudeMd = Join-Path $templatesRoot "CLAUDE.md"
 $sourceAgentsDir = Join-Path $templatesRoot "agents"
 $sourceSkillsDir = Join-Path $templatesRoot "skills"
 $sourceCommandsDir = Join-Path $templatesRoot "commands"
+$sourceSettings = Join-Path $templatesRoot "settings.json"
 
 $appliedFiles = @()
 
@@ -241,6 +247,17 @@ $appliedFiles = @()
 $null = Copy-Template -SourceFile $sourceClaudeMd -DestFile $targetClaudeMd `
     -ModelsConfig $modelsConfig -IsDryRun:$DryRun
 $appliedFiles += $targetClaudeMd
+
+# Copy settings.json
+# Deployed in both Global (~/.claude/settings.json) and Project
+# (<project>/.claude/settings.json) modes. Model role placeholders
+# ({{role:main}}, {{role:small-fast}}) are resolved via Copy-Template from
+# config/models.yaml, so the Bedrock model IDs stay in a single source of truth.
+if (Test-Path $sourceSettings) {
+    $null = Copy-Template -SourceFile $sourceSettings -DestFile $targetSettings `
+        -ModelsConfig $modelsConfig -IsDryRun:$DryRun
+    $appliedFiles += $targetSettings
+}
 
 # Copy agents/*.md
 $agentFiles = Get-ChildItem -LiteralPath $sourceAgentsDir -Filter "*.md" -File
@@ -278,6 +295,72 @@ if (Test-Path $sourceCommandsDir) {
         $null = Copy-Template -SourceFile $commandFile.FullName -DestFile $destCommand `
             -ModelsConfig $modelsConfig -IsDryRun:$DryRun
         $appliedFiles += $destCommand
+    }
+}
+
+# Copy Claude rules (Project mode only)
+# Rules are project-specific by Claude Code convention, so they are deployed to
+# <project>/.claude/rules/ and are intentionally skipped in Global mode.
+# The build pipeline (build-rules.ps1) compiles source/rules/*.md into
+# dist/.claude/rules/<id>.md with audience filtering. If dist is missing or
+# stale relative to the source, it is rebuilt first. Rules carry no role
+# placeholders, so they are copied verbatim (no Copy-Template substitution).
+if ($mode -eq "Project") {
+    $distRulesDir = Join-Path (Join-Path (Join-Path $KitRoot "dist") ".claude") "rules"
+    $sourceRulesDir = Join-Path (Join-Path $KitRoot "source") "rules"
+    $buildScript = Join-Path (Join-Path $KitRoot "scripts") "build-rules.ps1"
+
+    # Freshness check: rebuild when dist is absent, empty, or older than source.
+    $needBuild = $false
+    if (-not (Test-Path $distRulesDir)) {
+        $needBuild = $true
+    } elseif (Test-Path $sourceRulesDir) {
+        $newestSource = Get-ChildItem -LiteralPath $sourceRulesDir -Recurse -Filter "*.md" -File |
+            Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
+        $newestDist = Get-ChildItem -LiteralPath $distRulesDir -Filter "*.md" -File |
+            Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
+        if ($null -eq $newestDist) {
+            $needBuild = $true
+        } elseif ($null -ne $newestSource -and $newestSource.LastWriteTimeUtc -gt $newestDist.LastWriteTimeUtc) {
+            $needBuild = $true
+        }
+    }
+
+    if ($needBuild) {
+        if ($DryRun) {
+            Write-Host "[dry-run] would build rules from source/rules/ (dist missing or stale)"
+        } elseif (Test-Path $buildScript) {
+            Write-Host "[rules] dist is missing or stale; building from source/rules/"
+            # Switch cwd to the kit root while invoking build-rules.ps1, then restore.
+            Push-Location $KitRoot
+            try {
+                & $buildScript | Out-Null
+            } finally {
+                Pop-Location
+            }
+        } else {
+            Write-Warning "build-rules.ps1 not found at: $buildScript"
+        }
+    }
+
+    if (Test-Path $distRulesDir) {
+        $ruleFiles = Get-ChildItem -LiteralPath $distRulesDir -Filter "*.md" -File
+        foreach ($ruleFile in $ruleFiles) {
+            $destRule = Join-Path $targetRulesDir $ruleFile.Name
+            if ($DryRun) {
+                Write-Host "[dry-run] $($ruleFile.FullName) -> $destRule"
+            } else {
+                if (-not (Test-Path $targetRulesDir)) {
+                    New-Item -ItemType Directory -Force -Path $targetRulesDir | Out-Null
+                }
+                # Verbatim UTF-8 (no BOM) copy; rules contain no role placeholders.
+                $ruleContent = Get-Content -LiteralPath $ruleFile.FullName -Raw
+                $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+                [System.IO.File]::WriteAllText($destRule, $ruleContent, $utf8NoBom)
+                Write-Host "[apply] $($ruleFile.FullName) -> $destRule"
+            }
+            $appliedFiles += $destRule
+        }
     }
 }
 
