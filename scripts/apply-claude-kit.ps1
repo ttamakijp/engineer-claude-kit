@@ -413,6 +413,32 @@ if ($mode -eq "Project") {
     }
 }
 
+# Work schedule config (Global mode only)
+# config/work-schedule.yaml powers the work-end-reminder rule (ADR-0006). A
+# single global copy at ~/.claude/work-schedule.yaml covers every project, so
+# it is intentionally skipped in Project mode. It is preserved when it already
+# exists so the user's edited schedule is never clobbered (same policy as the
+# Group C root config files above).
+if ($mode -eq "Global") {
+    $scheduleSource = Join-Path (Join-Path $KitRoot "config") "work-schedule.yaml"
+    $scheduleDest = Join-Path $homeClaude "work-schedule.yaml"
+    if ((Test-Path $scheduleSource) -and -not (Test-Path $scheduleDest)) {
+        if ($DryRun) {
+            Write-Host "[dry-run] $scheduleSource -> $scheduleDest"
+        } else {
+            # Plain YAML, no role placeholders: verbatim UTF-8 (no BOM) copy.
+            $scheduleContent = Get-Content -LiteralPath $scheduleSource -Raw
+            $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+            [System.IO.File]::WriteAllText($scheduleDest, $scheduleContent, $utf8NoBom)
+            Write-Host "[apply] $scheduleSource -> $scheduleDest"
+            Write-Host "[hint] To enable work-end reminder, edit ~/.claude/work-schedule.yaml with your work schedule."
+        }
+        $appliedFiles += $scheduleDest
+    } elseif (Test-Path $scheduleDest) {
+        Write-Host "[skip] $scheduleDest already exists (preserving user customization)"
+    }
+}
+
 # Write marker file
 if (-not $DryRun) {
     Write-AppliedMarker -TargetRoot $markerRoot -Mode $mode -AppliedFiles $appliedFiles
