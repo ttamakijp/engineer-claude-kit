@@ -1,0 +1,43 @@
+# Build outputs
+build/
+dist/
+*.apk
+*.aab
+*.app
+*.exe
+*.dll
+*.dylib
+*.so
+
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets - DO NOT COMMIT
+.env
+.env.*
+*.keystore
+*.pem
+*.key
+local.properties
+secrets/
+
+# Claude Code state
+.claude/state/
+.claude/checkpoints/
+
+# Reports
+reports/

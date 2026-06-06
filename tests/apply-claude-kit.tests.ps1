@@ -10,6 +10,9 @@ if (Test-Path $MockGlobal) { Remove-Item -Recurse -Force $MockGlobal }
 if (Test-Path $MockProject) { Remove-Item -Recurse -Force $MockProject }
 New-Item -ItemType Directory -Force -Path $MockGlobal | Out-Null
 New-Item -ItemType Directory -Force -Path $MockProject | Out-Null
+# Group C leak-protection hooks distribute into <project>/.git/hooks, so the
+# mock project must be a real git repo for those tests to exercise the path.
+& git init -q $MockProject 2>&1 | Out-Null
 
 Describe "apply-claude-kit.ps1" {
     It "exists" {
@@ -98,6 +101,26 @@ Describe "apply-claude-kit.ps1" {
     It "writes applied marker" {
         $marker = Join-Path $MockProject ".engineer-claude-kit-applied"
         Test-Path $marker | Should Be $true
+    }
+
+    It "applies pre-commit hook in Project mode" {
+        Test-Path (Join-Path $MockProject ".git" "hooks" "pre-commit") | Should Be $true
+    }
+
+    It "applies pre-push hook in Project mode" {
+        Test-Path (Join-Path $MockProject ".git" "hooks" "pre-push") | Should Be $true
+    }
+
+    It "applies .gitleaks.toml when missing" {
+        Test-Path (Join-Path $MockProject ".gitleaks.toml") | Should Be $true
+    }
+
+    It "applies .mailmap when missing" {
+        Test-Path (Join-Path $MockProject ".mailmap") | Should Be $true
+    }
+
+    It "applies .gitignore when missing" {
+        Test-Path (Join-Path $MockProject ".gitignore") | Should Be $true
     }
 }
 
