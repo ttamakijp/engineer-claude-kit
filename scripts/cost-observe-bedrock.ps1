@@ -50,7 +50,7 @@ function Test-AwsCli {
 
 $kitRoot = Get-KitRoot
 if (-not $BudgetConfig) {
-    $BudgetConfig = Join-Path $kitRoot "config" "cost-budget.yaml"
+    $BudgetConfig = Join-Path (Join-Path $kitRoot "config") "cost-budget.yaml"
 }
 if (-not $OutputDir) {
     $OutputDir = Join-Path $kitRoot "reports"

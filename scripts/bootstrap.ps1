@@ -86,9 +86,9 @@ $kitRoot = Get-KitRoot
 Write-Host "Kit root: $kitRoot"
 
 $requiredPaths = @(
-    (Join-Path $kitRoot "scripts" "apply-claude-kit.ps1"),
-    (Join-Path $kitRoot "config" "models.yaml"),
-    (Join-Path $kitRoot "templates" "CLAUDE.md")
+    (Join-Path (Join-Path $kitRoot "scripts") "apply-claude-kit.ps1"),
+    (Join-Path (Join-Path $kitRoot "config") "models.yaml"),
+    (Join-Path (Join-Path $kitRoot "templates") "CLAUDE.md")
 )
 foreach ($p in $requiredPaths) {
     if (-not (Test-Path $p)) {
@@ -125,14 +125,14 @@ if ($resolvedUrl -and -not $NoEnvPersist) {
 }
 
 # Step 4: invoke apply-claude-kit.ps1 -Global
-$applyScript = Join-Path $kitRoot "scripts" "apply-claude-kit.ps1"
+$applyScript = Join-Path (Join-Path $kitRoot "scripts") "apply-claude-kit.ps1"
 Write-Host ""
 Write-Host "[invoke] apply-claude-kit.ps1 -Global"
 
 $applyArgs = @("-NoProfile", "-File", $applyScript, "-Global")
 if ($DryRun) { $applyArgs += "-DryRun" }
 
-& pwsh @applyArgs
+& powershell @applyArgs
 if ($LASTEXITCODE -ne 0) {
     throw "apply-claude-kit.ps1 -Global failed with exit code $LASTEXITCODE"
 }
@@ -160,7 +160,7 @@ if ($shouldPromptProject) {
     if ($answer -match '^[yY]') {
         Write-Host "[invoke] apply-claude-kit.ps1 -Project `"$cwd`""
         $projectArgs = @("-NoProfile", "-File", $applyScript, "-Project", $cwd)
-        & pwsh @projectArgs
+        & powershell @projectArgs
         if ($LASTEXITCODE -ne 0) {
             throw "apply-claude-kit.ps1 -Project failed with exit code $LASTEXITCODE"
         }

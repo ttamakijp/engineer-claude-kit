@@ -113,7 +113,7 @@ Remove-Item -Recurse -Force "$projectDir\.claude" -ErrorAction SilentlyContinue
 Remove-Item -Force "$projectDir\CLAUDE.md" -ErrorAction SilentlyContinue
 
 cd $env:USERPROFILE\.claude-kit
-pwsh -NoProfile -File scripts/apply-claude-kit.ps1 -Global
+powershell -NoProfile -File scripts/apply-claude-kit.ps1 -Global
 cd $projectDir
 ```
 
@@ -156,7 +156,7 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.claude" -ErrorAction SilentlyCont
 
 # プロジェクトに配置
 cd $env:USERPROFILE\.claude-kit
-pwsh -NoProfile -File scripts/apply-claude-kit.ps1 -Project $projectDir
+powershell -NoProfile -File scripts/apply-claude-kit.ps1 -Project $projectDir
 cd $projectDir
 ```
 
@@ -190,8 +190,8 @@ T1 / T2 / T3 を順に試す。
 ```powershell
 # 両方配置
 cd $env:USERPROFILE\.claude-kit
-pwsh -NoProfile -File scripts/apply-claude-kit.ps1 -Global
-pwsh -NoProfile -File scripts/apply-claude-kit.ps1 -Project $projectDir
+powershell -NoProfile -File scripts/apply-claude-kit.ps1 -Global
+powershell -NoProfile -File scripts/apply-claude-kit.ps1 -Project $projectDir
 cd $projectDir
 ```
 
