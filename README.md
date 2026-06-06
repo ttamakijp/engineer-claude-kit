@@ -111,7 +111,7 @@ engineer-claude-kit/
 | 配置 | 機能 | Phase |
 |---|---|---|
 | `CLAUDE.md` | 全プロジェクト共通の指示、Haiku/Sonnet 4.5 自動使い分けルール (ADR-0004) | ✅ Phase 2 |
-| `settings.json` | Bedrock 接続 + model 設定 (`config/models.yaml` から generate) | ⏳ Phase 2 |
+| `settings.json` | Bedrock 接続 + model 設定 (`config/models.yaml` から generate) | ✅ Phase 2 |
 | `agents/commit-msg.md` | コミットメッセージ生成 (Haiku 委譲) | ✅ Phase 2 |
 | `agents/lint-helper.md` | 軽微修正 (Haiku 委譲) | ✅ Phase 2 |
 | `agents/log-summary.md` | ビルド/テストログ要約 (Haiku 委譲) | ✅ Phase 2 |
@@ -134,7 +134,7 @@ engineer-claude-kit/
 | 配置 | 機能 | Phase |
 |---|---|---|
 | `CLAUDE.md` | プロジェクト固有指示 (技術スタック / ビルドコマンド) | ✅ Phase 2 |
-| `.claude/rules/<rule-id>.md` | `source/rules/` から build された Claude rules | ⏳ Phase 2 |
+| `.claude/rules/<rule-id>.md` | `source/rules/` から build された Claude rules | ✅ Phase 2 |
 | `.claude/skills/` | プロジェクト固有 skill (android-build / web-test 等) | ⏳ Phase 3 |
 | `.claude/agents/` | プロジェクト固有 sub-agent | ⏳ Phase 3 |
 | `.claude/state/` | プロジェクト固有 state (.gitignore) | ⏳ Phase 3 |

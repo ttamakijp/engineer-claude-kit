@@ -63,6 +63,30 @@ Describe "apply-claude-kit.ps1" {
         Test-Path $applyCommand | Should Be $true
     }
 
+    It "applies settings.json in Project mode" {
+        $settings = Join-Path (Join-Path $MockProject ".claude") "settings.json"
+        Test-Path $settings | Should Be $true
+    }
+
+    It "substitutes model placeholders in settings.json" {
+        $settingsPath = Join-Path (Join-Path $MockProject ".claude") "settings.json"
+        $settings = Get-Content -LiteralPath $settingsPath -Raw
+        $settings | Should Not Match '\{\{role:main\}\}'
+        $settings | Should Not Match '\{\{role:small-fast\}\}'
+        $settings | Should Match 'claude-sonnet-4-5'
+    }
+
+    It "applies project rules in Project mode" {
+        $rulesDir = Join-Path (Join-Path $MockProject ".claude") "rules"
+        Test-Path $rulesDir | Should Be $true
+        (Get-ChildItem $rulesDir -Filter "*.md").Count | Should BeGreaterThan 0
+    }
+
+    It "does NOT apply project rules in Global (DryRun) mode" {
+        $output = & powershell -NoProfile -File $ScriptPath -Global -DryRun 2>&1
+        ($output -join "`n") | Should Not Match 'rules'
+    }
+
     It "writes applied marker" {
         $marker = Join-Path $MockProject ".engineer-claude-kit-applied"
         Test-Path $marker | Should Be $true
