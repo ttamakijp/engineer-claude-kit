@@ -101,7 +101,7 @@ engineer-claude-kit/
 
 **目的**: §1 の配置内にある各ファイルの機能を表形式で説明。Phase status (✅ 実装済 / ⏳ 計画) で実装状況も示す。
 
-凡例: ✅ 実装済 / ⏳ 計画 (未着手)。Phase 1 (foundation) + Phase 3.1 (共通 skills) + Phase 3.2 (Bedrock cost 観測) が実装済 (Pester テスト群は PS 5.1 / Pester 3.4 互換、手動検証ドキュメントも整備済)、Phase 2 系 (bootstrap / apply / model 配布) と Phase 4 系 (ADO CI 等) は計画段階。
+凡例: ✅ 実装済 / ⏳ 計画 (未着手 または 配布機能未完成)。⏳ には「実体ファイルが kit リポジトリ内に存在するが、ユーザ環境への配布機能 (bootstrap.ps1 / apply-claude-kit.ps1) がまだ完成していない」ケースを含む。Phase 1 (foundation) + Phase 3.1 (共通 skills) + Phase 3.2 (Bedrock cost 観測) が実装済 (Pester テスト群は PS 5.1 / Pester 3.4 互換、手動検証ドキュメントも整備済)、Phase 2 系 (bootstrap / apply / model 配布) と Phase 4 系 (ADO CI 等) は計画段階。
 
 ### 2.1 グローバル側 `~/.claude/`
 
