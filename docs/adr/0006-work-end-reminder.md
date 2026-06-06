@@ -1,17 +1,17 @@
 ---
-status: Proposed
+status: Accepted
 date: 2026-06-07
 deciders: [Tetsuya]
 tags: [reminder, work-life-balance, rule, time-aware]
 ---
 
-# ADR (draft): work-end-reminder rule
+# ADR-0006: work-end-reminder rule
 
-> **draft メモ**: 本 ファイル は Proposed 段階の draft (草案) である。正式 ADR ID
-> (0006) の採番・`drafts/proposed-` から `0006-` への rename・README §4 ADR Index
-> への追記は、いずれも **Accepted 昇格時の別 PR** で実施する (ADR-0005 と同じ運用)。
-> 本 PR では本 draft markdown の新規作成のみを行い、実装 (rule + config) には触れない。
-> 下記 "Implementation plan" の各項目は Accepted 昇格後の別 PR で実施する。
+> **昇格メモ**: 本 ADR は Proposed → Accepted に昇格済み。確定設計に基づき
+> `config/work-schedule.yaml` / `source/rules/common/work-end-reminder.md` を同一 PR
+> (Group F') で実装し、README §4 ADR Index に本 ADR を追記した。`drafts/proposed-`
+> から `0006-` への rename も本 PR で実施済み (ADR-0005 と同じ運用)。下記
+> "Implementation plan" の各項目は本 PR で実施済み (残課題は "Open questions" 参照)。
 
 ## Context
 
@@ -117,23 +117,27 @@ Accepted 昇格レビューで議論すべき未解決点 (現時点では全て
   yaml に持たせるべきかは未定。
 - **規模推定の評価**: precision / recall の評価方法。false positive を許容する
   方針なら定量評価は不要だが、運用後に review して判断する。
+- **downstream project への yaml 配布**: 本 PR では `apply-claude-kit.ps1` を変更
+  せず (既存構造不変方針)、`config/work-schedule.yaml` の project 配布は未配線。
+  kit repo 自身では参照されるが、apply 先 project では rule が silent fallback と
+  なる。利用には user が `~/.claude/work-schedule.yaml` を global 設置する必要が
+  ある。apply 配布の追加は別 PR とするか未定 (**保留**)。
 
 ## Implementation plan
 
-Accepted 昇格後の **別 PR** で実施する (本 PR の対象外):
+本 PR (Group F') で実施済み:
 
-1. `config/work-schedule.yaml` 新規作成 (上記スキーマ、user customizable)
-2. `source/rules/common/work-end-reminder.md` 新規作成 (rule body 50-80 行、
-   frontmatter で `priority: medium` / `applyTo: global`)
-3. `templates/CLAUDE.md` 末尾に 5 行追記 (rule 発火条件 + reminder format note。
-   任意、rule 本体で完結するなら省略可)
-4. `build-rules.ps1` の generic ループで自動 build (script 変更不要)
+1. `config/work-schedule.yaml` 新規作成 (上記スキーマ、user customizable) — 実施済み
+2. `source/rules/common/work-end-reminder.md` 新規作成 (rule body、
+   frontmatter で `priority: medium` / `applyTo: "**"`) — 実施済み
+3. `templates/CLAUDE.md` への追記 — rule 本体で完結するため省略 (任意項目)
+4. `build-rules.ps1` の generic ループで自動 build (script 変更不要) — 確認済み
 5. `apply-claude-kit.ps1` の `.claude/rules/` 配布で自動配布 (Project mode、
-   script 変更不要)
-6. `tests/build-rules.tests.ps1` で rule の build 動作確認 (任意)
-7. README §2.1 で `work-end-reminder rule` を ✅ Phase 4 (新項目) として追加
+   script 変更不要) — rule は配布済み。yaml の project 配布は未配線 (Open questions 参照)
+6. `tests/apply-claude-kit.tests.ps1` で rule の配布動作確認 (任意) — smoke test 追加
+7. README §4 ADR Index に本 ADR を追記 — 実施済み
 8. 本 ADR を Proposed → Accepted へ昇格、`drafts/proposed-work-end-reminder.md`
-   を `0006-work-end-reminder.md` へ rename、README §4 ADR Index に追記
+   を `0006-work-end-reminder.md` へ rename — 実施済み
 
 ## Refs
 

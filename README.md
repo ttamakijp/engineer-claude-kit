@@ -155,6 +155,7 @@ engineer-claude-kit/
 | `config/models.yaml` | Bedrock model ID + role mapping (Sonnet 4.5 / Haiku 4.5) | ✅ Phase 2 |
 | `config/distribution.yaml` | 配布元 URL (env `ENGINEER_CLAUDE_KIT_GIT_URL` override 可能) | ✅ Phase 2 |
 | `config/env-defaults.yaml` | AWS region / profile / cache flag 既定値 | ✅ Phase 2 |
+| `config/work-schedule.yaml` | 曜日別終業時刻 + warning_window (work-end-reminder rule / ADR-0006、user 編集可) | ✅ Phase 4 |
 | `source/rules/` | Claude rules の single source (multi-AI 出力なし) | ✅ Phase 2 |
 | `scripts/bootstrap.ps1` | ADO clone + `~/.claude` 配布 (entry point) | ✅ Phase 2 |
 | `scripts/apply-claude-kit.ps1` | 配布実装 | ✅ Phase 2 |
@@ -210,6 +211,7 @@ cd <your-project>
 | [ADR-0003](docs/adr/0003-bootstrap-and-abstraction.md) | bootstrap design + `config/*.yaml` SSoT | Proposed |
 | [ADR-0004](docs/adr/0004-claude-md-auto-model-routing.md) | CLAUDE.md による Haiku/Sonnet 4.5 自動使い分け | Proposed |
 | [ADR-0005](docs/adr/0005-checkpoint-resume-commands.md) | `/checkpoint` `/resume` slash commands 設計 (Group B) | Accepted |
+| [ADR-0006](docs/adr/0006-work-end-reminder.md) | work-end-reminder rule (終業リマインダ / ホスピタリティ機能、Group F') | Accepted |
 
 ## 5. モデル戦略 (要約)
 

@@ -93,6 +93,11 @@ Describe "apply-claude-kit.ps1" {
         (Get-ChildItem $rulesDir -Filter "*.md").Count | Should BeGreaterThan 0
     }
 
+    It "applies work-end-reminder rule in Project mode" {
+        $ruleFile = Join-Path (Join-Path (Join-Path $MockProject ".claude") "rules") "work-end-reminder.md"
+        Test-Path $ruleFile | Should Be $true
+    }
+
     It "does NOT apply project rules in Global (DryRun) mode" {
         $output = & powershell -NoProfile -File $ScriptPath -Global -DryRun 2>&1
         ($output -join "`n") | Should Not Match 'rules'
