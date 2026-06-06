@@ -92,16 +92,36 @@ T1 / T2 / T3 を順に試す。
 - commit-msg / leak-check / propose-adr は **認識されない** (skill 不在)
 - 応答が一般的・標準的な Claude default
 
-### 結果記録テンプレ
+### 結果記録テンプレ (5 軸)
 
-```
+5 軸 = 使用モデル / 解答内容 / コスト / 応答時間 / tool 利用。計測手順は本書「計測方法と環境差分」を参照。
+
 ### シナリオ A 結果
 - 実施日: YYYY-MM-DD
-- T1 応答 (要約): ...
-- T2 応答 (要約): ...
-- T3 応答 (要約): ...
-- 観察: 期待通り default 動作。kit の影響なし
-```
+- 環境: <Windows 11 + Claude MAX 20x | Windows 11 + Bedrock>
+- 全体観察: 期待通り default 動作。kit の影響なし
+
+#### T1 (コミットメッセージ生成)
+- 使用モデル (main agent): <Sonnet 4.5 / Haiku 4.5 / other>
+- sub-agent 起動: <yes (どの agent) / no>
+- tool 利用: <Read, Edit, Bash, Task, etc. の回数>
+- 応答時間: <X 秒>
+- 解答 (full text):
+
+  ```
+  <Claude の応答をそのまま貼る>
+  ```
+
+- 品質評価: <Conventional Commits 形式? Y/N、scope 適切? Y/N、subject 50 文字以下? Y/N>
+- input token: <N>
+- output token: <M>
+- 概算コスト: <$X> (環境別単価で計算、後述「コスト計算式」参照)
+
+#### T2 (セキュリティチェック)
+(T1 と同じ書式)
+
+#### T3 (ADR 起票)
+(T1 と同じ書式)
 
 ## シナリオ B: グローバルのみ
 
@@ -142,9 +162,37 @@ T1 / T2 / T3 を順に試す。
 | skill (leak-check, propose-adr) 認識 | なし | あり |
 | プロジェクト固有 rule | なし | なし (variant) |
 
-### 結果記録テンプレ
+### 結果記録テンプレ (5 軸)
 
-(シナリオ A と同様の形式)
+書式はシナリオ A と同一 (使用モデル / 解答 full text / token / コスト / 応答時間 / tool 利用)。シナリオ B 固有の補足を 全体観察 に記録。
+
+### シナリオ B 結果
+- 実施日: YYYY-MM-DD
+- 環境: <Windows 11 + Claude MAX 20x | Windows 11 + Bedrock>
+- 全体観察: グローバル kit のみ適用。Haiku 委譲 / sub-agent / skill 発火を A と比較
+- シナリオ固有の補足: グローバル CLAUDE.md のルーティング指示が読み込まれたか (モデル質問で確認)
+
+#### T1 (コミットメッセージ生成)
+- 使用モデル (main agent): <Sonnet 4.5 / Haiku 4.5 / other>
+- sub-agent 起動: <yes (どの agent) / no>  ※ commit-msg sub-agent 発火が核心
+- tool 利用: <Read, Edit, Bash, Task, etc. の回数>
+- 応答時間: <X 秒>
+- 解答 (full text):
+
+  ```
+  <Claude の応答をそのまま貼る>
+  ```
+
+- 品質評価: <Conventional Commits 形式? Y/N、scope 適切? Y/N、subject 50 文字以下? Y/N>
+- input token: <N>
+- output token: <M>
+- 概算コスト: <$X> (環境別単価で計算、後述「コスト計算式」参照)
+
+#### T2 (セキュリティチェック)
+(T1 と同じ書式。leak-check skill 発火を観察)
+
+#### T3 (ADR 起票)
+(T1 と同じ書式。propose-adr skill + architect sub-agent 発火を観察)
 
 ## シナリオ C: プロジェクトのみ
 
@@ -182,6 +230,38 @@ T1 / T2 / T3 を順に試す。
 | sub-agent | グローバル定義 | プロジェクト定義 |
 | skill | グローバル定義 | プロジェクト定義 |
 | プロジェクト切替時の継承 | 引き継がれる | プロジェクト出ると消える |
+
+### 結果記録テンプレ (5 軸)
+
+書式はシナリオ A と同一 (使用モデル / 解答 full text / token / コスト / 応答時間 / tool 利用)。シナリオ C 固有の補足を 全体観察 に記録。
+
+### シナリオ C 結果
+- 実施日: YYYY-MM-DD
+- 環境: <Windows 11 + Claude MAX 20x | Windows 11 + Bedrock>
+- 全体観察: プロジェクト kit のみ適用。グローバル指示不在のため Sonnet 4.5 default で動作するか
+- シナリオ固有の補足: skill / sub-agent がプロジェクトスコープで認識されるか、Haiku 委譲が起きないか
+
+#### T1 (コミットメッセージ生成)
+- 使用モデル (main agent): <Sonnet 4.5 / Haiku 4.5 / other>
+- sub-agent 起動: <yes (どの agent) / no>  ※ プロジェクト定義の commit-msg を参照
+- tool 利用: <Read, Edit, Bash, Task, etc. の回数>
+- 応答時間: <X 秒>
+- 解答 (full text):
+
+  ```
+  <Claude の応答をそのまま貼る>
+  ```
+
+- 品質評価: <Conventional Commits 形式? Y/N、scope 適切? Y/N、subject 50 文字以下? Y/N>
+- input token: <N>
+- output token: <M>
+- 概算コスト: <$X> (環境別単価で計算、後述「コスト計算式」参照)
+
+#### T2 (セキュリティチェック)
+(T1 と同じ書式。プロジェクト定義 leak-check skill 発火を観察)
+
+#### T3 (ADR 起票)
+(T1 と同じ書式。プロジェクト定義 propose-adr skill 発火を観察)
 
 ## シナリオ D: 両方 (グローバル + プロジェクト)
 
@@ -223,6 +303,81 @@ T1 / T2 / T3 を順に試す。
 - プロジェクト固有 `rule` (`.claude/rules/*.md`) が **追加** されるか **上書き** されるか
 - agent 定義の `model:` が プロジェクト側で override 可能か
 
+### 結果記録テンプレ (5 軸)
+
+書式はシナリオ A と同一 (使用モデル / 解答 full text / token / コスト / 応答時間 / tool 利用)。シナリオ D 固有の補足を 全体観察 に記録。
+
+### シナリオ D 結果
+- 実施日: YYYY-MM-DD
+- 環境: <Windows 11 + Claude MAX 20x | Windows 11 + Bedrock>
+- 全体観察: グローバル + プロジェクト両方適用。階層 merge が成立するか (kit の最終形)
+- シナリオ固有の補足: 同名 skill / agent の優先順位 (グローバル vs プロジェクト)、rule の追加 vs 上書き、model override
+
+#### T1 (コミットメッセージ生成)
+- 使用モデル (main agent): <Sonnet 4.5 / Haiku 4.5 / other>
+- sub-agent 起動: <yes (どの agent) / no>  ※ どちらの階層の commit-msg が発火したか明記
+- tool 利用: <Read, Edit, Bash, Task, etc. の回数>
+- 応答時間: <X 秒>
+- 解答 (full text):
+
+  ```
+  <Claude の応答をそのまま貼る>
+  ```
+
+- 品質評価: <Conventional Commits 形式? Y/N、scope 適切? Y/N、subject 50 文字以下? Y/N>
+- input token: <N>
+- output token: <M>
+- 概算コスト: <$X> (環境別単価で計算、後述「コスト計算式」参照)
+
+#### T2 (セキュリティチェック)
+(T1 と同じ書式。階層 merge 時の leak-check 発火元を観察)
+
+#### T3 (ADR 起票)
+(T1 と同じ書式。階層 merge 時の propose-adr / architect 発火元を観察)
+
+## `/clear` と session 再起動の使い分け
+
+検証品質を保つため、シナリオ間および同一シナリオ内のテスト試行間で適切に context をリセットすること。
+
+### 推奨タイミング
+
+| タイミング | アクション | 理由 |
+|---|---|---|
+| シナリオ A → B 切替時 | **session 再起動必須** (`/quit` → 設定変更 → `claude` 再起動) | 設定ファイル新規読込のため |
+| シナリオ B → C 切替時 | 同上 | 同 |
+| シナリオ C → D 切替時 | 同上 | 同 |
+| 同一シナリオ内 T1 → T2 → T3 | `/clear` で OK | 設定不変、context 汚染防止のみ |
+
+### `/clear` の限界
+
+- 会話履歴は消えるが、**設定ファイル (`~/.claude/CLAUDE.md` / `agents/*.md` / `skills/`) は再読み込みされない可能性**
+- シナリオ間で `apply-claude-kit.ps1` で設定を変更した場合は **必ず session 再起動**
+
+### 追加観察項目 (検証時に確認推奨)
+
+「`/clear` 後と session 再起動後で同じ挙動か」をシナリオ B / D で観察:
+
+- もし `/clear` だけで設定変更が反映 → 検証手順を簡略化可
+- もし反映されない → 本番運用でも user に「設定変更後は session 再起動が必要」と明示する必要あり
+
+具体的な observation 方法:
+
+```powershell
+# シナリオ B 完了後、設定を変更
+# (例: ~/.claude/CLAUDE.md の応答スタイル指示を変更)
+notepad "$env:USERPROFILE\.claude\CLAUDE.md"
+
+# 方法 1: /clear のみ
+# Claude session 内で /clear → 同じ session で再質問
+# → 応答スタイル変更が反映されているか確認
+
+# 方法 2: session 再起動
+# /quit → claude → 再質問
+# → 応答スタイル変更が確実に反映される
+```
+
+この観察結果は本書末尾の「結果記録」セクションに追記する (項目: "/clear vs 再起動の差")。
+
 ## 結果比較表 (実施後に記入)
 
 | 項目 | A | B | C | D |
@@ -232,8 +387,100 @@ T1 / T2 / T3 を順に試す。
 | leak-check skill 発火 | | | | |
 | propose-adr skill 発火 | | | | |
 | Haiku 委譲動作 | | | | |
+| Sonnet 4.5 利用率 (推定 %) | | | | |
+| Haiku 4.5 利用率 (推定 %) | | | | |
+| 平均応答時間 (T1-T3 mean) | | | | |
+| 総 input token (T1+T2+T3) | | | | |
+| 総 output token (T1+T2+T3) | | | | |
+| 推定総コスト (USD) | | | | |
+| tool 呼出総数 (T1+T2+T3) | | | | |
 | プロジェクト切替時の引き継ぎ | | | | |
 | 階層 merge 動作 | n/a | n/a | n/a | |
+| /clear vs session 再起動の差 | n/a | | n/a | |
+
+## 計測方法と環境差分
+
+5 軸 (使用モデル / 解答内容 / コスト / 応答時間 / tool 利用) の計測手順と、MAX 環境 / Bedrock 環境での差分。
+
+### 1. 使用モデルの特定
+
+Claude session 内で以下を質問:
+
+```
+あなたは今どのモデルで動作していますか?
+sub-agent (Task tool) を呼び出した場合、その sub-agent はどのモデルで動作しますか?
+```
+
+応答内に `Sonnet 4.5` / `Haiku 4.5` が含まれるかを記録。
+
+### 2. 解答内容
+
+T1-T3 の Claude 応答を **そのまま貼り付け**。要約しない (シナリオ間の差を見逃さないため)。
+
+### 3. コスト計算式
+
+#### MAX 環境 (Claude MAX 20x)
+
+- MAX は **flat-rate (定額)** のため per-session コストは直接算出不可
+- 代替: token 数を測定し、Bedrock 環境での **理論コスト** を計算
+- 計算式:
+
+  ```
+  Sonnet 4.5 cost (USD) = (input_tokens * 0.003 / 1000) + (output_tokens * 0.015 / 1000)
+  Haiku 4.5 cost (USD)  = (input_tokens * 0.00080 / 1000) + (output_tokens * 0.004 / 1000)
+  ```
+
+  ※ 単価は近似値。最新は [Anthropic Pricing](https://www.anthropic.com/pricing) で確認
+
+#### Bedrock 環境
+
+- AWS Cost Explorer で per-token billing を直接観察
+- Phase 3.2 で実装した `scripts/cost-observe-bedrock.ps1` で daily report 生成
+- session 単位の細かいコストは Cost Explorer の Cost Allocation Tag (もし設定済なら) で集計
+
+#### token 数の取得方法
+
+- Claude Code の `/status` コマンド (もし表示されれば、最新 turn の token 数)
+- もし `/status` で token が表示されない場合は、応答文字数で近似:
+  - 概算: 1 token ≈ 4 文字 (英語) / 1 token ≈ 1 文字 (日本語) の混合で `total_chars / 2.5` 程度
+- 厳密には Anthropic Console (MAX 環境) または AWS Bedrock model invocation log で確認
+
+### 4. 応答時間
+
+- 手動計測: stopwatch / 時計
+- プログラマブル計測 (PowerShell):
+
+  ```powershell
+  Measure-Command {
+      # claude のプロンプト入力時間は除外、Claude 応答開始から完了までを記録するのが理想
+      # ただし claude CLI は対話形式のため Measure-Command で直接測定困難
+      # 推奨: 質問送信時刻と回答完了時刻を手動記録、差分を秒数で記載
+  }
+  ```
+
+- ストップウォッチで「Enter 押下 → 応答完了」までを計測する方が現実的
+
+### 5. tool 利用
+
+Claude Code は通常、応答内で「○○ tool を使います」と明示する。応答テキストから:
+
+- `Read`, `Edit`, `Bash`, `Write`, `Task`, `Glob`, `Grep` 等の名前を抽出
+- 各 tool の呼出回数を記録 (例: `Read: 3, Edit: 1, Bash: 2, Task: 1`)
+
+sub-agent (Task tool) の呼出は特に重要 (ADR-0004 のルーティング検証の核心)。
+
+### MAX vs Bedrock の計測差分まとめ
+
+| 項目 | MAX | Bedrock |
+|---|---|---|
+| 使用モデル | 質問で確認 | 質問で確認 |
+| 解答内容 | full text 記録 | full text 記録 |
+| token 数 | `/status` or 文字数推定 | `/status` or Bedrock log で精確 |
+| コスト | 理論値 (単価 × token) | 実費 (Cost Explorer) |
+| 応答時間 | 手動計測 | 手動計測 |
+| tool 利用 | 応答テキストから抽出 | 応答テキストから抽出 |
+
+MAX 環境では「コストの絶対値」より「シナリオ間の token 数比較 (Haiku 委譲が起きたか)」が中心になる。
 
 ## クリーンアップ
 
