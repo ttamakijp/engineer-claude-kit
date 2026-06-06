@@ -82,7 +82,9 @@ engineer-claude-kit/
 |-- tests/                    # Pester テスト (PowerShell 5.1 / Pester 3.4 互換)
 |-- docs/
 |   |-- adr/                  # Architecture Decision Records
-|   `-- manual-verification/  # 手動検証手順 (scenario-comparison 等)
+|   `-- manual-verification/  # 手動検証手順
+|       |-- bootstrap-installation.md  # bootstrap chain 動作検証 (Windows / MAX)
+|       `-- scenario-comparison.md     # kit 効果測定 (5 軸比較)
 `-- README.md                 # 本ファイル
 ```
 
@@ -145,6 +147,7 @@ engineer-claude-kit/
 | `templates/` | `~/.claude` 配布素材 (CLAUDE.md / agents / skills) | ✅ Phase 3.1 (skills) / ⏳ Phase 2 (agents) |
 | `tests/*.tests.ps1` | Pester 単体テスト (bootstrap / apply / build-rules / cost-observe、PS 5.1 + Pester 3.4 互換) | ✅ |
 | `docs/manual-verification/` | kit 効果測定の手動検証手順 (scenario-comparison: 5 軸比較) | ✅ |
+| `docs/manual-verification/bootstrap-installation.md` | bootstrap chain 動作検証手順 (Windows / Claude MAX 環境対応) | ✅ |
 | `docs/adr/` | Architecture Decision Records (現状 0001-0004) | ✅ Phase 1 |
 | `README.md` (本ファイル) | プロジェクト概要 + 配置構成 + Quick start | ✅ Phase 1 |
 | `LICENSE` / `.gitignore` | リポ初期セット | ✅ Phase 1 |
