@@ -43,6 +43,17 @@ Describe "apply-claude-kit.ps1" {
         $content | Should -Match 'claude-haiku-4-5'
     }
 
+    It "applies skills in Project mode" {
+        $skillDir = Join-Path (Join-Path $script:MockProject ".claude") "skills"
+        Test-Path $skillDir | Should -BeTrue
+        (Get-ChildItem $skillDir -Recurse -Filter "SKILL.md").Count | Should -BeGreaterThan 0
+    }
+
+    It "places commit-helper skill" {
+        $commitHelperSkill = Join-Path (Join-Path (Join-Path (Join-Path $script:MockProject ".claude") "skills") "commit-helper") "SKILL.md"
+        Test-Path $commitHelperSkill | Should -BeTrue
+    }
+
     It "writes applied marker" {
         $marker = Join-Path $script:MockProject ".engineer-claude-kit-applied"
         Test-Path $marker | Should -BeTrue

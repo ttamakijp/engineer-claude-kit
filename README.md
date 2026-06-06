@@ -95,8 +95,9 @@ engineer-claude-kit/
 | `agents/architect.md` | 設計判断・ADR 起票 (Sonnet 4.5) | ⏳ Phase 2 |
 | `agents/debug-analyze.md` | 因果推論・根本原因分析 (Sonnet 4.5) | ⏳ Phase 2 |
 | `skills/apply-claude-kit/` | プロジェクトへ kit を配布する skill | ⏳ Phase 2 |
-| `skills/leak-check/` | PII / credentials 検出 (5 層防御) | ⏳ Phase 3 |
-| `skills/commit-helper/` | Conventional Commits 補助 | ⏳ Phase 3 |
+| `skills/commit-helper/` | Conventional Commits 補助 (Haiku 委譲) | ✅ Phase 3.1 |
+| `skills/leak-check/` | PII / credentials / 機密ファイル 検出 | ✅ Phase 3.1 |
+| `skills/propose-adr/` | ADR draft 起票 (architect sub-agent 連携) | ✅ Phase 3.1 |
 | `commands/apply.md` | `/apply` slash command | ⏳ Phase 2 |
 | `commands/checkpoint.md` | `/checkpoint` セッション state 保存 | ⏳ Phase 3 |
 | `commands/resume.md` | `/resume` state からの再開 | ⏳ Phase 3 |
