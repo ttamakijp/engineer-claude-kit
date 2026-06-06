@@ -1,0 +1,10 @@
+# Bedrock cost budget configuration
+# Used by scripts/cost-observe-bedrock.ps1 to detect over-budget conditions.
+
+# Thresholds in USD
+bedrock_daily_budget_usd: 50.0
+bedrock_weekly_budget_usd: 350.0
+
+# Alert percentages (relative to budget)
+warn_threshold_pct: 80
+alert_threshold_pct: 100

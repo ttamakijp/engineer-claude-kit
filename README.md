@@ -131,6 +131,9 @@ engineer-claude-kit/
 | `scripts/bootstrap.ps1` | ADO clone + `~/.claude` 配布 (entry point) | ⏳ Phase 2 |
 | `scripts/apply-claude-kit.ps1` | 配布実装 | ⏳ Phase 2 |
 | `scripts/build-rules.ps1` | `source/rules/` -> `.claude/rules/` build | ⏳ Phase 2 |
+| `scripts/cost-observe-bedrock.ps1` | AWS Cost Explorer から Bedrock コストを取得し markdown report 生成 | ✅ Phase 3.2 |
+| `config/cost-budget.yaml` | Bedrock コスト予算しきい値 | ✅ Phase 3.2 |
+| `reports/bedrock-cost-<date>.md` | weekly cost report (auto-generated, gitignored) | ✅ Phase 3.2 |
 | `docs/adr/` | Architecture Decision Records (現状 0001-0004) | ✅ Phase 1 |
 | `README.md` (本ファイル) | プロジェクト概要 + 配置構成 + Quick start | ✅ Phase 1 |
 | `LICENSE` / `.gitignore` | リポ初期セット | ✅ Phase 1 |
