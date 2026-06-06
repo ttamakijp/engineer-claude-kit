@@ -123,9 +123,9 @@ engineer-claude-kit/
 | `skills/leak-check/` | PII / credentials / 機密ファイル 検出 | ✅ Phase 3.1 |
 | `skills/propose-adr/` | ADR draft 起票 (architect sub-agent 連携) | ✅ Phase 3.1 |
 | `commands/apply.md` | `/apply` slash command | ✅ Phase 2 |
-| `commands/checkpoint.md` | `/checkpoint` セッション state 保存 | ⏳ Phase 3 |
-| `commands/resume.md` | `/resume` state からの再開 | ⏳ Phase 3 |
-| `state/` | checkpoint state (.gitignore) | ⏳ Phase 3 |
+| `commands/checkpoint.md` | `/checkpoint` セッション state 保存 | ✅ Phase 3 |
+| `commands/resume.md` | `/resume` state からの再開 | ✅ Phase 3 |
+| `state/` | checkpoint state (実行時生成 / .gitignore、template には含まれない) | ✅ Phase 3 |
 
 ### 2.2 プロジェクト側 `<project>/`
 
@@ -209,6 +209,7 @@ cd <your-project>
 | [ADR-0002](docs/adr/0002-adr-portage-from-dev-templates.md) | dev-templates ADR 移植精査 (A/B/C/D 分類) | Proposed |
 | [ADR-0003](docs/adr/0003-bootstrap-and-abstraction.md) | bootstrap design + `config/*.yaml` SSoT | Proposed |
 | [ADR-0004](docs/adr/0004-claude-md-auto-model-routing.md) | CLAUDE.md による Haiku/Sonnet 4.5 自動使い分け | Proposed |
+| [ADR-0005](docs/adr/0005-checkpoint-resume-commands.md) | `/checkpoint` `/resume` slash commands 設計 (Group B) | Accepted |
 
 ## 5. モデル戦略 (要約)
 

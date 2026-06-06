@@ -1,17 +1,16 @@
 ---
-status: Proposed
+status: Accepted
 date: 2026-06-07
 deciders: [Tetsuya]
 tags: [commands, checkpoint, resume, ux]
 ---
 
-# ADR (draft): `/checkpoint` `/resume` slash commands
+# ADR-0005: `/checkpoint` `/resume` slash commands
 
-> **draft 段階の注記**: 本ファイルは `proposed-` prefix のみで、正式な ADR ID
-> (ADR-0005) は Accepted 昇格時に採番する。Accepted 昇格時に
-> `docs/adr/0005-*.md` へ rename し、README §4 ADR Index へ別 PR で追記する。
-> 実装 (`templates/commands/checkpoint.md` / `templates/commands/resume.md`) は
-> 本 ADR が Accepted になった後の別 PR で行う。本 PR は本 draft の起票のみ。
+> **昇格メモ**: 本 ADR は Proposed → Accepted に昇格済み。確定設計に基づき
+> `templates/commands/checkpoint.md` / `templates/commands/resume.md` を同一 PR
+> (Group B) で実装し、README §2.1 を ✅ Phase 3 化・§4 ADR Index に本 ADR を追記した。
+> 下記 "Implementation plan" の各項目は本 PR で実施済み (残課題は "Open questions" 参照)。
 
 ## Context
 
