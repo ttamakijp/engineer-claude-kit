@@ -127,6 +127,20 @@ Describe "apply-claude-kit.ps1" {
     It "applies .gitignore when missing" {
         Test-Path (Join-Path $MockProject ".gitignore") | Should Be $true
     }
+
+    It "applies work-schedule.yaml in Global (DryRun) mode" {
+        # Global mode writes into the real ~/.claude, so we verify via DryRun
+        # output instead of touching the user's home directory. The line is
+        # present whether the destination is new ([dry-run] ...) or already
+        # exists ([skip] ...), so this holds on any machine.
+        $output = & powershell -NoProfile -File $ScriptPath -Global -DryRun 2>&1
+        ($output -join "`n") | Should Match 'work-schedule.yaml'
+    }
+
+    It "does NOT apply work-schedule.yaml in Project mode" {
+        # Project mode is unchanged: the schedule is a single global file.
+        Test-Path (Join-Path $MockProject "work-schedule.yaml") | Should Be $false
+    }
 }
 
 if (Test-Path $MockGlobal) { Remove-Item -Recurse -Force $MockGlobal }
