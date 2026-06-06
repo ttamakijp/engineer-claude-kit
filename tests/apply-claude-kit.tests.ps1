@@ -63,6 +63,14 @@ Describe "apply-claude-kit.ps1" {
         Test-Path $applyCommand | Should Be $true
     }
 
+    It "applies checkpoint command in Project mode" {
+        Test-Path (Join-Path $MockProject ".claude" "commands" "checkpoint.md") | Should Be $true
+    }
+
+    It "applies resume command in Project mode" {
+        Test-Path (Join-Path $MockProject ".claude" "commands" "resume.md") | Should Be $true
+    }
+
     It "applies settings.json in Project mode" {
         $settings = Join-Path (Join-Path $MockProject ".claude") "settings.json"
         Test-Path $settings | Should Be $true
