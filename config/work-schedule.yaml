@@ -1,0 +1,19 @@
+# Work end-time schedule for work-end-reminder rule (Group F' / ADR-0006)
+#
+# Hospitality feature -- used by Claude when active.
+# Edit this file to match your work schedule.
+#
+# Day keys: lowercase 3-letter abbreviation (mon/tue/wed/thu/fri/sat/sun)
+# Values: "HH:MM" in 24h format, or null to skip reminder (holiday / off-day)
+
+schedule:
+  mon: "17:30"
+  tue: "17:30"
+  wed: "17:30"
+  thu: "17:30"
+  fri: "17:00"
+  sat: null
+  sun: null
+
+# How many minutes before work end to start showing reminder
+warning_window_minutes: 30
