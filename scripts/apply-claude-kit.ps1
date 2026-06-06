@@ -212,6 +212,7 @@ if ($Project) {
     $targetClaudeMd = Join-Path $resolvedProject "CLAUDE.md"
     $targetAgentsDir = Join-Path (Join-Path $resolvedProject ".claude") "agents"
     $targetSkillsDir = Join-Path (Join-Path $resolvedProject ".claude") "skills"
+    $targetCommandsDir = Join-Path (Join-Path $resolvedProject ".claude") "commands"
     $markerRoot = $resolvedProject
     $mode = "Project"
     Write-Host "Mode: Project ($resolvedProject)"
@@ -220,6 +221,7 @@ if ($Project) {
     $targetClaudeMd = Join-Path $homeClaude "CLAUDE.md"
     $targetAgentsDir = Join-Path $homeClaude "agents"
     $targetSkillsDir = Join-Path $homeClaude "skills"
+    $targetCommandsDir = Join-Path $homeClaude "commands"
     $markerRoot = $homeClaude
     $mode = "Global"
     Write-Host "Mode: Global ($homeClaude)"
@@ -231,6 +233,7 @@ $templatesRoot = Join-Path $KitRoot "templates"
 $sourceClaudeMd = Join-Path $templatesRoot "CLAUDE.md"
 $sourceAgentsDir = Join-Path $templatesRoot "agents"
 $sourceSkillsDir = Join-Path $templatesRoot "skills"
+$sourceCommandsDir = Join-Path $templatesRoot "commands"
 
 $appliedFiles = @()
 
@@ -261,6 +264,20 @@ if (Test-Path $sourceSkillsDir) {
         $null = Copy-Template -SourceFile $skillFile.FullName -DestFile $destSkill `
             -ModelsConfig $modelsConfig -IsDryRun:$DryRun
         $appliedFiles += $destSkill
+    }
+}
+
+# Copy commands/*.md
+# Each slash command source lives at templates/commands/<name>.md. We deploy it to
+# <target>/commands/<name>.md so Claude Code can load it as a /<name> command.
+# Substitution is applied via Copy-Template for consistency with other templates.
+if (Test-Path $sourceCommandsDir) {
+    $commandFiles = Get-ChildItem -LiteralPath $sourceCommandsDir -Filter "*.md" -File
+    foreach ($commandFile in $commandFiles) {
+        $destCommand = Join-Path $targetCommandsDir $commandFile.Name
+        $null = Copy-Template -SourceFile $commandFile.FullName -DestFile $destCommand `
+            -ModelsConfig $modelsConfig -IsDryRun:$DryRun
+        $appliedFiles += $destCommand
     }
 }
 

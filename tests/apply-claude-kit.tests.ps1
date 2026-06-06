@@ -52,6 +52,17 @@ Describe "apply-claude-kit.ps1" {
         Test-Path $commitHelperSkill | Should Be $true
     }
 
+    It "applies commands in Project mode" {
+        $commandsDir = Join-Path (Join-Path $MockProject ".claude") "commands"
+        Test-Path $commandsDir | Should Be $true
+        (Get-ChildItem $commandsDir -Filter "*.md").Count | Should BeGreaterThan 0
+    }
+
+    It "places apply command" {
+        $applyCommand = Join-Path (Join-Path (Join-Path $MockProject ".claude") "commands") "apply.md"
+        Test-Path $applyCommand | Should Be $true
+    }
+
     It "writes applied marker" {
         $marker = Join-Path $MockProject ".engineer-claude-kit-applied"
         Test-Path $marker | Should Be $true

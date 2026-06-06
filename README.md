@@ -82,7 +82,8 @@ engineer-claude-kit/
 |-- templates/                # ~/.claude へ配布する素材 (apply-claude-kit が参照)
 |   |-- CLAUDE.md             # 共通 CLAUDE.md 素材
 |   |-- agents/               # commit-msg / lint-helper / log-summary / review / architect / debug-analyze
-|   `-- skills/               # commit-helper / leak-check / propose-adr (Phase 3.1)
+|   |-- skills/               # apply-claude-kit / commit-helper / leak-check / propose-adr
+|   `-- commands/             # apply.md (/apply slash command)
 |-- scripts/
 |   |-- bootstrap.ps1         # ADO clone + ~/.claude 配布 (entry point)
 |   |-- apply-claude-kit.ps1  # ~/.claude or <project>/.claude へ配布する内部 script
@@ -101,7 +102,7 @@ engineer-claude-kit/
 
 **目的**: §1 の配置内にある各ファイルの機能を表形式で説明。Phase status (✅ 実装済 / ⏳ 計画) で実装状況も示す。
 
-凡例: ✅ 実装済 / ⏳ 計画 (未着手 または 配布機能未完成)。⏳ には「実体ファイルが kit リポジトリ内に存在するが、ユーザ環境への配布機能 (bootstrap.ps1 / apply-claude-kit.ps1) がまだ完成していない」ケースを含む。Phase 1 (foundation) + Phase 3.1 (共通 skills) + Phase 3.2 (Bedrock cost 観測) が実装済 (Pester テスト群は PS 5.1 / Pester 3.4 互換、手動検証ドキュメントも整備済)、Phase 2 系 (bootstrap / apply / model 配布) と Phase 4 系 (ADO CI 等) は計画段階。
+凡例: ✅ 実装済 / ⏳ 計画 (未着手 または 配布機能未完成)。⏳ には「実体ファイルが kit リポジトリ内に存在するが、ユーザ環境への配布機能 (bootstrap.ps1 / apply-claude-kit.ps1) がまだ完成していない」ケースを含む。Phase 1 (foundation) + Phase 2 (bootstrap / apply / model 配布) + Phase 3.1 (共通 skills) + Phase 3.2 (Bedrock cost 観測) が実装済 (Pester テスト群は PS 5.1 / Pester 3.4 互換、手動検証ドキュメントも整備済)、Phase 4 系 (ADO CI 等) は計画段階。
 
 ### 2.1 グローバル側 `~/.claude/`
 
@@ -117,11 +118,11 @@ engineer-claude-kit/
 | `agents/review.md` | コードレビュー (Sonnet 4.5) | ⏳ Phase 2 |
 | `agents/architect.md` | 設計判断・ADR 起票 (Sonnet 4.5) | ⏳ Phase 2 |
 | `agents/debug-analyze.md` | 因果推論・根本原因分析 (Sonnet 4.5) | ⏳ Phase 2 |
-| `skills/apply-claude-kit/` | プロジェクトへ kit を配布する skill | ⏳ Phase 2 |
+| `skills/apply-claude-kit/` | プロジェクトへ kit を配布する skill | ✅ Phase 2 |
 | `skills/commit-helper/` | Conventional Commits 補助 (Haiku 委譲) | ✅ Phase 3.1 |
 | `skills/leak-check/` | PII / credentials / 機密ファイル 検出 | ✅ Phase 3.1 |
 | `skills/propose-adr/` | ADR draft 起票 (architect sub-agent 連携) | ✅ Phase 3.1 |
-| `commands/apply.md` | `/apply` slash command | ⏳ Phase 2 |
+| `commands/apply.md` | `/apply` slash command | ✅ Phase 2 |
 | `commands/checkpoint.md` | `/checkpoint` セッション state 保存 | ⏳ Phase 3 |
 | `commands/resume.md` | `/resume` state からの再開 | ⏳ Phase 3 |
 | `state/` | checkpoint state (.gitignore) | ⏳ Phase 3 |
@@ -161,7 +162,9 @@ engineer-claude-kit/
 | `scripts/cost-observe-bedrock.ps1` | AWS Cost Explorer から Bedrock コストを取得し markdown report 生成 | ✅ Phase 3.2 |
 | `config/cost-budget.yaml` | Bedrock コスト予算しきい値 | ✅ Phase 3.2 |
 | `reports/bedrock-cost-<date>.md` | weekly cost report (auto-generated, gitignored) | ✅ Phase 3.2 |
-| `templates/` | `~/.claude` 配布素材 (CLAUDE.md / agents / skills) | ✅ Phase 3.1 (skills) / ⏳ Phase 2 (agents) |
+| `templates/` | `~/.claude` 配布素材 (CLAUDE.md / agents / skills / commands) | ✅ Phase 3.1 (skills) / ⏳ Phase 2 (agents) |
+| `templates/skills/apply-claude-kit/SKILL.md` | kit を再適用する skill (技能) のソース | ✅ Phase 2 |
+| `templates/commands/apply.md` | `/apply` slash command のソース | ✅ Phase 2 |
 | `tests/*.tests.ps1` | Pester 単体テスト (bootstrap / apply / build-rules / cost-observe、PS 5.1 + Pester 3.4 互換) | ✅ |
 | `docs/manual-verification/` | kit 効果測定の手動検証手順 (scenario-comparison: 5 軸比較) | ✅ |
 | `docs/manual-verification/bootstrap-installation.md` | bootstrap chain 動作検証手順 (Windows / Claude MAX 環境対応) | ✅ |
