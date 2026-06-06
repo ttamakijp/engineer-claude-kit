@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# pre-push hook - backup ref guard + remote host allowlist warning
+# Distributed by engineer-claude-kit (Group C). Overwrite-safe runtime artifact.
+set -euo pipefail
+
+remote_name="${1:-}"
+remote_url="${2:-}"
+
+# 1. Read refs being pushed from stdin:
+#    <local ref> <local sha> <remote ref> <remote sha>
+#    Reject any push targeting refs/backup/* (ADR-0004 backup-ref leak guard).
+while read -r local_ref local_sha remote_ref remote_sha; do
+    case "$remote_ref" in
+        refs/backup/*)
+            echo "[pre-push] pushing backup refs (refs/backup/*) is blocked (ADR-0004 backup-ref leak guard)." >&2
+            exit 1
+            ;;
+    esac
+done
+
+# 2. Remote host allowlist (warning only; never blocks).
+#    User override: ~/.config/eck/host-allowlist.txt (one host per line, '#' comments).
+allowlist_file="${HOME:-}/.config/eck/host-allowlist.txt"
+allowed=0
+
+if [ -n "$remote_url" ]; then
+    if [ -f "$allowlist_file" ]; then
+        while IFS= read -r host; do
+            [ -z "$host" ] && continue
+            case "$host" in \#*) continue ;; esac
+            case "$remote_url" in *"$host"*) allowed=1 ;; esac
+        done < "$allowlist_file"
+    else
+        for host in github.com dev.azure.com gitlab.com; do
+            case "$remote_url" in *"$host"*) allowed=1 ;; esac
+        done
+    fi
+
+    if [ "$allowed" -ne 1 ]; then
+        echo "[pre-push] WARNING: remote '$remote_url' is not in the host allowlist." >&2
+        echo "[pre-push] Proceeding without blocking. Verify the destination is intended." >&2
+    fi
+fi
+
+exit 0

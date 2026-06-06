@@ -1,0 +1,37 @@
+# gitleaks configuration - engineer-claude-kit (Group C)
+# Format: gitleaks v8+. See https://github.com/gitleaks/gitleaks
+title = "engineer-claude-kit gitleaks config"
+
+[[rules]]
+id = "aws-access-key-id"
+description = "AWS Access Key ID"
+regex = '''AKIA[0-9A-Z]{16}'''
+tags = ["aws", "credentials"]
+
+[[rules]]
+id = "anthropic-api-key"
+description = "Anthropic API key (sk-ant-)"
+regex = '''sk-ant-[A-Za-z0-9_-]{20,}'''
+tags = ["anthropic", "credentials"]
+
+[[rules]]
+id = "openai-api-key"
+description = "OpenAI API key (sk-)"
+regex = '''sk-[A-Za-z0-9]{20,}'''
+tags = ["openai", "credentials"]
+
+[[rules]]
+id = "generic-high-entropy"
+description = "Generic high-entropy string (64+ chars)"
+regex = '''[A-Za-z0-9+/_-]{64,}'''
+entropy = 4.5
+tags = ["generic", "entropy"]
+
+[allowlist]
+description = "Global allowlist - generated and vendored paths"
+paths = [
+    '''dist/''',
+    '''reports/''',
+    '''node_modules/''',
+    '''tests/fixtures/''',
+]

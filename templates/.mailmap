@@ -1,0 +1,6 @@
+# Git mailmap - identity normalization
+# Format: Proper Name <proper@email.com> Commit Name <commit@email.com>
+# See: https://git-scm.com/docs/gitmailmap
+#
+# Example:
+# Tetsuya <t_tamaki@icloud.com> Tetsuya Tamaki <t.tamaki@example.com>

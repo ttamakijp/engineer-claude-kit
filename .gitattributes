@@ -1,0 +1,9 @@
+# Keep leak-protection templates LF-only across platforms.
+# Git hooks are executed via Git-for-Windows sh, whose shebang parsing breaks
+# on CRLF. apply-claude-kit.ps1 copies these templates verbatim, so the kit
+# working tree must retain LF even when core.autocrlf=true.
+templates/git-hooks/pre-commit text eol=lf
+templates/git-hooks/pre-push text eol=lf
+templates/.gitleaks.toml text eol=lf
+templates/.mailmap text eol=lf
+templates/.gitignore text eol=lf

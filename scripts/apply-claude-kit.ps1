@@ -364,6 +364,55 @@ if ($mode -eq "Project") {
     }
 }
 
+# Leak-protection artifacts (Project mode only)
+# Git hooks and root-level config (.gitleaks.toml / .mailmap / .gitignore) are
+# project-specific, so they are intentionally skipped in Global mode.
+# Hooks live under <project>/.git/hooks/ and are runtime artifacts: overwriting
+# them on re-apply is expected. Root config files, by contrast, are preserved
+# when they already exist so user customization is never clobbered.
+if ($mode -eq "Project") {
+    # Hooks distribution (overwrite OK; runtime artifacts).
+    $hooksSourceDir = Join-Path $templatesRoot "git-hooks"
+    $projectGitDir = Join-Path $resolvedProject ".git"
+    $hooksDestDir = Join-Path $projectGitDir "hooks"
+    if ((Test-Path $hooksSourceDir) -and (Test-Path $projectGitDir)) {
+        if (-not (Test-Path $hooksDestDir)) {
+            New-Item -ItemType Directory -Force -Path $hooksDestDir | Out-Null
+        }
+        Get-ChildItem -LiteralPath $hooksSourceDir -File | ForEach-Object {
+            $dest = Join-Path $hooksDestDir $_.Name
+            if ($DryRun) {
+                Write-Host "[dry-run] $($_.FullName) -> $dest"
+            } else {
+                # Verbatim copy. Hook bodies are LF + shebang; Git for Windows
+                # executes them via its bundled sh. POSIX execute bit (chmod +x)
+                # is not settable from PowerShell and is unnecessary on Windows.
+                Copy-Item -LiteralPath $_.FullName -Destination $dest -Force
+                Write-Host "[apply] $($_.FullName) -> $dest"
+            }
+            $appliedFiles += $dest
+        }
+    }
+
+    # Root config distribution (skip when the file already exists).
+    $rootFiles = @(".gitleaks.toml", ".mailmap", ".gitignore")
+    foreach ($rootFile in $rootFiles) {
+        $source = Join-Path $templatesRoot $rootFile
+        $dest = Join-Path $resolvedProject $rootFile
+        if ((Test-Path $source) -and -not (Test-Path $dest)) {
+            if ($DryRun) {
+                Write-Host "[dry-run] $source -> $dest"
+            } else {
+                Copy-Item -LiteralPath $source -Destination $dest
+                Write-Host "[apply] $source -> $dest"
+            }
+            $appliedFiles += $dest
+        } elseif (Test-Path $dest) {
+            Write-Host "[skip] $dest already exists (preserving user customization)"
+        }
+    }
+}
+
 # Write marker file
 if (-not $DryRun) {
     Write-AppliedMarker -TargetRoot $markerRoot -Mode $mode -AppliedFiles $appliedFiles

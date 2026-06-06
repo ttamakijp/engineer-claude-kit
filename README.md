@@ -138,11 +138,11 @@ engineer-claude-kit/
 | `.claude/skills/` | プロジェクト固有 skill (android-build / web-test 等) | ⏳ Phase 3 |
 | `.claude/agents/` | プロジェクト固有 sub-agent | ⏳ Phase 3 |
 | `.claude/state/` | プロジェクト固有 state (.gitignore) | ⏳ Phase 3 |
-| `.git/hooks/pre-commit` | leak 検出 hook | ⏳ Phase 3 |
-| `.git/hooks/pre-push` | host allowlist + backup ref 拒否 hook | ⏳ Phase 3 |
-| `.gitignore` | `.claude/state/` / `*.keystore` / `local.properties` / `.env*` | ⏳ Phase 3 |
-| `.gitleaks.toml` | gitleaks 設定 | ⏳ Phase 3 |
-| `.mailmap` | identity normalization | ⏳ Phase 3 |
+| `.git/hooks/pre-commit` | leak 検出 hook (gitleaks + minimal PII regex、上書き OK) | ✅ Phase 3 |
+| `.git/hooks/pre-push` | host allowlist + backup ref 拒否 hook (上書き OK) | ✅ Phase 3 |
+| `.gitignore` | `.claude/state/` / `*.keystore` / `local.properties` / `.env*` (既存なら skip) | ✅ Phase 3 |
+| `.gitleaks.toml` | gitleaks 設定 (既存なら skip) | ✅ Phase 3 |
+| `.mailmap` | identity normalization (既存なら skip) | ✅ Phase 3 |
 | `.engineer-claude-kit-applied` | 適用 marker JSON | ✅ Phase 2 |
 | `azure-pipelines.yml` | ADO CI (quality gates / leak scan) | ⏳ Phase 4 |
 
