@@ -1,0 +1,143 @@
+---
+status: Proposed
+date: 2026-06-07
+deciders: [Tetsuya]
+tags: [reminder, work-life-balance, rule, time-aware]
+---
+
+# ADR (draft): work-end-reminder rule
+
+> **draft メモ**: 本 ファイル は Proposed 段階の draft (草案) である。正式 ADR ID
+> (0006) の採番・`drafts/proposed-` から `0006-` への rename・README §4 ADR Index
+> への追記は、いずれも **Accepted 昇格時の別 PR** で実施する (ADR-0005 と同じ運用)。
+> 本 PR では本 draft markdown の新規作成のみを行い、実装 (rule + config) には触れない。
+> 下記 "Implementation plan" の各項目は Accepted 昇格後の別 PR で実施する。
+
+## Context
+
+user は Claude Code を日常的に使う中で、就業終了時刻 (終業時刻) の直前に大きな
+タスクを着手してしまい「終わらず後悔する」事例が頻発している。中断しづらい
+実装・refactor・新規 PR 起票などを終業間際に始めると、退勤時刻を超過するか、
+中途半端な状態で session を畳むことになり、いずれも体験が悪い。
+
+この課題に対し、**Claude 自身が現在時刻と就業終了時刻を認識**し、終業 30 分前
+以降は次の 3 case に応じた挙動を取る rule (ルール) を導入する:
+
+- (a) 軽量タスクには応答末尾に控えめな reminder (リマインダ) を 1 行表示する
+- (b) 大きなタスク着手前には「本当に今やるか」を確認する
+- (c) 終業時刻を過ぎた後は `/checkpoint` 保存を強く推奨する
+
+実装方式として、Cowork / Dispatch (scheduled task) は engineer-claude-kit の主要
+target である business 環境で利用できない制約があるため不採用とする。代わりに
+**Claude 自身がターン毎に時刻をチェックする** rule-based (ルールベース) 実装を
+採用する。OS-level scheduler (Windows Task Scheduler) を介する複雑な解決は、
+過剰判断として不採用とする (詳細は "Alternatives" 参照)。
+
+## Decision
+
+確定済みの設計判断は以下のとおり。
+
+### 1. 時刻取得
+
+ターン開始時に shell で現在時刻を取得する。低コスト (ミリ秒単位) で完結する:
+
+- bash: `date +%H:%M`
+- PowerShell: `Get-Date -Format "HH:mm dddd"`
+
+### 2. 終業時刻設定
+
+`config/work-schedule.yaml` で曜日別に終業時刻を定義する (user customizable):
+
+```yaml
+schedule:
+  mon: "17:30"
+  tue: "17:30"
+  wed: "17:30"
+  thu: "17:30"
+  fri: "17:00"
+  sat: null   # 終業 reminder 不要 (休日)
+  sun: null
+warning_window_minutes: 30
+```
+
+`null` の曜日は終業 reminder を発火しない (休日扱い)。`warning_window_minutes`
+で「終業何分前から警告するか」を制御する (既定 30 分)。
+
+### 3. 動作分岐 (3 case)
+
+| 時刻条件 | user request の規模 | Claude の挙動 |
+|---|---|---|
+| 終業 30 分前以降 | 小さい質問 (1-2 tool call で完結) | 応答末尾に `⏰ そろそろ終業時刻 (HH:MM)、必要なら /checkpoint 推奨` を 1 行表示 |
+| 終業 30 分前以降 | 大きいタスク (3+ tool call、実装/refactor/新規 PR 等) | **着手前に確認**: `⚠️ 終業 30 分前です。このタスクは推定 N 分。本気で着手しますか? (a) 今着手 (b) 明日 / 翌セッションで (c) checkpoint 保存して保留` |
+| 終業時刻過ぎ | 規模を問わず全て | 応答末尾に `⏰ 終業時刻過ぎ。/checkpoint 強推奨` + 中断選択肢を表示 |
+
+### 4. タスク規模推定 (Claude 自己判断)
+
+Claude がターン毎に user request の規模を自己判断する:
+
+- **大判定の条件** (いずれかに該当):
+  - prompt 内に「実装」「rewrite」「新規 PR」「ADR 起票」「全体」
+    「リファクタリング」などのキーワードを含む
+  - 影響 file 数 3 以上が言及されている
+  - 3+ tool call が期待される
+- **判定が曖昧な場合** → conservative (保守的) に「大」扱いとする。
+  誤検知 (false positive) でも害は「確認が 1 回増える」だけで小さく、
+  逆に大タスクを小と誤判定して reminder を出し損ねる方が損失が大きいため。
+
+### 5. rule の発火条件
+
+全プロジェクト / 全ターンで発火する。CLAUDE.md のグローバル設定から常時参照される
+(`applyTo: global`)。
+
+## Alternatives
+
+採用しなかった候補と、その理由:
+
+| 案 | 採用しなかった理由 |
+|---|---|
+| Windows Task Scheduler 連携 (取下げた Group F) | OS-level scheduler が必要で Bedrock 環境依存・構成が複雑。Claude 起動毎の time check で代替可能なため過剰 |
+| Outlook / Google Calendar 連携 | calendar integration が必要で user 環境依存が大きい |
+| PowerShell profile での起動毎 reminder | Claude 起動とは独立に発火するため、Claude 内 reminder と二重化してしまう |
+| 終業 60 分前から段階的 reminder | 「短期記憶への押し付け感」が強い。30 分前に 1 回で十分との user 判断 |
+| 規模推定を全て user 確認に投げる | UX 負荷が大きい。Claude 自己判断 + 保守的 fallback の方が摩擦が少ない |
+
+> 当初の Group F (OS-level scheduler + Windows Task Scheduler 連携) は、上表のとおり
+> 過剰判断として取下げた。本 ADR の rule-based 方式 (Group F') がその代替である。
+
+## Open questions
+
+Accepted 昇格レビューで議論すべき未解決点 (現時点では全て **保留**):
+
+- **祝日対応**: 日本の祝日に終業 reminder を抑制する仕組み。日本祝日 API 連携 か、
+  yaml への手動 holiday list 拡張か未定。
+- **特殊日 override**: 出張 / 在宅 / 早退 day の一時的な schedule 変更の仕組み。
+- **Claude 非起動時**: 席に居るが Claude を使っていない時間帯には reminder が
+  届かない。別 channel (OS 通知等) が必要かは未判断。
+- **timezone**: 時刻表示は現状 OS local time に依存。明示的な timezone 設定を
+  yaml に持たせるべきかは未定。
+- **規模推定の評価**: precision / recall の評価方法。false positive を許容する
+  方針なら定量評価は不要だが、運用後に review して判断する。
+
+## Implementation plan
+
+Accepted 昇格後の **別 PR** で実施する (本 PR の対象外):
+
+1. `config/work-schedule.yaml` 新規作成 (上記スキーマ、user customizable)
+2. `source/rules/common/work-end-reminder.md` 新規作成 (rule body 50-80 行、
+   frontmatter で `priority: medium` / `applyTo: global`)
+3. `templates/CLAUDE.md` 末尾に 5 行追記 (rule 発火条件 + reminder format note。
+   任意、rule 本体で完結するなら省略可)
+4. `build-rules.ps1` の generic ループで自動 build (script 変更不要)
+5. `apply-claude-kit.ps1` の `.claude/rules/` 配布で自動配布 (Project mode、
+   script 変更不要)
+6. `tests/build-rules.tests.ps1` で rule の build 動作確認 (任意)
+7. README §2.1 で `work-end-reminder rule` を ✅ Phase 4 (新項目) として追加
+8. 本 ADR を Proposed → Accepted へ昇格、`drafts/proposed-work-end-reminder.md`
+   を `0006-work-end-reminder.md` へ rename、README §4 ADR Index に追記
+
+## Refs
+
+- ADR-0001 (kit clean-start design)
+- ADR-0004 (auto model routing — 規模推定で Haiku 利用の候補)
+- ADR-0005 (`/checkpoint` 連携 — case (a)(c) の checkpoint 推奨で参照)
+- 取下げ案: 当初 Group F (OS-level scheduler + Windows Task Scheduler) — 過剰判断で取下げ
