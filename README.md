@@ -66,21 +66,29 @@ engineer-claude-kit/
 |-- config/
 |   |-- models.yaml           # Bedrock model ID + role mapping
 |   |-- distribution.yaml     # 配布元リポジトリ URL (env override 可能)
-|   `-- env-defaults.yaml     # AWS region / profile / cache flag 既定値
+|   |-- env-defaults.yaml     # AWS region / profile / cache flag 既定値
+|   `-- cost-budget.yaml      # Bedrock コスト予算しきい値 (Phase 3.2)
 |-- source/
 |   `-- rules/                # Claude rules の single source (multi-AI 出力なし、Claude 専用)
+|-- templates/                # ~/.claude へ配布する素材 (apply-claude-kit が参照)
+|   |-- CLAUDE.md             # 共通 CLAUDE.md 素材
+|   |-- agents/               # commit-msg / lint-helper / log-summary / review / architect / debug-analyze
+|   `-- skills/               # commit-helper / leak-check / propose-adr (Phase 3.1)
 |-- scripts/
 |   |-- bootstrap.ps1         # ADO clone + ~/.claude 配布 (entry point)
 |   |-- apply-claude-kit.ps1  # ~/.claude or <project>/.claude へ配布する内部 script
-|   `-- build-rules.ps1       # source/rules/ -> .claude/rules/ build
+|   |-- build-rules.ps1       # source/rules/ -> .claude/rules/ build
+|   `-- cost-observe-bedrock.ps1  # AWS Cost Explorer から Bedrock コスト report 生成 (Phase 3.2)
+|-- tests/                    # Pester テスト (PowerShell 5.1 / Pester 3.4 互換)
 |-- docs/
-|   `-- adr/                  # Architecture Decision Records
+|   |-- adr/                  # Architecture Decision Records
+|   `-- manual-verification/  # 手動検証手順 (scenario-comparison 等)
 `-- README.md                 # 本ファイル
 ```
 
 ## 2. ファイル機能表 (Phase status 付き)
 
-凡例: ✅ 実装済 / ⏳ 計画 (未着手)。Phase 1 (foundation) + Phase 3.1 (共通 skills) + Phase 3.2 (Bedrock cost 観測) が実装済、Phase 2 系 (bootstrap / apply / model 配布) と Phase 4 系 (ADO CI 等) は計画段階。
+凡例: ✅ 実装済 / ⏳ 計画 (未着手)。Phase 1 (foundation) + Phase 3.1 (共通 skills) + Phase 3.2 (Bedrock cost 観測) が実装済 (Pester テスト群は PS 5.1 / Pester 3.4 互換、手動検証ドキュメントも整備済)、Phase 2 系 (bootstrap / apply / model 配布) と Phase 4 系 (ADO CI 等) は計画段階。
 
 ### 2.1 グローバル側 `~/.claude/`
 
@@ -134,6 +142,9 @@ engineer-claude-kit/
 | `scripts/cost-observe-bedrock.ps1` | AWS Cost Explorer から Bedrock コストを取得し markdown report 生成 | ✅ Phase 3.2 |
 | `config/cost-budget.yaml` | Bedrock コスト予算しきい値 | ✅ Phase 3.2 |
 | `reports/bedrock-cost-<date>.md` | weekly cost report (auto-generated, gitignored) | ✅ Phase 3.2 |
+| `templates/` | `~/.claude` 配布素材 (CLAUDE.md / agents / skills) | ✅ Phase 3.1 (skills) / ⏳ Phase 2 (agents) |
+| `tests/*.tests.ps1` | Pester 単体テスト (bootstrap / apply / build-rules / cost-observe、PS 5.1 + Pester 3.4 互換) | ✅ |
+| `docs/manual-verification/` | kit 効果測定の手動検証手順 (scenario-comparison: 5 軸比較) | ✅ |
 | `docs/adr/` | Architecture Decision Records (現状 0001-0004) | ✅ Phase 1 |
 | `README.md` (本ファイル) | プロジェクト概要 + 配置構成 + Quick start | ✅ Phase 1 |
 | `LICENSE` / `.gitignore` | リポ初期セット | ✅ Phase 1 |
@@ -183,6 +194,7 @@ cd <your-project>
 - Bedrock 経由: `ENABLE_PROMPT_CACHING_1H_BEDROCK=1` + `AWS_MAX_ATTEMPTS=2`
 - 軽作業 (commit-msg / lint / log-summary) は Haiku sub-agent に自動委譲
 - model ID は `config/models.yaml` SSoT、`apply-claude-kit.ps1` が `~/.claude/settings.json` を generate
+- コスト観測: `scripts/cost-observe-bedrock.ps1` が AWS Cost Explorer から weekly report を生成、`config/cost-budget.yaml` のしきい値で予算監視 (Phase 3.2)
 
 根拠: [t-tamaki-todo Phase 1 検証](https://github.com/ttamakijp/t-tamaki-todo) (cost 54% 削減実証)
 
