@@ -25,8 +25,9 @@ bootstrap 実行後、以下の 2 層構造で配置される。
 |   `-- debug-analyze.md      # Sonnet 4.5: 因果推論・根本原因分析
 |-- skills/                   # 共通 skill (全プロジェクトで利用可能)
 |   |-- apply-claude-kit/     # プロジェクトへ kit を配布する skill
-|   |-- leak-check/           # PII / credentials 検出 (5 層防御 / ADR-0006)
-|   `-- commit-helper/        # Conventional Commits 補助
+|   |-- leak-check/           # PII / credentials 検出 (5 層防御 / ADR は Phase 4 起票予定)
+|   |-- commit-helper/        # Conventional Commits 補助
+|   `-- propose-adr/          # ADR draft 起票 (architect sub-agent 連携)
 |-- commands/                 # slash commands
 |   |-- apply.md              # /apply <project-path>
 |   |-- checkpoint.md         # /checkpoint セッション state 保存
