@@ -15,11 +15,17 @@ param(
 
     [switch]$DryRun,
 
-    [string]$KitRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
+    # Default resolved in the body: referencing $PSScriptRoot in a param default
+    # is unreliable under Windows PowerShell 5.1 when parameter sets are present.
+    [string]$KitRoot
 )
 
 $ErrorActionPreference = 'Stop'
 $ScriptVersion = "0.1.0"
+
+if (-not $KitRoot) {
+    $KitRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
+}
 
 # --- minimal YAML reader for our config schema ---
 

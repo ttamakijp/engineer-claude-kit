@@ -1,66 +1,62 @@
 # apply-claude-kit.tests.ps1
-# Pester v5 smoke tests. ASCII only.
+# Pester v3.4 smoke tests (Windows PowerShell 5.1). ASCII only.
 
-BeforeAll {
-    $script:ScriptPath = Join-Path (Join-Path $PSScriptRoot "..") "scripts" | Join-Path -ChildPath "apply-claude-kit.ps1"
-    $script:KitRoot = Join-Path $PSScriptRoot ".."
-    $script:MockGlobal = Join-Path $env:TEMP "eck-test-global"
-    $script:MockProject = Join-Path $env:TEMP "eck-test-project"
+$ScriptPath = Join-Path (Join-Path (Join-Path $PSScriptRoot "..") "scripts") "apply-claude-kit.ps1"
+$KitRoot = Join-Path $PSScriptRoot ".."
+$MockGlobal = Join-Path $env:TEMP "eck-test-global"
+$MockProject = Join-Path $env:TEMP "eck-test-project"
 
-    if (Test-Path $script:MockGlobal) { Remove-Item -Recurse -Force $script:MockGlobal }
-    if (Test-Path $script:MockProject) { Remove-Item -Recurse -Force $script:MockProject }
-    New-Item -ItemType Directory -Force -Path $script:MockGlobal | Out-Null
-    New-Item -ItemType Directory -Force -Path $script:MockProject | Out-Null
-}
+if (Test-Path $MockGlobal) { Remove-Item -Recurse -Force $MockGlobal }
+if (Test-Path $MockProject) { Remove-Item -Recurse -Force $MockProject }
+New-Item -ItemType Directory -Force -Path $MockGlobal | Out-Null
+New-Item -ItemType Directory -Force -Path $MockProject | Out-Null
 
 Describe "apply-claude-kit.ps1" {
     It "exists" {
-        Test-Path $script:ScriptPath | Should -BeTrue
+        Test-Path $ScriptPath | Should Be $true
     }
 
     It "runs in DryRun mode (Global)" {
-        $output = & pwsh -NoProfile -File $script:ScriptPath -Global -DryRun 2>&1
-        ($output -join "`n") | Should -Match "DryRun: yes"
-        ($output -join "`n") | Should -Match "dry-run"
+        $output = & powershell -NoProfile -File $ScriptPath -Global -DryRun 2>&1
+        ($output -join "`n") | Should Match "DryRun: yes"
+        ($output -join "`n") | Should Match "dry-run"
     }
 
     It "applies CLAUDE.md and at least one agent in Project mode" {
-        & pwsh -NoProfile -File $script:ScriptPath -Project $script:MockProject 2>&1 | Out-Null
+        & powershell -NoProfile -File $ScriptPath -Project $MockProject 2>&1 | Out-Null
 
-        $claudeMd = Join-Path $script:MockProject "CLAUDE.md"
-        Test-Path $claudeMd | Should -BeTrue
+        $claudeMd = Join-Path $MockProject "CLAUDE.md"
+        Test-Path $claudeMd | Should Be $true
 
-        $agentDir = Join-Path (Join-Path $script:MockProject ".claude") "agents"
-        Test-Path $agentDir | Should -BeTrue
-        (Get-ChildItem $agentDir -Filter "*.md").Count | Should -BeGreaterThan 0
+        $agentDir = Join-Path (Join-Path $MockProject ".claude") "agents"
+        Test-Path $agentDir | Should Be $true
+        (Get-ChildItem $agentDir -Filter "*.md").Count | Should BeGreaterThan 0
     }
 
     It "substitutes placeholders" {
-        $commitMsgAgent = Join-Path (Join-Path (Join-Path $script:MockProject ".claude") "agents") "commit-msg.md"
-        Test-Path $commitMsgAgent | Should -BeTrue
+        $commitMsgAgent = Join-Path (Join-Path (Join-Path $MockProject ".claude") "agents") "commit-msg.md"
+        Test-Path $commitMsgAgent | Should Be $true
         $content = Get-Content -LiteralPath $commitMsgAgent -Raw
-        $content | Should -Not -Match '\{\{role:'
-        $content | Should -Match 'claude-haiku-4-5'
+        $content | Should Not Match '\{\{role:'
+        $content | Should Match 'claude-haiku-4-5'
     }
 
     It "applies skills in Project mode" {
-        $skillDir = Join-Path (Join-Path $script:MockProject ".claude") "skills"
-        Test-Path $skillDir | Should -BeTrue
-        (Get-ChildItem $skillDir -Recurse -Filter "SKILL.md").Count | Should -BeGreaterThan 0
+        $skillDir = Join-Path (Join-Path $MockProject ".claude") "skills"
+        Test-Path $skillDir | Should Be $true
+        (Get-ChildItem $skillDir -Recurse -Filter "SKILL.md").Count | Should BeGreaterThan 0
     }
 
     It "places commit-helper skill" {
-        $commitHelperSkill = Join-Path (Join-Path (Join-Path (Join-Path $script:MockProject ".claude") "skills") "commit-helper") "SKILL.md"
-        Test-Path $commitHelperSkill | Should -BeTrue
+        $commitHelperSkill = Join-Path (Join-Path (Join-Path (Join-Path $MockProject ".claude") "skills") "commit-helper") "SKILL.md"
+        Test-Path $commitHelperSkill | Should Be $true
     }
 
     It "writes applied marker" {
-        $marker = Join-Path $script:MockProject ".engineer-claude-kit-applied"
-        Test-Path $marker | Should -BeTrue
+        $marker = Join-Path $MockProject ".engineer-claude-kit-applied"
+        Test-Path $marker | Should Be $true
     }
 }
 
-AfterAll {
-    if (Test-Path $script:MockGlobal) { Remove-Item -Recurse -Force $script:MockGlobal }
-    if (Test-Path $script:MockProject) { Remove-Item -Recurse -Force $script:MockProject }
-}
+if (Test-Path $MockGlobal) { Remove-Item -Recurse -Force $MockGlobal }
+if (Test-Path $MockProject) { Remove-Item -Recurse -Force $MockProject }
