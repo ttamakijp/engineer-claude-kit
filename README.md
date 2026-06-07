@@ -152,7 +152,7 @@ engineer-claude-kit/
 | `.gitleaks.toml` | gitleaks 設定 (既存なら skip) | ✅ Phase 3 |
 | `.mailmap` | identity normalization (既存なら skip) | ✅ Phase 3 |
 | `.engineer-claude-kit-applied` | 適用 marker JSON | ✅ Phase 2 |
-| `azure-pipelines.yml` | ADO CI (quality gates / leak scan) | ⏳ Phase 4 |
+| `azure-pipelines.yml` | ADO CI (quality gates / leak scan / Pester) | ✅ Phase 4 |
 
 ### 2.3 SSoT (kit 内部)
 
@@ -178,6 +178,9 @@ engineer-claude-kit/
 | `templates/skills/apply-claude-kit/SKILL.md` | kit を再適用する skill (技能) のソース | ✅ Phase 2 |
 | `templates/commands/apply.md` | `/apply` slash command のソース | ✅ Phase 2 |
 | `tests/*.tests.ps1` | Pester 単体テスト (bootstrap / apply / build-rules / cost-observe / install-deps、PS 5.1 + Pester 3.4 互換) | ✅ |
+| `.github/workflows/ci.yml` | kit 自身の CI: PS 5.1 + PS 7 matrix Pester + lint | ✅ Phase 4 |
+| `PSScriptAnalyzerSettings.psd1` | PS 5.1 互換性 lint 設定 (PSUseCompatibleSyntax / Commands) | ✅ Phase 4 |
+| `scripts/lint.ps1` | PSScriptAnalyzer runner (local + CI 共通) | ✅ Phase 4 |
 | `docs/manual-verification/` | kit 効果測定の手動検証手順 (scenario-comparison: 5 軸比較) | ✅ |
 | `docs/manual-verification/bootstrap-installation.md` | bootstrap chain 動作検証手順 (Windows / Claude MAX 環境対応) | ✅ |
 | `docs/adr/` | Architecture Decision Records (現状 0001-0004) | ✅ Phase 1 |
