@@ -112,7 +112,8 @@ engineer-claude-kit/
 |---|---|---|
 | `CLAUDE.md` | 全プロジェクト共通の指示、Haiku/Sonnet 4.5 自動使い分けルール (ADR-0004) | ✅ Phase 2 |
 | `settings.json` | Bedrock 接続 + model 設定 (`config/models.yaml` から generate) | ✅ Phase 2 |
-| `work-schedule.yaml` | 終業時刻リマインダ用 (曜日別終業時刻 + warning window、初回 apply 時に配置・既存なら skip、user 編集可) | ✅ Phase 4 |
+| `work-schedule.yaml` | 終業時刻リマインダ用の **曜日別フォールバック** (interactive 質問が無い場合に使用。初回 apply 時に配置・既存なら skip、user 編集可) | ✅ Phase 4 |
+| `.work-end-today` | 今日の終業時刻 marker (印・記録ファイル)。朝の初回ターン interactive 質問への回答を日次記録し、当日の reminder を制御 (ADR-0006、Claude が runtime 生成・自動更新) | ✅ Phase 4 |
 | `agents/commit-msg.md` | コミットメッセージ生成 (Haiku 委譲) | ✅ Phase 2 |
 | `agents/lint-helper.md` | 軽微修正 (Haiku 委譲) | ✅ Phase 2 |
 | `agents/log-summary.md` | ビルド/テストログ要約 (Haiku 委譲) | ✅ Phase 2 |
