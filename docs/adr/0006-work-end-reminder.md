@@ -89,6 +89,61 @@ Claude がターン毎に user request の規模を自己判断する:
 全プロジェクト / 全ターンで発火する。CLAUDE.md のグローバル設定から常時参照される
 (`applyTo: global`)。
 
+## Daily interactive prompt (Phase 2 extension)
+
+初版 (Group F') は yaml の曜日別終業時刻のみを参照する設計だった。しかし運用上、
+user が yaml を編集する摩擦が大きく、「在宅 / 早退 day の override」(Open questions
+参照) が未解決のまま残っていた。本拡張では、**その日の初回ターンで Claude 側から
+終業時刻を質問する** daily interactive prompt を追加し、この摩擦を解消する。
+
+### 設計理由
+
+- **yaml 編集の摩擦を回避**: user が設定ファイルを開かずとも今日の終業時刻を指定できる
+- **コマンド意識ゼロ**: slash command も覚える必要がなく、朝の自然な対話 1 往復で完結
+- **特殊日 override の自然な解決**: 在宅 / 早退 day も「今日は 15:00」と答えるだけで吸収。
+  yaml を恒久編集する必要がない
+
+### marker file 仕様
+
+質問の回答は global marker file に記録し、当日中の再質問を抑止する:
+
+- **場所**: `~/.claude/.work-end-today` (Windows: `$env:USERPROFILE\.claude\.work-end-today`)
+- **形式 (1 行)**: `YYYY-MM-DD <value>`
+  - `<value>` = `HH:MM` (時刻) / `off` (休日) / `yaml` (曜日デフォルト参照) / `skip` (今日は不発火)
+- 日付が今日と一致 → 既回答 (再質問しない)。前日以前 / 不在 → その日の初回。
+
+### 動作フロー
+
+1. ターン開始時に marker file を読込む。
+2. **初回** (marker 不在 or 日付不一致): 冒頭で「今日は何時に仕事を終わりますか?」と
+   1 行質問。次ターンの回答を parse し marker に書込む (`HH:MM` / `off` / `yaml` / `skip`)。
+   不明回答は 1 回だけ再質問。
+3. **既回答** (marker 今日付): 質問せず内容に従い従来の 3 case 分岐で動作。
+
+### 優先順位 (新規)
+
+1. **marker file (今日付)** ← 最優先 (user の今日の意思)
+2. **yaml schedule (曜日別)** ← fallback (marker = `yaml` モードでも fallback)
+3. **両方なし** → rule 不発火 (silent)
+
+yaml はこの拡張後も廃止せず **fallback** として存続する (marker 不在時 / `yaml` モード時の曜日デフォルト)。
+
+### Edge cases
+
+- **marker 読込エラー**: silent fallback (yaml を参照、それも無ければ不発火)
+- **初回質問を無視して別話題**: 質問を再表示しない (押し付けない)。marker 不在のため
+  次ターンで再判定されるが、1 ターン内の質問は 1 回のみ
+- **回答時刻が既に過去** (例: 17:30 と答えたが現在 18:00): marker 書込みつつ即 Case 3
+  (終業時刻過ぎ) reminder を表示
+- **PII (個人識別情報) 保護**: marker は global (`~/.claude/`) に置くが、念のため
+  `templates/.gitignore` でも project 内 `.claude/.work-end-today` を除外
+
+### 実装範囲
+
+- markdown のみ変更 (rule body + 本 ADR + README + `.gitignore`)。PowerShell スクリプト
+  (`build-rules.ps1` / `apply-claude-kit.ps1`) は不変。marker file の読書きは Claude が
+  ターン毎に bash / shell で行うため、配布スクリプト拡張は不要。
+
 ## Alternatives
 
 採用しなかった候補と、その理由:
@@ -110,7 +165,10 @@ Accepted 昇格レビューで議論すべき未解決点 (現時点では全て
 
 - **祝日対応**: 日本の祝日に終業 reminder を抑制する仕組み。日本祝日 API 連携 か、
   yaml への手動 holiday list 拡張か未定。
-- **特殊日 override**: 出張 / 在宅 / 早退 day の一時的な schedule 変更の仕組み。
+- ~~**特殊日 override**: 出張 / 在宅 / 早退 day の一時的な schedule 変更の仕組み。~~
+  → **Closed** (Phase 2 extension): daily interactive prompt により解決。初回質問へ
+  「今日は HH:MM」「休み」等と答えるだけで当日の override が可能になり、yaml の
+  一時編集が不要になった。詳細は "Daily interactive prompt (Phase 2 extension)" 参照。
 - **Claude 非起動時**: 席に居るが Claude を使っていない時間帯には reminder が
   届かない。別 channel (OS 通知等) が必要かは未判断。
 - **timezone**: 時刻表示は現状 OS local time に依存。明示的な timezone 設定を

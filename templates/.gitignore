@@ -39,5 +39,8 @@ secrets/
 .claude/state/
 .claude/checkpoints/
 
+# Claude Code work-end-reminder marker (daily interactive)
+.claude/.work-end-today
+
 # Reports
 reports/
