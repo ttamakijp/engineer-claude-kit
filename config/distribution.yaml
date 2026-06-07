@@ -1,13 +1,14 @@
-# Distribution repository URL (env override supported)
+# Distribution repository URL metadata (env override supported)
 # bootstrap.ps1 resolves the clone URL in this priority:
 # 1. $env:ENGINEER_CLAUDE_KIT_GIT_URL
 # 2. CLI argument -GitUrl
-# 3. distribution.primary.url_default below
+# 3. git remote get-url origin (derived from the clone itself)
+# There is intentionally no hard-coded url_default fallback: the per-target
+# clone URL is documented generically in the README instead (see ADR-0003).
 
 distribution:
   primary:
     url_env: ENGINEER_CLAUDE_KIT_GIT_URL
-    url_default: https://dev.azure.com/PLACEHOLDER_ORG/PLACEHOLDER_PROJ/_git/engineer-claude-kit
     host: ado
   mirrors:
     - url: https://github.com/ttamakijp/engineer-claude-kit
