@@ -15,6 +15,8 @@ param(
 
     [switch]$DryRun,
 
+    [switch]$AllowElevated,
+
     # Default resolved in the body: referencing $PSScriptRoot in a param default
     # is unreliable under Windows PowerShell 5.1 when parameter sets are present.
     [string]$KitRoot
@@ -22,6 +24,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $ScriptVersion = "0.1.0"
+
+# Fail-fast if running as Administrator (see ADR-0008). Escape hatch: -AllowElevated.
+. (Join-Path (Join-Path $PSScriptRoot "lib") "privilege-check.ps1")
+Assert-NonElevated -AllowElevated:$AllowElevated
 
 if (-not $KitRoot) {
     $KitRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path

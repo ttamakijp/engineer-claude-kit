@@ -10,11 +10,16 @@ param(
     [switch]$DryRun,
     [string]$GitUrl,
     [switch]$SkipProjectPrompt,
-    [switch]$NoEnvPersist
+    [switch]$NoEnvPersist,
+    [switch]$AllowElevated
 )
 
 $ErrorActionPreference = 'Stop'
 $ScriptVersion = "0.1.0"
+
+# Fail-fast if running as Administrator (see ADR-0008). Escape hatch: -AllowElevated.
+. (Join-Path (Join-Path $PSScriptRoot "lib") "privilege-check.ps1")
+Assert-NonElevated -AllowElevated:$AllowElevated
 
 # --- helpers ---
 
@@ -131,6 +136,7 @@ Write-Host "[invoke] apply-claude-kit.ps1 -Global"
 
 $applyArgs = @("-NoProfile", "-File", $applyScript, "-Global")
 if ($DryRun) { $applyArgs += "-DryRun" }
+if ($AllowElevated) { $applyArgs += "-AllowElevated" }
 
 & powershell @applyArgs
 if ($LASTEXITCODE -ne 0) {
@@ -160,6 +166,7 @@ if ($shouldPromptProject) {
     if ($answer -match '^[yY]') {
         Write-Host "[invoke] apply-claude-kit.ps1 -Project `"$cwd`""
         $projectArgs = @("-NoProfile", "-File", $applyScript, "-Project", $cwd)
+        if ($AllowElevated) { $projectArgs += "-AllowElevated" }
         & powershell @projectArgs
         if ($LASTEXITCODE -ne 0) {
             throw "apply-claude-kit.ps1 -Project failed with exit code $LASTEXITCODE"

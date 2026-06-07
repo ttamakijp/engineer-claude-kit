@@ -1,5 +1,8 @@
 # apply-claude-kit.tests.ps1
 # Pester v3.4 smoke tests (Windows PowerShell 5.1). ASCII only.
+# Script invocations pass -AllowElevated because CI runners (e.g. GitHub
+# windows-latest) run elevated and the ADR-0008 fail-fast guard would otherwise
+# exit 2 before the script body runs.
 
 # $PSScriptRoot can be empty when Invoke-Pester is given a direct file path
 # (vs a directory). Fall back to MyInvocation, then the current location.
@@ -23,13 +26,13 @@ Describe "apply-claude-kit.ps1" {
     }
 
     It "runs in DryRun mode (Global)" {
-        $output = & powershell -NoProfile -File $ScriptPath -Global -DryRun 2>&1
+        $output = & powershell -NoProfile -File $ScriptPath -AllowElevated -Global -DryRun 2>&1
         ($output -join "`n") | Should Match "DryRun: yes"
         ($output -join "`n") | Should Match "dry-run"
     }
 
     It "applies CLAUDE.md and at least one agent in Project mode" {
-        & powershell -NoProfile -File $ScriptPath -Project $MockProject 2>&1 | Out-Null
+        & powershell -NoProfile -File $ScriptPath -AllowElevated -Project $MockProject 2>&1 | Out-Null
 
         $claudeMd = Join-Path $MockProject "CLAUDE.md"
         Test-Path $claudeMd | Should Be $true
@@ -88,7 +91,7 @@ Describe "apply-claude-kit.ps1" {
     }
 
     It "does NOT apply project rules in Global (DryRun) mode" {
-        $output = & powershell -NoProfile -File $ScriptPath -Global -DryRun 2>&1
+        $output = & powershell -NoProfile -File $ScriptPath -AllowElevated -Global -DryRun 2>&1
         ($output -join "`n") | Should Not Match 'rules'
     }
 
@@ -122,7 +125,7 @@ Describe "apply-claude-kit.ps1" {
         # output instead of touching the user's home directory. The line is
         # present whether the destination is new ([dry-run] ...) or already
         # exists ([skip] ...), so this holds on any machine.
-        $output = & powershell -NoProfile -File $ScriptPath -Global -DryRun 2>&1
+        $output = & powershell -NoProfile -File $ScriptPath -AllowElevated -Global -DryRun 2>&1
         ($output -join "`n") | Should Match 'work-schedule.yaml'
     }
 
@@ -132,7 +135,7 @@ Describe "apply-claude-kit.ps1" {
     }
 
     It "applies android-build skill in Global (DryRun) mode" {
-        $output = & powershell -NoProfile -File $ScriptPath -Global -DryRun 2>&1 | Out-String
+        $output = & powershell -NoProfile -File $ScriptPath -AllowElevated -Global -DryRun 2>&1 | Out-String
         $output | Should Match 'android-build'
     }
 

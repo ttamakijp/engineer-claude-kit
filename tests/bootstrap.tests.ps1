@@ -13,7 +13,8 @@ Describe "bootstrap.ps1" {
     }
 
     It "runs in DryRun mode without errors" {
-        $output = & powershell -NoProfile -File $ScriptPath -DryRun -SkipProjectPrompt 2>&1
+        # -AllowElevated: CI runners run elevated; the ADR-0008 guard would else exit 2.
+        $output = & powershell -NoProfile -File $ScriptPath -DryRun -SkipProjectPrompt -AllowElevated 2>&1
         ($output -join "`n") | Should Match "Kit root:"
         ($output -join "`n") | Should Match "kit structure validated"
         ($output -join "`n") | Should Match "Bootstrap complete"
@@ -27,7 +28,7 @@ Describe "bootstrap.ps1" {
 
     It "derives URL from git remote (if kit is a git clone)" {
         # Will print "[url] derived from git remote: <url>" if working tree is a git repo
-        $output = & powershell -NoProfile -File $ScriptPath -DryRun -SkipProjectPrompt 2>&1
+        $output = & powershell -NoProfile -File $ScriptPath -DryRun -SkipProjectPrompt -AllowElevated 2>&1
         $joined = $output -join "`n"
         # Either derived from git OR using env OR could not derive - all valid in test env
         ($joined -match "url" -or $joined -match "Could not derive") | Should Be $true
