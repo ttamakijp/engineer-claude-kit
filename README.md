@@ -77,7 +77,7 @@ engineer-claude-kit/
 |   |-- env-defaults.yaml     # AWS region / profile / cache flag 既定値
 |   `-- cost-budget.yaml      # Bedrock コスト予算しきい値 (Phase 3.2)
 |-- source/
-|   `-- rules/                # Claude rules の single source (multi-AI 出力なし、Claude 専用)
+|   `-- rules/                # Claude rules の single source
 |-- templates/                # ~/.claude へ配布する素材 (apply-claude-kit が参照)
 |   |-- CLAUDE.md             # 共通 CLAUDE.md 素材
 |   |-- agents/               # commit-msg / lint-helper / log-summary / review / architect / debug-analyze
@@ -163,7 +163,7 @@ engineer-claude-kit/
 | `config/env-defaults.yaml` | AWS region / profile / cache flag 既定値 | ✅ Phase 2 |
 | `config/work-schedule.yaml` | 曜日別終業時刻 + warning_window (work-end-reminder rule / ADR-0006、user 編集可) | ✅ Phase 4 |
 | `config/recommended-skills.yaml` | project type 検出 + 推薦 mapping | ✅ Phase 4 |
-| `source/rules/` | Claude rules の single source (multi-AI 出力なし) | ✅ Phase 2 |
+| `source/rules/` | Claude rules の single source | ✅ Phase 2 |
 | `source/rules/common/project-skill-recommend.md` | project type 検出と skill 推薦 rule | ✅ Phase 4 |
 | `scripts/bootstrap.ps1` | ADO clone + `~/.claude` 配布 (entry point) | ✅ Phase 2 |
 | `scripts/apply-claude-kit.ps1` | 配布実装 | ✅ Phase 2 |
@@ -242,8 +242,6 @@ cd <your-project>
 - **OS**: Windows 10/11 (PowerShell 5.1 以上)
 - **Claude Code**: Bedrock 経由で動作 (AWS 認証情報設定済み前提)
 - **配布**: Azure DevOps repo の `_git` 形式 URL (canonical)
-- **AI**: Claude のみ (Copilot/Cursor/Cline 出力は非対応、ADR-0001 §D)
-- **Persona**: engineer 固定 (multi-persona なし、ADR-0001 §E)
 - **PowerShell スクリプト**: ASCII only (UTF-8 BOM 剥落による文字化け回避、ADR-0003 §C)
 
 ## 7. ライセンス
