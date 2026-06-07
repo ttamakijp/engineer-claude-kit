@@ -19,7 +19,6 @@ bootstrap 実行後、以下の 2 層構造で配置される。
 ```
 ~/.claude/
 |-- CLAUDE.md                 # 全プロジェクト共通指示 (Haiku/Sonnet 4.5 自動使い分け含む)
-|-- settings.json             # Bedrock 接続 + model 設定 (config/models.yaml から generate)
 |-- agents/                   # sub-agent 定義 (ADR-0004)
 |   |-- commit-msg.md         # Haiku 委譲: コミットメッセージ生成
 |   |-- lint-helper.md        # Haiku 委譲: typo / フォーマット / 軽微 refactor
@@ -111,7 +110,6 @@ engineer-claude-kit/
 | 配置 | 機能 | Phase |
 |---|---|---|
 | `CLAUDE.md` | 全プロジェクト共通の指示、Haiku/Sonnet 4.5 自動使い分けルール (ADR-0004) | ✅ Phase 2 |
-| `settings.json` | Bedrock 接続 + model 設定 (`config/models.yaml` から generate) | ✅ Phase 2 |
 | `work-schedule.yaml` | 終業時刻リマインダ用の **曜日別フォールバック** (interactive 質問が無い場合に使用。初回 apply 時に配置・既存なら skip、user 編集可) | ✅ Phase 4 |
 | `.work-end-today` | 今日の終業時刻 marker (印・記録ファイル)。朝の初回ターン interactive 質問への回答を日次記録し、当日の reminder を制御 (ADR-0006、Claude が runtime 生成・自動更新) | ✅ Phase 4 |
 | `agents/commit-msg.md` | コミットメッセージ生成 (Haiku 委譲) | ✅ Phase 2 |
@@ -202,7 +200,7 @@ git clone https://dev.azure.com/<your-org>/<your-proj>/_git/engineer-claude-kit 
 `bootstrap.ps1` は以下を順に実行する:
 
 1. clone した repo の `git remote get-url origin` から配布元 URL を取得 → ユーザ環境変数 `ENGINEER_CLAUDE_KIT_GIT_URL` に永続保存 (以降の自動更新の起点)
-2. `~/.claude/CLAUDE.md` / `settings.json` / `agents/` / `skills/` / `commands/` を配置
+2. `~/.claude/CLAUDE.md` / `agents/` / `skills/` / `commands/` を配置
 3. (任意) 現在の cwd が git repo なら、その project にも `.claude/` を配置するか提案 (yes なら `apply-claude-kit.ps1 -Project (Get-Location)` を内部呼出)
 
 ### 3.2 新規プロジェクトでの利用
@@ -226,6 +224,7 @@ cd <your-project>
 | [ADR-0004](docs/adr/0004-claude-md-auto-model-routing.md) | CLAUDE.md による Haiku/Sonnet 4.5 自動使い分け | Proposed |
 | [ADR-0005](docs/adr/0005-checkpoint-resume-commands.md) | `/checkpoint` `/resume` slash commands 設計 (Group B) | Accepted |
 | [ADR-0006](docs/adr/0006-work-end-reminder.md) | work-end-reminder rule (終業リマインダ / ホスピタリティ機能、Group F') | Accepted |
+| [ADR-0007](docs/adr/0007-hands-off-settings.md) | settings.json hands-off policy | Accepted |
 
 ## 5. モデル戦略 (要約)
 
@@ -233,7 +232,7 @@ cd <your-project>
 - small fast model: **Haiku 4.5** (`us.anthropic.claude-haiku-4-5-20251001-v1:0`)
 - Bedrock 経由: `ENABLE_PROMPT_CACHING_1H_BEDROCK=1` + `AWS_MAX_ATTEMPTS=2`
 - 軽作業 (commit-msg / lint / log-summary) は Haiku sub-agent に自動委譲
-- model ID は `config/models.yaml` SSoT、`apply-claude-kit.ps1` が `~/.claude/settings.json` を generate
+- model ID は `config/models.yaml` SSoT で管理。`~/.claude/settings.json` は user 自身が `docs/setup/` の example から設定 (ADR-0007 hands-off policy)
 - コスト観測: `scripts/cost-observe-bedrock.ps1` が AWS Cost Explorer から weekly report を生成、`config/cost-budget.yaml` のしきい値で予算監視 (Phase 3.2)
 
 根拠: 実環境での Bedrock 1h cache 実測検証 (cost 54% 削減実証)

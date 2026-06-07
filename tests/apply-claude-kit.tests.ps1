@@ -73,20 +73,6 @@ Describe "apply-claude-kit.ps1" {
     It "applies resume command in Project mode" {
         Test-Path (Join-Path (Join-Path (Join-Path $MockProject ".claude") "commands") "resume.md") | Should Be $true
     }
-
-    It "applies settings.json in Project mode" {
-        $settings = Join-Path (Join-Path $MockProject ".claude") "settings.json"
-        Test-Path $settings | Should Be $true
-    }
-
-    It "substitutes model placeholders in settings.json" {
-        $settingsPath = Join-Path (Join-Path $MockProject ".claude") "settings.json"
-        $settings = Get-Content -LiteralPath $settingsPath -Raw
-        $settings | Should Not Match '\{\{role:main\}\}'
-        $settings | Should Not Match '\{\{role:small-fast\}\}'
-        $settings | Should Match 'claude-sonnet-4-5'
-    }
-
     It "applies project rules in Project mode" {
         $rulesDir = Join-Path (Join-Path $MockProject ".claude") "rules"
         Test-Path $rulesDir | Should Be $true
