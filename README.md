@@ -187,15 +187,21 @@ engineer-claude-kit/
 
 ## 3. Quick Start (Phase 2 完成後の想定)
 
-### 3.1 ADO repo から bootstrap (推奨、業務環境)
+### 3.1 clone して bootstrap
 
 ```powershell
-# 1 行で clone + bootstrap (Phase 2.2 で実装予定)
+# このリポジトリを clone してから bootstrap.ps1 を実行
 # 配布元 URL は git clone 時点で .git/config に保存されるため、別途環境変数の手動設定は不要
-git clone https://dev.azure.com/<your-org>/<your-proj>/_git/engineer-claude-kit `
-  "$env:USERPROFILE\.claude-kit"
+git clone <repository-url> "$env:USERPROFILE\.claude-kit"
 & "$env:USERPROFILE\.claude-kit\scripts\bootstrap.ps1"
 ```
+
+> `<repository-url>` は配布先によって以下のいずれか:
+> - GitHub: `https://github.com/<owner>/engineer-claude-kit`
+> - Azure DevOps: `https://dev.azure.com/<org>/<proj>/_git/engineer-claude-kit`
+> - Self-hosted Git: 環境に応じた URL
+>
+> `bootstrap.ps1` は clone 済みの作業ツリーから `git remote get-url origin` で配布元 URL を自動導出するため、どの配布先でもコマンドは共通。kit 内には特定配布先の URL を埋め込まない (ADR-0003)。
 
 `bootstrap.ps1` は以下を順に実行する:
 
@@ -214,6 +220,27 @@ cd <your-project>
 & "$env:USERPROFILE\.claude-kit\scripts\apply-claude-kit.ps1" -Project (Get-Location)
 ```
 
+### 3.3 実行権限について
+
+bootstrap.ps1 および同梱スクリプトはすべて **ユーザ権限で動作** します。管理者権限 (Run as Administrator) は不要です:
+
+- 書込み先は `$env:USERPROFILE\.claude\` 配下のみ
+- PowerShell module install (PSScriptAnalyzer / Pester) は `-Scope CurrentUser` 強制
+- system パス (`C:\Program Files`, `HKLM:`) は一切触らない
+
+スクリプト側でも elevation 検出を組み込んでおり、管理者権限で起動された場合は中止します (理由: admin で `~/.claude/` を作ると owner が Administrators となり、以降の通常ユーザ実行が permission denied になるため)。どうしても管理者権限で実行する必要がある場合のみ `-AllowElevated` を付けて続行できます (非推奨、ADR-0008)。
+
+#### Execution Policy が `Restricted` の場合
+
+恒久変更は不要。Process scope で一時的に Bypass する:
+
+    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+    & "$env:USERPROFILE\.claude-kit\scripts\bootstrap.ps1"
+
+または one-shot 呼出:
+
+    powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude-kit\scripts\bootstrap.ps1"
+
 ## 4. 設計判断 (ADR Index)
 
 | ADR | テーマ | ステータス |
@@ -225,6 +252,7 @@ cd <your-project>
 | [ADR-0005](docs/adr/0005-checkpoint-resume-commands.md) | `/checkpoint` `/resume` slash commands 設計 (Group B) | Accepted |
 | [ADR-0006](docs/adr/0006-work-end-reminder.md) | work-end-reminder rule (終業リマインダ / ホスピタリティ機能、Group F') | Accepted |
 | [ADR-0007](docs/adr/0007-hands-off-settings.md) | settings.json hands-off policy | Accepted |
+| [ADR-0008](docs/adr/0008-privilege-aware-bootstrap.md) | bootstrap スクリプトの非管理者権限実行強制 (Administrator 検出で fail-fast) | Accepted |
 
 ## 5. モデル戦略 (要約)
 
@@ -241,7 +269,8 @@ cd <your-project>
 
 - **OS**: Windows 10/11 (PowerShell 5.1 以上)
 - **Claude Code**: Bedrock 経由で動作 (AWS 認証情報設定済み前提)
-- **配布**: Azure DevOps repo の `_git` 形式 URL (canonical)
+- **実行権限**: 通常ユーザ権限で実行 (管理者権限不要・むしろ非推奨)。詳細は [§3.3 実行権限について](#33-実行権限について) / ADR-0008
+- **配布**: 配布元は問わず、clone コマンドは generic な `<repository-url>` で表記し配布先別 URL は注釈で示す (GitHub / Azure DevOps `_git` / self-hosted、ADR-0003)
 - **PowerShell スクリプト**: ASCII only (UTF-8 BOM 剥落による文字化け回避、ADR-0003 §C)
 
 ## 7. ライセンス
