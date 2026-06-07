@@ -36,6 +36,10 @@ jobs:
       if: matrix.ps-version == '5.1'
       shell: powershell
       run: |
+        # windows-latest ships Pester 5.x preinstalled, which auto-loads over the
+        # 3.4.0 we install. The suite is written for v3 (legacy Should syntax,
+        # top-level scope), so pin v3 explicitly before invoking.
+        Import-Module Pester -RequiredVersion 3.4.0 -Force
         $result = Invoke-Pester -Path tests -PassThru
         if ($result.FailedCount -gt 0) {
           Write-Error "Pester failures: $($result.FailedCount)"
@@ -46,6 +50,10 @@ jobs:
       if: matrix.ps-version == '7'
       shell: pwsh
       run: |
+        # windows-latest ships Pester 5.x preinstalled, which auto-loads over the
+        # 3.4.0 we install. The suite is written for v3 (legacy Should syntax,
+        # top-level scope), so pin v3 explicitly before invoking.
+        Import-Module Pester -RequiredVersion 3.4.0 -Force
         $result = Invoke-Pester -Path tests -PassThru
         if ($result.FailedCount -gt 0) {
           Write-Error "Pester failures: $($result.FailedCount)"
