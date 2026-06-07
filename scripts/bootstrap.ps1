@@ -176,3 +176,9 @@ if ($shouldPromptProject) {
 Write-Host ""
 Write-Host "Bootstrap complete."
 if ($DryRun) { Write-Host "Note: -DryRun was specified, no files were modified and no env was persisted." }
+
+# Step 6: post-bootstrap hint for optional tool installation
+Write-Host ""
+Write-Host "[hint] To install required tools (gitleaks, gh, node, etc.) via winget, run:"
+Write-Host "       pwsh `"$kitRoot\scripts\install-deps.ps1`""
+Write-Host "       (add -DryRun to preview without installing anything)"

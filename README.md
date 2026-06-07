@@ -163,12 +163,13 @@ engineer-claude-kit/
 | `scripts/apply-claude-kit.ps1` | 配布実装 | ✅ Phase 2 |
 | `scripts/build-rules.ps1` | `source/rules/` -> `.claude/rules/` build | ✅ Phase 2 |
 | `scripts/cost-observe-bedrock.ps1` | AWS Cost Explorer から Bedrock コストを取得し markdown report 生成 | ✅ Phase 3.2 |
+| `scripts/install-deps.ps1` | 必要ツール (gitleaks / gh / pwsh / node) を winget で一括インストール (既存は skip) | ✅ Phase 4 |
 | `config/cost-budget.yaml` | Bedrock コスト予算しきい値 | ✅ Phase 3.2 |
 | `reports/bedrock-cost-<date>.md` | weekly cost report (auto-generated, gitignored) | ✅ Phase 3.2 |
 | `templates/` | `~/.claude` 配布素材 (CLAUDE.md / agents / skills / commands) | ✅ Phase 3.1 (skills) / ✅ Phase 2 (agents) |
 | `templates/skills/apply-claude-kit/SKILL.md` | kit を再適用する skill (技能) のソース | ✅ Phase 2 |
 | `templates/commands/apply.md` | `/apply` slash command のソース | ✅ Phase 2 |
-| `tests/*.tests.ps1` | Pester 単体テスト (bootstrap / apply / build-rules / cost-observe、PS 5.1 + Pester 3.4 互換) | ✅ |
+| `tests/*.tests.ps1` | Pester 単体テスト (bootstrap / apply / build-rules / cost-observe / install-deps、PS 5.1 + Pester 3.4 互換) | ✅ |
 | `docs/manual-verification/` | kit 効果測定の手動検証手順 (scenario-comparison: 5 軸比較) | ✅ |
 | `docs/manual-verification/bootstrap-installation.md` | bootstrap chain 動作検証手順 (Windows / Claude MAX 環境対応) | ✅ |
 | `docs/adr/` | Architecture Decision Records (現状 0001-0004) | ✅ Phase 1 |
