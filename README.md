@@ -124,9 +124,14 @@ engineer-claude-kit/
 | `skills/commit-helper/` | Conventional Commits 補助 (Haiku 委譲) | ✅ Phase 3.1 |
 | `skills/leak-check/` | PII / credentials / 機密ファイル 検出 | ✅ Phase 3.1 |
 | `skills/propose-adr/` | ADR draft 起票 (architect sub-agent 連携) | ✅ Phase 3.1 |
+| `skills/android-build/` | Android ビルド・ADB 操作支援 (Group F project-recommend 候補) | ✅ Phase 4 |
+| `skills/web-test/` | Web/Node test 実行・依存管理支援 (Group F 候補) | ✅ Phase 4 |
+| `skills/python-test/` | Python pytest・venv 管理支援 (Group F 候補) | ✅ Phase 4 |
+| `skills/skill-installer/` | Global skill → project コピー helper | ✅ Phase 4 |
 | `commands/apply.md` | `/apply` slash command | ✅ Phase 2 |
 | `commands/checkpoint.md` | `/checkpoint` セッション state 保存 | ✅ Phase 3 |
 | `commands/resume.md` | `/resume` state からの再開 | ✅ Phase 3 |
+| `commands/install-skill.md` | `/install-skill <name>` slash command | ✅ Phase 4 |
 | `state/` | checkpoint state (実行時生成 / .gitignore、template には含まれない) | ✅ Phase 3 |
 
 ### 2.2 プロジェクト側 `<project>/`
@@ -140,6 +145,7 @@ engineer-claude-kit/
 | `.claude/skills/` | プロジェクト固有 skill (android-build / web-test 等) | ⏳ Phase 3 |
 | `.claude/agents/` | プロジェクト固有 sub-agent | ⏳ Phase 3 |
 | `.claude/state/` | プロジェクト固有 state (.gitignore) | ⏳ Phase 3 |
+| `.claude/.skill-recommendations-dismissed` | 推薦拒否 marker (runtime 生成) | ✅ Phase 4 |
 | `.git/hooks/pre-commit` | leak 検出 hook (gitleaks + minimal PII regex、上書き OK) | ✅ Phase 3 |
 | `.git/hooks/pre-push` | host allowlist + backup ref 拒否 hook (上書き OK) | ✅ Phase 3 |
 | `.gitignore` | `.claude/state/` / `*.keystore` / `local.properties` / `.env*` (既存なら skip) | ✅ Phase 3 |
@@ -158,7 +164,9 @@ engineer-claude-kit/
 | `config/distribution.yaml` | 配布元 URL (env `ENGINEER_CLAUDE_KIT_GIT_URL` override 可能) | ✅ Phase 2 |
 | `config/env-defaults.yaml` | AWS region / profile / cache flag 既定値 | ✅ Phase 2 |
 | `config/work-schedule.yaml` | 曜日別終業時刻 + warning_window (work-end-reminder rule / ADR-0006、user 編集可) | ✅ Phase 4 |
+| `config/recommended-skills.yaml` | project type 検出 + 推薦 mapping | ✅ Phase 4 |
 | `source/rules/` | Claude rules の single source (multi-AI 出力なし) | ✅ Phase 2 |
+| `source/rules/common/project-skill-recommend.md` | project type 検出と skill 推薦 rule | ✅ Phase 4 |
 | `scripts/bootstrap.ps1` | ADO clone + `~/.claude` 配布 (entry point) | ✅ Phase 2 |
 | `scripts/apply-claude-kit.ps1` | 配布実装 | ✅ Phase 2 |
 | `scripts/build-rules.ps1` | `source/rules/` -> `.claude/rules/` build | ✅ Phase 2 |

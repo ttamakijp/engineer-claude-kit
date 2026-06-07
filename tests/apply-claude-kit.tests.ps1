@@ -141,6 +141,19 @@ Describe "apply-claude-kit.ps1" {
         # Project mode is unchanged: the schedule is a single global file.
         Test-Path (Join-Path $MockProject "work-schedule.yaml") | Should Be $false
     }
+
+    It "applies android-build skill in Global (DryRun) mode" {
+        $output = & powershell -NoProfile -File $ScriptPath -Global -DryRun 2>&1 | Out-String
+        $output | Should Match 'android-build'
+    }
+
+    It "applies install-skill command in Project mode" {
+        Test-Path (Join-Path (Join-Path (Join-Path $MockProject ".claude") "commands") "install-skill.md") | Should Be $true
+    }
+
+    It "applies skill-installer skill in Project mode" {
+        Test-Path (Join-Path (Join-Path (Join-Path $MockProject ".claude") "skills") "skill-installer") | Should Be $true
+    }
 }
 
 if (Test-Path $MockGlobal) { Remove-Item -Recurse -Force $MockGlobal }
