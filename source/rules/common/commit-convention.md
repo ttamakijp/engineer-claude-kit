@@ -17,7 +17,7 @@ tags: [git, workflow]
 - 全変更は feature/fix ブランチ → PR 経由でマージする（main/master への直接 push 禁止）
 - 1 Phase = 1 PR を原則とし、レビュー・ロールバック単位を小さく保つ
 - マージ方式は **squash + delete-branch** を標準とし、コミット履歴を線形に保つ
-- squash merge の commit message 戦略は **`PR_TITLE` + `PR_BODY`** を選択し、GitHub default の `(#NN)` 自動付与を無効化する (TBD: durable-references portage, dev-templates ADR-0005)
+- squash merge の commit message 戦略は **`PR_TITLE` + `PR_BODY`** を選択し、GitHub default の `(#NN)` 自動付与を無効化する (TBD: durable-references 規約として別途整備予定)
 
 ## Conventional Commits フォーマット
 
@@ -127,14 +127,14 @@ Refs: e5f6g7h8
 footer `Refs:` には **commit SHA (7-12 文字 short) / ADR-NNNN / tag (`vX.Y.Z`)** を使う。
 `#NN` は GitHub-native の counter でリポ再作成・org 移行で壊れるため、本体参照に使わない
 (GitHub の `Closes #N` auto-close keyword は例外として補助的に併用可。詳細は
-durable-references portage 予定: TBD)。
+durable-references として別途整備予定: TBD)。
 
 ## 根拠
 
 - Conventional Commits は changelog 自動生成と semantic versioning 判定の前提
 - squash + delete-branch は履歴を線形に保ち、`git bisect` を機械的に走らせやすくする
 - 設計先行 draft PR は実装後の手戻りを激減させ、レビュアーが文脈を持った状態でコードレビューできる
-- footer の `Refs:` を SHA / ADR / tag に揃えると、リポ削除・再作成・org 移行のいずれを経ても参照が壊れない（durable-references の方針、TBD: dev-templates ADR-0005 由来）
+- footer の `Refs:` を SHA / ADR / tag に揃えると、リポ削除・再作成・org 移行のいずれを経ても参照が壊れない（durable-references の方針、TBD: 別途 ADR で整備予定）
 
 ## 例外
 
@@ -144,4 +144,4 @@ durable-references portage 予定: TBD)。
 
 ## 関連
 
-- durable-references — 参照スタイル詳細 (`Refs:` に何を入れるか、`#NN` の取扱)。engineer-claude-kit では未採番 (TBD, 完全移植 Phase 1 / dev-templates ADR-0005 由来)
+- durable-references — 参照スタイル詳細 (`Refs:` に何を入れるか、`#NN` の取扱)。engineer-claude-kit では未採番 (TBD, Phase 1 で整備予定)

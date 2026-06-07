@@ -3,7 +3,7 @@
 **ステータス**: Proposed
 **日付**: 2026-06-05
 **Phase**: 1 → 2 (foundation → bootstrap implementation 設計)
-**関連**: ADR-0001 (clean start design) / ADR-0002 (ADR portage triage)
+**関連**: ADR-0001 (clean start design) / ADR-0002 (ADR セット取捨選択方針)
 
 ## コンテキスト
 
@@ -55,7 +55,7 @@ config/
 `config/models.yaml` の例:
 
 ```yaml
-# Bedrock model registry (Phase 1 実測値、t-tamaki-todo §3.1/§8.1 出典)
+# Bedrock model registry (Phase 1 実測値、実環境での Bedrock 1h cache 実測検証 §3.1/§8.1 出典)
 models:
   main:
     id: us.anthropic.claude-sonnet-4-5-20250929-v1:0
@@ -132,11 +132,11 @@ ADR-0001 §H で「ADO 固定」を決定したが、現在 engineer-claude-kit 
 
 ## 未解決の問い
 
-1. `apply-claude-kit.ps1` の **再 apply** 時の挙動 (overwrite / merge / skip の選択)。dev-templates の `apply-to-project.ps1 --dry-run` パターンを踏襲するか
+1. `apply-claude-kit.ps1` の **再 apply** 時の挙動 (overwrite / merge / skip の選択)。再 apply 時の `--dry-run` パターンを踏襲するか
 2. ADO 認証フローの fallback として GitHub mirror も clone 候補に含めるか (社内→社外 mirror のフェイルオーバ)
 3. `config/*.yaml` の schema validation (`scripts/validate-config.ps1`) を Phase 2 / Phase 3 のどちらで導入するか
 4. ASCII only 規約の **自動検出** を pre-commit hook で行うか、CI でのみ行うか
-5. dev-templates の `apply-cost-optimization.ps1` の中身 (Sonnet 自動委譲 logic) を Phase 2 で移植するか、再設計するか
+5. コスト最適化スクリプト (Sonnet 自動委譲 logic) を Phase 2 で実装するか、再設計するか
 
 ## 結果
 
@@ -157,9 +157,9 @@ ADR-0001 §H で「ADO 固定」を決定したが、現在 engineer-claude-kit 
 ## 参照
 
 - ADR-0001 (clean start design) §G モデル戦略 / §G-2 抽象化方針注記
-- ADR-0002 (ADR portage triage) §B 変形移植カテゴリ (0040 bootstrap, 0044 Bedrock model ID, 0007 apply orchestration)
-- dev-templates ADR-0040: `DEV_TEMPLATES_GIT_URL` 環境変数 override パターン
-- dev-templates ADR-0007: apply-to-project orchestration (apply-claude-kit.ps1 の参考実装)
-- dev-templates ADR-0042: apply-deploys-agents-and-settings (gen + 配布の参考)
-- t-tamaki-todo `docs/2026-06-04-bedrock-1h-cache-investigation-complete.md` §3.1 / §8.1 (model ID 出典)
-- t-tamaki-todo `docs/cost-timeline.md` (将来 Phase の見通し、本 ADR Phase 2/3 と整合)
+- ADR-0002 (ADR セット取捨選択方針) §B 変形採用カテゴリ (bootstrap, Bedrock model ID, apply orchestration)
+- 配布元 URL は `ENGINEER_CLAUDE_KIT_GIT_URL` 環境変数 override パターンで解決 (§B)
+- apply orchestration は apply-claude-kit.ps1 として実装 (§A/§B)
+- agents + settings の generate / 配布は apply-claude-kit.ps1 が担当 (§B)
+- model ID 出典: 実環境での Bedrock 1h cache 実測検証 §3.1 / §8.1
+- 将来 Phase の見通しは本 ADR Phase 2/3 と整合

@@ -64,5 +64,5 @@ description: |
 
 - ADR の **promote** (Proposed → Accepted) は skill では行わない (user 判断)
 - 代替案は **最低 2 案** を強制。「推奨案 1 案のみ」になりがちな場合は再考を促す
-- 既存 ADR-0023 (propose-adr workflow、dev-templates 由来) と整合
+- propose-adr workflow の不変原則 (代替案強制 / Proposed 起票) と整合
 - 生成 ADR は `Proposed` ステータスで起票し、勝手に Accepted 化しない

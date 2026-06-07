@@ -59,7 +59,7 @@
 - 結果は必ず main がユーザに転送する (sub-agent 出力のみで終わらない)
 - 同一リポジトリ内の並列 sub-agent は **逐次** を default とし、worktree 分離が成立する場合のみ並列
 
-詳細: `~/.claude/rules/subagent-orchestration.md` (dev-templates 由来、本 kit に含まれる)
+詳細: `~/.claude/rules/subagent-orchestration.md` (本 kit に含まれる)
 
 ## 5. プロジェクト個別設定の優先順位
 

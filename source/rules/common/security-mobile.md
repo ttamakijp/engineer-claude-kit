@@ -104,7 +104,7 @@ tags: [security, owasp-mobile, encryption, auth, supply-chain]
 - ログ保存期間を定め、不要ログを定期削除する
 - external storage 保存時は Android 10+ のスコープドストレージに対応する
 
-## リポジトリ全体での PII 検出 (TBD: PII detection policy portage, dev-templates ADR-0006)
+## リポジトリ全体での PII 検出 (TBD: PII detection policy として別途整備予定)
 
 ログ出力規約はランタイム挙動の話だが、**リポジトリ commit / push 段階での PII 混入**
 も同じカテゴリで防御する。engineer-claude-kit では leak-check スクリプト
@@ -119,7 +119,7 @@ tags: [security, owasp-mobile, encryption, auth, supply-chain]
 - クレデンシャルファイル (`.env` / `*.pem` / `*.key` / `local.properties` 等が
   tracked 化されたら fail)
 
-詳細: PII / クレデンシャルファイル検出ポリシー ADR (TBD, 完全移植 Phase 1 / dev-templates ADR-0006 由来)。
+詳細: PII / クレデンシャルファイル検出ポリシー ADR (TBD, Phase 1 で整備予定)。
 Android アプリ実装では「ログに出すな」「リポにコミットするな」の両層で防御することを
 覚える。
 
