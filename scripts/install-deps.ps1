@@ -17,6 +17,52 @@ function Write-Info {
     if (-not $Quiet) { Write-Host $msg }
 }
 
+function Install-PSScriptAnalyzerNonInteractive {
+    # Install PSScriptAnalyzer so it succeeds in a non-interactive shell.
+    # PSScriptAnalyzer is a PowerShell module, not a winget package, so it
+    # cannot be installed through the winget loop above. Three things break the
+    # default Install-Module flow when unattended:
+    #   1. PSGallery is untrusted -> Install-Module prompts for confirmation.
+    #   2. TLS 1.2 not enabled -> NuGet API connection fails on older defaults.
+    #   3. NuGet provider missing -> Install-Module prompts to install it.
+    [CmdletBinding()]
+    param()
+
+    # Force TLS 1.2 for the NuGet / PSGallery endpoints.
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = `
+            [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+    } catch {
+        Write-Warning "Failed to set TLS 1.2 (continuing): $_"
+    }
+
+    # Ensure the NuGet package provider is present (else Install-Module prompts).
+    $nuget = Get-PackageProvider -Name NuGet -ListAvailable -ErrorAction SilentlyContinue |
+        Where-Object { $_.Version -ge [version]'2.8.5.201' }
+    if (-not $nuget) {
+        Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 `
+            -Scope CurrentUser -Force -Confirm:$false | Out-Null
+    }
+
+    # Temporarily mark PSGallery as Trusted to avoid the confirmation prompt.
+    $gallery = Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue
+    $originalPolicy = $null
+    if ($gallery -and $gallery.InstallationPolicy -ne 'Trusted') {
+        $originalPolicy = $gallery.InstallationPolicy
+        Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+    }
+
+    try {
+        Install-Module -Name PSScriptAnalyzer -Scope CurrentUser `
+            -Force -SkipPublisherCheck -Confirm:$false -ErrorAction Stop
+    } finally {
+        # Restore the original PSGallery installation policy.
+        if ($originalPolicy) {
+            Set-PSRepository -Name PSGallery -InstallationPolicy $originalPolicy
+        }
+    }
+}
+
 function Test-WingetAvailable {
     try {
         $null = Get-Command winget -ErrorAction Stop
@@ -74,6 +120,29 @@ foreach ($t in $tools) {
             $failed++
         } else {
             Write-Info "  [skip] optional tool $($t.name) failed to install (continuing)"
+        }
+    }
+}
+
+# PSScriptAnalyzer (separate path: PowerShell module via Install-Module, not winget)
+$psa = Get-Module -ListAvailable PSScriptAnalyzer | Select-Object -First 1
+if ($psa) {
+    Write-Info "[skip] PSScriptAnalyzer already installed: v$($psa.Version)"
+    $skipped++
+} else {
+    Write-Info ""
+    Write-Info "[PSScriptAnalyzer] Required for lint (scripts/lint.ps1)"
+    if ($DryRun) {
+        Write-Info "[dry-run] would install: Install-Module PSScriptAnalyzer -Scope CurrentUser"
+    } else {
+        Write-Info "Installing PSScriptAnalyzer via Install-Module (non-interactive) ..."
+        try {
+            Install-PSScriptAnalyzerNonInteractive
+            Write-Info "  [ok] PSScriptAnalyzer installed"
+            $installed++
+        } catch {
+            Write-Warning "  [fail] PSScriptAnalyzer failed to install: $_"
+            $failed++
         }
     }
 }
