@@ -1,0 +1,51 @@
+# Project skill recommendation mapping (Group F / project-skill-recommend rule)
+#
+# Format:
+#   project_types.<name>:
+#     detect: list of file glob patterns indicating this project type
+#     recommend: list of skill names to suggest (must exist in ~/.claude/skills/)
+
+project_types:
+  android:
+    detect:
+      - "gradlew"
+      - "build.gradle"
+      - "build.gradle.kts"
+      - "AndroidManifest.xml"
+    recommend:
+      - android-build
+
+  web-node:
+    detect:
+      - "package.json"
+    recommend:
+      - web-test
+
+  python:
+    detect:
+      - "requirements.txt"
+      - "pyproject.toml"
+      - "setup.py"
+    recommend:
+      - python-test
+
+  ios:
+    detect:
+      - "*.xcodeproj"
+      - "Podfile"
+    recommend: []   # ios-build skill 未実装
+
+  rust:
+    detect:
+      - "Cargo.toml"
+    recommend: []
+
+  go:
+    detect:
+      - "go.mod"
+    recommend: []
+
+  esp32-embedded:
+    detect:
+      - "platformio.ini"
+    recommend: []
