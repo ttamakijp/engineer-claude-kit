@@ -1,8 +1,11 @@
 # bootstrap.tests.ps1
 # Pester v3.4 smoke tests (Windows PowerShell 5.1). ASCII only.
 
-$ScriptPath = Join-Path (Join-Path (Join-Path $PSScriptRoot "..") "scripts") "bootstrap.ps1"
-$KitRoot = Join-Path $PSScriptRoot ".."
+# $PSScriptRoot can be empty when Invoke-Pester is given a direct file path
+# (vs a directory). Fall back to MyInvocation, then the current location.
+$here = if ($PSScriptRoot) { $PSScriptRoot } elseif ($MyInvocation.MyCommand.Path) { Split-Path -Parent $MyInvocation.MyCommand.Path } else { (Get-Location).Path }
+$ScriptPath = Join-Path (Join-Path (Join-Path $here "..") "scripts") "bootstrap.ps1"
+$KitRoot = Join-Path $here ".."
 
 Describe "bootstrap.ps1" {
     It "exists" {
