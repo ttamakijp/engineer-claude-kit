@@ -1,6 +1,6 @@
 # engineer-claude-kit
 
-職場 (AWS Bedrock + Azure DevOps + Windows) で Claude Code を使い始めるエンジニア向け、ワンコマンド bootstrap キット。dev-templates v3.5 のノウハウを継承しつつ、initial setup の認知負荷を最小化することを設計目標とする。
+職場 (AWS Bedrock + Azure DevOps + Windows) で Claude Code を使い始めるエンジニア向け、ワンコマンド bootstrap キット。initial setup の認知負荷を最小化し、単独環境で完結する self-contained な構成を設計目標とする。
 
 > 設計詳細は [docs/adr/](docs/adr/) を参照。本 README は配置 (deployment) と利用方法 (usage) に絞る。
 
@@ -209,7 +209,7 @@ cd <your-project>
 | ADR | テーマ | ステータス |
 |---|---|---|
 | [ADR-0001](docs/adr/0001-clean-start-design.md) | clean start 設計 (モデル戦略 / persona / host / OS) | Proposed |
-| [ADR-0002](docs/adr/0002-adr-portage-from-dev-templates.md) | dev-templates ADR 移植精査 (A/B/C/D 分類) | Proposed |
+| [ADR-0002](docs/adr/0002-adr-curation-policy.md) | ADR セット取捨選択方針 (A/B/C/D 分類) | Proposed |
 | [ADR-0003](docs/adr/0003-bootstrap-and-abstraction.md) | bootstrap design + `config/*.yaml` SSoT | Proposed |
 | [ADR-0004](docs/adr/0004-claude-md-auto-model-routing.md) | CLAUDE.md による Haiku/Sonnet 4.5 自動使い分け | Proposed |
 | [ADR-0005](docs/adr/0005-checkpoint-resume-commands.md) | `/checkpoint` `/resume` slash commands 設計 (Group B) | Accepted |
@@ -224,7 +224,7 @@ cd <your-project>
 - model ID は `config/models.yaml` SSoT、`apply-claude-kit.ps1` が `~/.claude/settings.json` を generate
 - コスト観測: `scripts/cost-observe-bedrock.ps1` が AWS Cost Explorer から weekly report を生成、`config/cost-budget.yaml` のしきい値で予算監視 (Phase 3.2)
 
-根拠: [t-tamaki-todo Phase 1 検証](https://github.com/ttamakijp/t-tamaki-todo) (cost 54% 削減実証)
+根拠: 実環境での Bedrock 1h cache 実測検証 (cost 54% 削減実証)
 
 ## 6. 制約・前提
 
@@ -239,7 +239,7 @@ cd <your-project>
 
 [MIT](LICENSE)
 
-## 8. 関連リポジトリ
+## 8. 関連ドキュメント
 
-- [ttamakijp/dev-templates](https://github.com/ttamakijp/dev-templates): 継承元 (multi-AI / multi-persona platform)
-- [ttamakijp/t-tamaki-todo](https://github.com/ttamakijp/t-tamaki-todo): Bedrock TTL / cost 検証 (本キットのモデル戦略の実証根拠)
+- [docs/adr/](docs/adr/): 設計判断の記録 (ADR-0001〜0006)
+- [docs/manual-verification/](docs/manual-verification/): 手動検証手順 (bootstrap / apply / leak-scan)

@@ -119,13 +119,13 @@ ADR-0003 §B で確定した role mapping を sub-agent 定義から参照する
 - Haiku 委譲 turn の token cost / Sonnet 4.5 turn の token cost
 - 委譲した turn での品質低下発生率 (Sonnet 引き取り回数)
 
-期待値: 全 turn の 30-50% が Haiku 委譲、cost 削減効果は dev-templates ADR-0017 cost-optimization の知見を参考に input 単価で 1/4 程度。実測値は Phase 3 で確定。
+期待値: 全 turn の 30-50% が Haiku 委譲、cost 削減効果は cost-optimization (sub-agent 委譲) の知見を参考に input 単価で 1/4 程度。実測値は Phase 3 で確定。
 
 ## 検討した代替案
 
 ### 代替案 1: main を Haiku、重作業のみ Sonnet 4.5 sub-agent 呼出
 - メリット: 基本 cost が低い
-- デメリット: t-tamaki-todo 実証で Haiku の指示遵守率・判定精度が未測定。main の判定ミスはシステム全体の品質を下げる。ADR-0001 §G の結論 (Sonnet 4.5 main) を破ることになる
+- デメリット: 実測検証で Haiku の指示遵守率・判定精度が未測定。main の判定ミスはシステム全体の品質を下げる。ADR-0001 §G の結論 (Sonnet 4.5 main) を破ることになる
 
 ### 代替案 2: モデル切り替えを CLAUDE.md ではなく settings.json で固定 (静的設定)
 - メリット: 判定不要、シンプル
@@ -140,7 +140,7 @@ ADR-0003 §B で確定した role mapping を sub-agent 定義から参照する
 1. **Haiku の指示遵守率**: CLAUDE.md ルールを main (Sonnet 4.5) が確実に発火させるか、Phase 3 で実機検証必要
 2. **委譲オーバーヘッド**: sub-agent 呼出 1 回の context 構築 cost と Haiku 単価のトレードオフ点を測定要
 3. **判定基準のグレーゾーン**: 「軽 vs 重」の自動判定で誤判定したケースのリカバリ方法 (Sonnet 引き取り) の発火条件
-4. **dev-templates ADR-0017 / 0042 の流用範囲**: agents 定義の generate ロジックを dev-templates から移植するか、新規に書くか (ADR-0002 では ADR-0042 を変形移植カテゴリ B にしている)
+4. **agents 配布ロジックの実装範囲**: agents 定義の generate ロジックを既存の apply 設計から流用するか、新規に書くか (ADR-0002 では apply-deploys-agents-and-settings を変形採用カテゴリ B にしている)
 5. **Haiku 1h cache の確認**: ADR-0001 §G の未解決 #5 と同じ。Haiku 4.5 の 1h cache サポート確認次第、Haiku を main 化する選択肢も復活する
 
 ## 結果
@@ -163,8 +163,8 @@ ADR-0003 §B で確定した role mapping を sub-agent 定義から参照する
 ## 参照
 
 - ADR-0001 (clean start design) §G モデル戦略 / §G-2 抽象化方針注記
-- ADR-0002 (ADR portage triage) §B 0042 apply-deploys-agents-and-settings 変形移植
+- ADR-0002 (ADR セット取捨選択方針) §B apply-deploys-agents-and-settings 変形採用
 - ADR-0003 (bootstrap + 抽象化) §A bootstrap フロー / §B `config/models.yaml` SSoT
-- dev-templates ADR-0017 cost-optimization (sub-agent 委譲パターンの先例)
-- dev-templates ADR-0042 apply-deploys-agents-and-settings (agents 配布の参考)
-- t-tamaki-todo `docs/2026-06-04-bedrock-1h-cache-investigation-complete.md` §3.1 / §8.1 (Haiku 4.5 1h cache 未測定の根拠)
+- cost-optimization (sub-agent 委譲パターン) を本 ADR の Haiku 委譲設計の先例として参照
+- apply-deploys-agents-and-settings は apply-claude-kit.ps1 の agents 配布として実装 (§B)
+- Haiku 4.5 1h cache 未測定の根拠は実環境での Bedrock 1h cache 実測検証 §3.1 / §8.1
