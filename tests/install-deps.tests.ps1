@@ -21,7 +21,9 @@ Describe "install-deps.ps1" {
     It "runs in DryRun mode and exits 0 (winget present) or 1 (winget absent)" {
         # Either outcome is acceptable: exit 1 only happens when winget is not on
         # PATH, which emits the manual-install guidance and is not a script fault.
-        & powershell -NoProfile -File $ScriptPath -DryRun -Quiet 2>&1 | Out-Null
+        # -AllowElevated: CI runners (e.g. GitHub windows-latest) run elevated, so
+        # the ADR-0008 fail-fast guard would otherwise exit 2 before the dry run.
+        & powershell -NoProfile -File $ScriptPath -DryRun -Quiet -AllowElevated 2>&1 | Out-Null
         ($LASTEXITCODE -eq 0 -or $LASTEXITCODE -eq 1) | Should Be $true
     }
 }

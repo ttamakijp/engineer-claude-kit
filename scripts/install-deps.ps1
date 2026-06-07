@@ -7,10 +7,15 @@
 [CmdletBinding()]
 param(
     [switch]$DryRun,
-    [switch]$Quiet
+    [switch]$Quiet,
+    [switch]$AllowElevated
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Fail-fast if running as Administrator (see ADR-0008). Escape hatch: -AllowElevated.
+. (Join-Path (Join-Path $PSScriptRoot "lib") "privilege-check.ps1")
+Assert-NonElevated -AllowElevated:$AllowElevated
 
 function Write-Info {
     param([string]$msg)
