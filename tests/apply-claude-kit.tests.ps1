@@ -67,11 +67,11 @@ Describe "apply-claude-kit.ps1" {
     }
 
     It "applies checkpoint command in Project mode" {
-        Test-Path (Join-Path $MockProject ".claude" "commands" "checkpoint.md") | Should Be $true
+        Test-Path (Join-Path (Join-Path (Join-Path $MockProject ".claude") "commands") "checkpoint.md") | Should Be $true
     }
 
     It "applies resume command in Project mode" {
-        Test-Path (Join-Path $MockProject ".claude" "commands" "resume.md") | Should Be $true
+        Test-Path (Join-Path (Join-Path (Join-Path $MockProject ".claude") "commands") "resume.md") | Should Be $true
     }
 
     It "applies settings.json in Project mode" {
@@ -109,11 +109,11 @@ Describe "apply-claude-kit.ps1" {
     }
 
     It "applies pre-commit hook in Project mode" {
-        Test-Path (Join-Path $MockProject ".git" "hooks" "pre-commit") | Should Be $true
+        Test-Path (Join-Path (Join-Path (Join-Path $MockProject ".git") "hooks") "pre-commit") | Should Be $true
     }
 
     It "applies pre-push hook in Project mode" {
-        Test-Path (Join-Path $MockProject ".git" "hooks" "pre-push") | Should Be $true
+        Test-Path (Join-Path (Join-Path (Join-Path $MockProject ".git") "hooks") "pre-push") | Should Be $true
     }
 
     It "applies .gitleaks.toml when missing" {
