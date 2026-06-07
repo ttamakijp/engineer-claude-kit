@@ -235,3 +235,92 @@ dry-run まで動作確認するだけでも以下が確認可能:
 - ADR-0003 (bootstrap design) §A bootstrap フロー
 - ADR-0004 (auto model routing) §B sub-agent 定義
 - README §6 制約 (Windows + PowerShell ASCII only)
+
+---
+
+## Appendix A: 自宅 vs Bedrock 検証マトリクス
+
+正式 release 前の暫定 doc。**ほとんどの機能は自宅 (Anthropic API 直 = 非 Bedrock) で先行検証可能**。Bedrock 環境必須は cost 計測 / 1h cache / Bedrock model ID 受理のみ。
+
+### A. ファイル配布 / スクリプト系 (API 不要、純粋 PowerShell + Git)
+
+| 項目 | 検証方法 | 期待結果 |
+|---|---|---|
+| `bootstrap.ps1` clone + 配置 | `git clone … ~/.claude-kit` → `./bootstrap.ps1` | `~/.claude/` 配下に CLAUDE.md / settings.json / agents / skills / commands / work-schedule.yaml が出現 |
+| `apply-claude-kit.ps1 -Global -DryRun` | コマンド実行 | dry-run 出力で 12+ ファイルの配置先表示 |
+| `apply-claude-kit.ps1 -Project <path>` | mock project 作成 → 実行 | project 配下に CLAUDE.md / .claude/rules / hooks / .gitleaks.toml / .mailmap / .gitignore 配置 |
+| `build-rules.ps1` source → dist 変換 | `pwsh scripts/build-rules.ps1` | `dist/.claude/rules/*.md` 5 件生成 |
+| Pester smoke test 全 23 件 | `Invoke-Pester tests/apply-claude-kit.tests.ps1` | 全 pass |
+| `.work-end-today` 自動配布 | apply Global 実行 → `~/.claude/work-schedule.yaml` 確認 | 初回 hint 表示 + yaml 配置 |
+
+### B. Slash Command / Skill / Agent 系 (Anthropic API 直で動作可)
+
+**事前準備**: `~/.claude/settings.json` を Anthropic API 用に一時編集する:
+
+```json
+{
+  "env": {
+    "ANTHROPIC_API_KEY": "<your home API key>",
+    "ANTHROPIC_MODEL": "claude-sonnet-4-5-20250929",
+    "ANTHROPIC_SMALL_FAST_MODEL": "claude-haiku-4-5-20251001"
+  }
+}
+```
+
+- model ID から `us.anthropic.` prefix を外す
+- `CLAUDE_CODE_USE_BEDROCK=1` 削除
+- `ENABLE_PROMPT_CACHING_1H_BEDROCK=1` 削除 (Anthropic API 直では効果なし)
+
+| 項目 | 検証方法 | 期待結果 |
+|---|---|---|
+| `/apply` slash command | Claude Code で `/apply` 入力 | apply-claude-kit.ps1 が起動、配布実行 |
+| `/checkpoint` (Group B) | Claude Code で `/checkpoint` | `.claude/checkpoints/<YYYYMMDD-HHMMSS>-<slug>.md` 生成、要約は Haiku で実行 |
+| `/resume` (Group B) | `/resume` または `/resume <slug>` | 最近 5 件提示 → 選択 → context 復元 |
+| agents 6 種 (commit-msg / lint-helper / log-summary / review / architect / debug-analyze) | 各種タスク依頼 → 自動委譲 | sub-agent 起動、適切な model に routing |
+| skills 3 種 (commit-helper / leak-check / propose-adr) | 関連トリガで起動確認 | skill 起動、期待動作 |
+| **work-end-reminder rule** | 朝 1 番に Claude 起動 | 「今日は何時に仕事を終わりますか?」と質問 |
+| **interactive 質問の回答 parse** | `17:30` / `休み` / `yaml` / `skip` 入力 | `~/.claude/.work-end-today` に書込、次ターンで動作確認 |
+| 大タスク確認 (Case 2) | 終業 30 分前 + 「実装」キーワード prompt | 着手前に (a)/(b)/(c) 選択 |
+| 終業時刻過ぎ reminder (Case 3) | 終業時刻過ぎ + 任意 prompt | 末尾に reminder + 「お疲れ様」 |
+
+### C. Git Hook / Leak 検出系 (gitleaks インストール + bash 環境)
+
+| 項目 | 検証方法 | 期待結果 |
+|---|---|---|
+| `pre-commit` hook | テスト project で `git commit` (PII or AWS key を含む) | hook 起動、commit reject |
+| `pre-push` hook | `refs/backup/` への push 試行 | reject |
+| `.gitleaks.toml` rule | `gitleaks protect --redact` 単独実行 | AWS / Anthropic key 検出 |
+| `.mailmap` 配置 | 配置済 → `git log --use-mailmap` | identity normalization 動作 (本質的にはツール側機能、配置確認のみで十分) |
+| `.gitignore` 配置 | 既存 vs 新規 project で確認 | 既存なら skip、新規なら配置 |
+
+### D. Documentation / README
+
+| 項目 | 検証方法 |
+|---|---|
+| README §2.1-§2.3 表 vs 実体 | 各行をリポジトリの実ファイルと突合 |
+| ADR 0001-0006 | 全 ADR を順読、設計判断と実装の整合確認 |
+| `docs/manual-verification/*.md` | 手順書を実行可能性で読む |
+
+### Bedrock 必須 (自宅では検証不可)
+
+| 項目 | 理由 | 必要環境 |
+|---|---|---|
+| settings.json の `CLAUDE_CODE_USE_BEDROCK=1` 経路 | Bedrock 接続そのもの | AWS IAM + Bedrock 有効 |
+| Bedrock model ID 受理 (`us.anthropic.claude-sonnet-4-5-20250929-v1:0` 形式) | Bedrock 固有 ARN 形式 | Bedrock |
+| `ENABLE_PROMPT_CACHING_1H_BEDROCK=1` の効果 (TTL 1h 効果検証) | Bedrock 固有 flag | Bedrock + 連続 call |
+| `AWS_MAX_ATTEMPTS=2` の retry 抑制効果 | AWS SDK 動作 | Bedrock |
+| `cost-observe-bedrock.ps1` | AWS Cost Explorer API | AWS 認証 |
+| 本 doc §V6 (cost 計測) | cost-observe-bedrock 実行 | Bedrock |
+| `docs/manual-verification/scenario-comparison.md` シナリオ A-D 完全実行 | Bedrock の応答 / cost / model routing 観測 | Bedrock |
+
+### 推奨検証順序
+
+1. **A 群 (ファイル配布)**: 自宅で完結、最小リスク、即実行可能
+2. **B 群 (slash command / agent / rule)**: 自宅で大半完了、特に `work-end-reminder` と `interactive 質問` は実機検証必須
+3. **C 群 (git hook)**: gitleaks インストール → 単独 project でテスト
+4. **D 群 (docs)**: 自宅で読み合わせ可能
+5. **Bedrock 環境で残り**: §V6 cost / 1h cache 効果 / Bedrock model ID 受理のみ
+
+### Appendix の管理
+
+本 appendix は **正式 release 前の一時情報**。release 後の doc 整理時に、本 bootstrap-installation.md 全体を refresh する流れで一緒に整理する (削除 or Quick Start に統合)。
