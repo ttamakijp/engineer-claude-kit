@@ -1,0 +1,95 @@
+# Engineer Claude Kit - Azure DevOps pipeline template
+# Customize the trigger paths, agent pool, and stage gates for your project.
+#
+# This template provides quality gates for projects using engineer-claude-kit:
+#   - Leak detection (gitleaks)
+#   - Pester tests on PowerShell 5.1 + 7 matrix
+#   - PSScriptAnalyzer lint (PS 5.1 compatibility)
+#
+# Prerequisites:
+#   - kit was applied to project via apply-claude-kit.ps1 -Project <repo>
+#   - .gitleaks.toml, scripts/lint.ps1, tests/ are present
+#   - Agent pool has Windows agents with PowerShell
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    exclude:
+      - '**/*.md'
+      - 'docs/**'
+
+pr:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: 'windows-latest'   # or: name: '<your-self-hosted-pool>'
+
+variables:
+  - name: pesterVersion
+    value: '3.4.0'
+
+stages:
+- stage: Quality
+  displayName: 'Quality Gates'
+  jobs:
+
+  - job: LeakScan
+    displayName: 'Leak Detection (gitleaks)'
+    steps:
+    - powershell: |
+        # Install gitleaks via winget (or download release)
+        if (-not (Get-Command gitleaks -ErrorAction SilentlyContinue)) {
+            winget install --id gitleaks.gitleaks --silent --accept-source-agreements --accept-package-agreements
+        }
+        gitleaks detect --source . --redact -v
+      displayName: 'Run gitleaks scan'
+      failOnStderr: false
+
+  - job: PesterPS51
+    displayName: 'Pester Tests (PowerShell 5.1)'
+    steps:
+    - powershell: |
+        Install-Module Pester -RequiredVersion $(pesterVersion) -Force -SkipPublisherCheck -Scope CurrentUser
+        if (Test-Path tests) {
+            $result = Invoke-Pester tests -PassThru
+            if ($result.FailedCount -gt 0) {
+                Write-Error "Pester failed: $($result.FailedCount) failures"
+                exit 1
+            }
+        } else {
+            Write-Host "No tests/ directory, skipping"
+        }
+      displayName: 'Run Pester (PS 5.1)'
+
+  - job: PesterPS7
+    displayName: 'Pester Tests (PowerShell 7)'
+    steps:
+    - pwsh: |
+        Install-Module Pester -RequiredVersion $(pesterVersion) -Force -SkipPublisherCheck -Scope CurrentUser
+        if (Test-Path tests) {
+            $result = Invoke-Pester tests -PassThru
+            if ($result.FailedCount -gt 0) {
+                Write-Error "Pester failed: $($result.FailedCount) failures"
+                exit 1
+            }
+        } else {
+            Write-Host "No tests/ directory, skipping"
+        }
+      displayName: 'Run Pester (PS 7)'
+
+  - job: Lint
+    displayName: 'PSScriptAnalyzer (PS 5.1 target)'
+    condition: succeededOrFailed()
+    steps:
+    - powershell: |
+        Install-Module PSScriptAnalyzer -Force -SkipPublisherCheck -Scope CurrentUser
+        if (Test-Path scripts/lint.ps1) {
+            pwsh -NoProfile -File scripts/lint.ps1 -Strict
+        } else {
+            Write-Host "No scripts/lint.ps1, skipping"
+        }
+      displayName: 'Run lint'

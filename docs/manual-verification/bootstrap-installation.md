@@ -247,6 +247,7 @@ dry-run まで動作確認するだけでも以下が確認可能:
 | 項目 | 検証方法 | 期待結果 |
 |---|---|---|
 | `install-deps.ps1` | `pwsh scripts/install-deps.ps1 -DryRun` で確認後、`-DryRun` を外して実行 | winget 経由で gitleaks / gh / pwsh / node がインストール (既存は skip) |
+| `scripts/lint.ps1 -Strict` | `pwsh scripts/lint.ps1 -Strict` (PSScriptAnalyzer 自動 install) | PS 5.1 互換性違反があれば exit 1 |
 | `bootstrap.ps1` clone + 配置 | `git clone … ~/.claude-kit` → `./bootstrap.ps1` | `~/.claude/` 配下に CLAUDE.md / settings.json / agents / skills / commands / work-schedule.yaml が出現 |
 | `apply-claude-kit.ps1 -Global -DryRun` | コマンド実行 | dry-run 出力で 12+ ファイルの配置先表示 |
 | `apply-claude-kit.ps1 -Project <path>` | mock project 作成 → 実行 | project 配下に CLAUDE.md / .claude/rules / hooks / .gitleaks.toml / .mailmap / .gitignore 配置 |
