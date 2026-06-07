@@ -2,8 +2,11 @@
 # Pester v3.4 smoke tests for scripts/build-rules.ps1 (Windows PowerShell 5.1).
 # ASCII only.
 
-$ScriptPath = Join-Path (Join-Path (Join-Path $PSScriptRoot "..") "scripts") "build-rules.ps1"
-$SourceDir = Join-Path (Join-Path (Join-Path $PSScriptRoot "..") "source") "rules"
+# $PSScriptRoot can be empty when Invoke-Pester is given a direct file path
+# (vs a directory). Fall back to MyInvocation, then the current location.
+$here = if ($PSScriptRoot) { $PSScriptRoot } elseif ($MyInvocation.MyCommand.Path) { Split-Path -Parent $MyInvocation.MyCommand.Path } else { (Get-Location).Path }
+$ScriptPath = Join-Path (Join-Path (Join-Path $here "..") "scripts") "build-rules.ps1"
+$SourceDir = Join-Path (Join-Path (Join-Path $here "..") "source") "rules"
 $TempDist = Join-Path $env:TEMP "engineer-claude-kit-test-dist"
 if (Test-Path $TempDist) {
     Remove-Item -Recurse -Force $TempDist

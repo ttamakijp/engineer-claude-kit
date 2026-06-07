@@ -36,7 +36,7 @@ jobs:
       if: matrix.ps-version == '5.1'
       shell: powershell
       run: |
-        $result = Invoke-Pester tests/apply-claude-kit.tests.ps1 -PassThru
+        $result = Invoke-Pester -Path tests -PassThru
         if ($result.FailedCount -gt 0) {
           Write-Error "Pester failures: $($result.FailedCount)"
           exit 1
@@ -46,7 +46,7 @@ jobs:
       if: matrix.ps-version == '7'
       shell: pwsh
       run: |
-        $result = Invoke-Pester tests/apply-claude-kit.tests.ps1 -PassThru
+        $result = Invoke-Pester -Path tests -PassThru
         if ($result.FailedCount -gt 0) {
           Write-Error "Pester failures: $($result.FailedCount)"
           exit 1
