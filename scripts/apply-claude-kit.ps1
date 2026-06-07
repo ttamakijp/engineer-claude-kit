@@ -213,7 +213,6 @@ if ($Project) {
     $targetAgentsDir = Join-Path (Join-Path $resolvedProject ".claude") "agents"
     $targetSkillsDir = Join-Path (Join-Path $resolvedProject ".claude") "skills"
     $targetCommandsDir = Join-Path (Join-Path $resolvedProject ".claude") "commands"
-    $targetSettings = Join-Path (Join-Path $resolvedProject ".claude") "settings.json"
     $targetRulesDir = Join-Path (Join-Path $resolvedProject ".claude") "rules"
     $markerRoot = $resolvedProject
     $mode = "Project"
@@ -224,7 +223,6 @@ if ($Project) {
     $targetAgentsDir = Join-Path $homeClaude "agents"
     $targetSkillsDir = Join-Path $homeClaude "skills"
     $targetCommandsDir = Join-Path $homeClaude "commands"
-    $targetSettings = Join-Path $homeClaude "settings.json"
     # Rules are project-specific (Claude Code convention) and are not deployed in Global mode.
     $targetRulesDir = $null
     $markerRoot = $homeClaude
@@ -239,7 +237,6 @@ $sourceClaudeMd = Join-Path $templatesRoot "CLAUDE.md"
 $sourceAgentsDir = Join-Path $templatesRoot "agents"
 $sourceSkillsDir = Join-Path $templatesRoot "skills"
 $sourceCommandsDir = Join-Path $templatesRoot "commands"
-$sourceSettings = Join-Path $templatesRoot "settings.json"
 
 $appliedFiles = @()
 
@@ -248,16 +245,6 @@ $null = Copy-Template -SourceFile $sourceClaudeMd -DestFile $targetClaudeMd `
     -ModelsConfig $modelsConfig -IsDryRun:$DryRun
 $appliedFiles += $targetClaudeMd
 
-# Copy settings.json
-# Deployed in both Global (~/.claude/settings.json) and Project
-# (<project>/.claude/settings.json) modes. Model role placeholders
-# ({{role:main}}, {{role:small-fast}}) are resolved via Copy-Template from
-# config/models.yaml, so the Bedrock model IDs stay in a single source of truth.
-if (Test-Path $sourceSettings) {
-    $null = Copy-Template -SourceFile $sourceSettings -DestFile $targetSettings `
-        -ModelsConfig $modelsConfig -IsDryRun:$DryRun
-    $appliedFiles += $targetSettings
-}
 
 # Copy agents/*.md
 $agentFiles = Get-ChildItem -LiteralPath $sourceAgentsDir -Filter "*.md" -File
@@ -445,5 +432,13 @@ if (-not $DryRun) {
 }
 
 Write-Host ""
+# Hands-off settings.json (ADR-0007): the kit no longer manages settings.json.
+# Display a hint pointing users to docs/setup/.
+Write-Host ""
+Write-Host "[hint] settings.json is NOT managed by this kit (hands-off policy, see ADR-0007)."
+Write-Host "       Setup guide and examples: <kit>/docs/setup/settings-setup.md"
+Write-Host "       - For Bedrock environment: docs/setup/settings-bedrock.example.json"
+Write-Host "       - For Anthropic API direct: docs/setup/settings-anthropic.example.json"
+
 Write-Host "Applied $($appliedFiles.Count) file(s) in $mode mode."
 if ($DryRun) { Write-Host "Note: -DryRun was specified, no files were modified." }
