@@ -176,7 +176,10 @@ engineer-claude-kit/
 | `templates/skills/apply-claude-kit/SKILL.md` | kit を再適用する skill (技能) のソース | ✅ Phase 2 |
 | `templates/commands/apply.md` | `/apply` slash command のソース | ✅ Phase 2 |
 | `tests/*.tests.ps1` | Pester 単体テスト (bootstrap / apply / build-rules / cost-observe / install-deps / lint、PS 5.1 + Pester 3.4 互換) | ✅ |
-| `.github/workflows/ci.yml` | kit 自身の CI: PS 5.1 + PS 7 matrix Pester + lint | ✅ Phase 4 |
+| `.github/workflows/ci.yml` | kit 自身の CI: PS 5.1 + PS 7 matrix Pester + lint + Leak Scan (gitleaks dogfood、ADR-0009) | ✅ Phase 4 / P9 |
+| `.gitleaks.toml` (top-level) | kit リポジトリ自身の gitleaks 設定 (leak protection ドッグフード、ADR-0009) | ✅ P9 |
+| `.github/CODEOWNERS` | single-admin owner 定義 (ADR-0009) | ✅ P9 |
+| `CONTRIBUTING.md` | 貢献ワークフロー + hard rules + テスト手順 (ADR-0009) | ✅ P9 |
 | `PSScriptAnalyzerSettings.psd1` | PS 5.1 互換性 lint 設定 (PSUseCompatibleSyntax / Commands) | ✅ Phase 4 |
 | `scripts/lint.ps1` | PSScriptAnalyzer runner (local + CI 共通、未導入時は非対話で自己 install) | ✅ Phase 4 |
 | `docs/manual-verification/` | kit 効果測定の手動検証手順 (scenario-comparison: 5 軸比較) | ✅ |
@@ -274,6 +277,7 @@ bootstrap.ps1 および同梱スクリプトはすべて **ユーザ権限で動
 | [ADR-0006](docs/adr/0006-work-end-reminder.md) | work-end-reminder rule (終業リマインダ / ホスピタリティ機能、Group F') | Accepted |
 | [ADR-0007](docs/adr/0007-hands-off-settings.md) | settings.json hands-off policy | Accepted |
 | [ADR-0008](docs/adr/0008-privilege-aware-bootstrap.md) | bootstrap スクリプトの非管理者権限実行強制 (Administrator 検出で fail-fast) | Accepted |
+| [ADR-0009](docs/adr/0009-repository-governance.md) | repository governance (branch protection + leak protection dogfood + CODEOWNERS、P9) | Accepted |
 
 ## 5. モデル戦略 (要約)
 
