@@ -11,7 +11,9 @@ param(
     [string]$GitUrl,
     [switch]$SkipProjectPrompt,
     [switch]$NoEnvPersist,
-    [switch]$AllowElevated
+    [switch]$AllowElevated,
+    [switch]$NonInteractive,
+    [switch]$NoSettingsWizard
 )
 
 $ErrorActionPreference = 'Stop'
@@ -137,6 +139,11 @@ Write-Host "[invoke] apply-claude-kit.ps1 -Global"
 $applyArgs = @("-NoProfile", "-File", $applyScript, "-Global")
 if ($DryRun) { $applyArgs += "-DryRun" }
 if ($AllowElevated) { $applyArgs += "-AllowElevated" }
+# Bootstrap owns the settings wizard and runs it once at the very end (after the
+# optional project prompt), so suppress it inside the apply -Global subprocess to
+# avoid prompting twice. Direct `apply-claude-kit.ps1 -Global` still runs it.
+$applyArgs += "-NoSettingsWizard"
+if ($NonInteractive) { $applyArgs += "-NonInteractive" }
 
 & powershell @applyArgs
 if ($LASTEXITCODE -ne 0) {
@@ -190,3 +197,14 @@ Write-Host "[hint] To install required tools (gitleaks, gh, node, etc.) via wing
 Write-Host "       powershell -NoProfile -File `"$kitRoot\scripts\install-deps.ps1`""
 Write-Host "       (or use ``pwsh`` instead of ``powershell`` if you prefer PowerShell 7+)"
 Write-Host "       (add -DryRun to preview without installing anything)"
+
+# Step 7: optional interactive settings wizard (ADR-0010).
+# Opt-in deep merge of missing settings.json keys (statusLine /
+# ANTHROPIC_SMALL_FAST_MODEL). Skipped on -DryRun (no modifications) and on
+# -NoSettingsWizard. The wizard itself skips in non-interactive contexts
+# (-NonInteractive / $env:CI / no UserInteractive console), so the default
+# non-interactive behavior is unchanged.
+if (-not $DryRun -and -not $NoSettingsWizard) {
+    . (Join-Path $PSScriptRoot "setup-wizard.ps1")
+    Invoke-SettingsSetupWizard -NonInteractive:$NonInteractive
+}

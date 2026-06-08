@@ -17,6 +17,14 @@ param(
 
     [switch]$AllowElevated,
 
+    # Skip the interactive settings wizard entirely (ADR-0010). bootstrap.ps1
+    # passes this so the wizard runs once at the end of bootstrap, not twice.
+    [switch]$NoSettingsWizard,
+
+    # Force the settings wizard into non-interactive (skip) mode regardless of
+    # console state. Honored only when the wizard would otherwise run (Global).
+    [switch]$NonInteractive,
+
     # Default resolved in the body: referencing $PSScriptRoot in a param default
     # is unreliable under Windows PowerShell 5.1 when parameter sets are present.
     [string]$KitRoot
@@ -449,3 +457,13 @@ Write-Host "       - For Anthropic API direct: docs/setup/settings-anthropic.exa
 
 Write-Host "Applied $($appliedFiles.Count) file(s) in $mode mode."
 if ($DryRun) { Write-Host "Note: -DryRun was specified, no files were modified." }
+
+# Optional interactive settings wizard (ADR-0010), Global mode only.
+# This is the sanctioned exception to the ADR-0007 hands-off policy: it asks
+# before every change and only deep-merges missing keys. Skipped on -DryRun (no
+# modifications), -NoSettingsWizard, and in Project mode. The wizard itself
+# skips in non-interactive contexts, so non-interactive callers are unaffected.
+if ($mode -eq "Global" -and -not $DryRun -and -not $NoSettingsWizard) {
+    . (Join-Path $PSScriptRoot "setup-wizard.ps1")
+    Invoke-SettingsSetupWizard -NonInteractive:$NonInteractive
+}

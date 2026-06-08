@@ -213,6 +213,7 @@ git clone <repository-url> "$env:USERPROFILE\.claude-kit"
 1. clone した repo の `git remote get-url origin` から配布元 URL を取得 → ユーザ環境変数 `ENGINEER_CLAUDE_KIT_GIT_URL` に永続保存 (以降の自動更新の起点)
 2. `~/.claude/CLAUDE.md` / `agents/` / `skills/` / `commands/` を配置
 3. (任意) 現在の cwd が git repo なら、その project にも `.claude/` を配置するか提案 (yes なら `apply-claude-kit.ps1 -Project (Get-Location)` を内部呼出)
+4. (任意) 対話的セットアップ wizard が起動し、`~/.claude/settings.json` に欠落している `statusLine` / `ANTHROPIC_SMALL_FAST_MODEL` を Y/N 確認のうえ追加 (default=Y、既存値は上書きしない、非対話/CI では自動 skip、`-NoSettingsWizard` で完全 skip 可。ADR-0010)
 
 これで Claude Code 起動時に kit の skill / agent / command が利用可能になる。**以降の操作はすべて Claude Code 内の `/apply` で完結し、bootstrap.ps1 を再実行する必要はない。**
 
@@ -278,6 +279,7 @@ bootstrap.ps1 および同梱スクリプトはすべて **ユーザ権限で動
 | [ADR-0007](docs/adr/0007-hands-off-settings.md) | settings.json hands-off policy | Accepted |
 | [ADR-0008](docs/adr/0008-privilege-aware-bootstrap.md) | bootstrap スクリプトの非管理者権限実行強制 (Administrator 検出で fail-fast) | Accepted |
 | [ADR-0009](docs/adr/0009-repository-governance.md) | repository governance (branch protection + leak protection dogfood + CODEOWNERS、P9) | Accepted |
+| [ADR-0010](docs/adr/0010-interactive-settings-wizard.md) | 対話的 settings wizard (opt-in deep merge、ADR-0007 hands-off の明示承認例外、P11) | Accepted |
 
 ## 5. モデル戦略 (要約)
 

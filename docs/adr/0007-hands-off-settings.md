@@ -8,6 +8,8 @@ tags: [settings, backend, hands-off, responsibility-separation]
 # ADR-0007: Hands-off settings.json policy
 
 > This ADR was promoted from Proposed to Accepted in this PR. Implementation is included.
+>
+> **2026-06-08 Update (wizard exception):** 明示承認を経た opt-in な wizard (ADR-0010) 経由の deep merge は本ポリシーの例外として許容する。wizard は項目ごとに Y/N 確認し、欠落 keys のみ追加 (既存 keys は決して上書きしない)、変更前 backup を取り、非対話モードでは skip する。default hands-off (kit が無確認で settings.json を書き換えない) は不変。詳細は [ADR-0010](0010-interactive-settings-wizard.md)。
 
 ## Context
 
