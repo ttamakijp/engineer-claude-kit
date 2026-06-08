@@ -133,12 +133,13 @@ function Invoke-SettingsSetupWizard {
     # --- 1. statusLine ---
     if (-not $settings.ContainsKey('statusLine')) {
         Write-Host "[?] statusLine setting not found."
-        Write-Host "    Add a 'current model + context usage' statusline?"
+        Write-Host "    Add a 'current model + color-coded context usage' statusline?"
+        Write-Host "    (green < 75%, yellow 75-90%, red >= 90%; see ADR-0012)"
         $ans = Read-Host "    [Y]es / [n]o (default: Y)"
         if ([string]::IsNullOrWhiteSpace($ans) -or $ans -match '^[Yy]') {
             $settings['statusLine'] = @{
                 type    = 'command'
-                command = 'powershell -NoProfile -Command "$input | ConvertFrom-Json | ForEach-Object { Write-Host (''['' + $_.model.display_name + ''] '' + [Math]::Floor($_.context_window.used_percentage) + ''% context'') }"'
+                command = 'powershell -NoProfile -Command "$input | ConvertFrom-Json | ForEach-Object { $p=[Math]::Floor($_.context_window.used_percentage); $c=if($p -ge 90){''31''}elseif($p -ge 75){''33''}else{''32''}; Write-Host ([char]27 + ''['' + $c + ''m['' + $_.model.display_name + ''] '' + $p + ''% context'' + [char]27 + ''[0m'') }"'
             }
             $modified = $true
             Write-Host "[OK] statusLine added"

@@ -23,8 +23,26 @@ kit は `~/.claude/settings.json` を**無確認で**生成・上書きしませ
 
 | key | 内容 |
 |---|---|
-| `statusLine` | 現在の model 名 + context 使用率を表示 (PowerShell ネイティブ、jq 不要。`docs/setup/statusline-powershell.example.json` 参照) |
+| `statusLine` | 現在の model 名 + context 使用率を**色分け表示** (PowerShell ネイティブ、jq 不要。`docs/setup/statusline-powershell.example.json` 参照) |
 | `env.ANTHROPIC_SMALL_FAST_MODEL` | Haiku 委譲を有効化 (ADR-0004)。Bedrock / Anthropic API 直で形式を出し分け |
+
+### statusLine の context % 色分け (ADR-0012)
+
+deploy される statusLine は context 使用率に応じて ANSI escape で色を変え、視覚的に `/compact` を促します:
+
+| context % | 色 | ANSI code | 推奨アクション |
+|---|---|---|---|
+| `< 75%` | 緑 | `32` | 通常運用 |
+| `75-90%` | 黄 | `33` | 区切りの良いタイミングで `/compact` |
+| `>= 90%` | 赤 | `31` | 即座に `/compact` (auto-compact 95% を回避) |
+
+背景: Claude Code には `/compact` の真の auto-trigger が無く (hooks は slash command を発火できず、
+Claude 自身は context % をリアルタイム不可視)、auto-compact は内部 ~95% でのみ動作し summary loss
+リスクがある。色分けで満杯前に user が能動的に compact できるようにする半自動化です (ADR-0012)。
+
+threshold を変えたい場合は `~/.claude/settings.json` の `statusLine.command` 内の `90` / `75` を
+編集してください。ANSI escape の prefix は `[char]27` (PS 5.1 互換) で記述しています。
+Windows Terminal は ANSI 対応、legacy cmd.exe console は非対応 (Claude Code は Windows Terminal 推奨)。
 
 ### wizard を skip したい場合
 
@@ -94,4 +112,6 @@ Write-Host "Backup: $backup"
 ## Refs
 
 - ADR-0007: docs/adr/0007-hands-off-settings.md
+- ADR-0010: docs/adr/0010-interactive-settings-wizard.md
+- ADR-0012: docs/adr/0012-context-awareness-convention.md (statusLine 色分け)
 - Claude Code 公式 docs: https://docs.claude.com/en/docs/build-with-claude/
