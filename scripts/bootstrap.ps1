@@ -187,5 +187,6 @@ if ($DryRun) { Write-Host "Note: -DryRun was specified, no files were modified a
 # Step 6: post-bootstrap hint for optional tool installation
 Write-Host ""
 Write-Host "[hint] To install required tools (gitleaks, gh, node, etc.) via winget, run:"
-Write-Host "       pwsh `"$kitRoot\scripts\install-deps.ps1`""
+Write-Host "       powershell -NoProfile -File `"$kitRoot\scripts\install-deps.ps1`""
+Write-Host "       (or use ``pwsh`` instead of ``powershell`` if you prefer PowerShell 7+)"
 Write-Host "       (add -DryRun to preview without installing anything)"
