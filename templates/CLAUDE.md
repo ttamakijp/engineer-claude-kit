@@ -82,6 +82,26 @@
 - `AWS_MAX_ATTEMPTS=2` で retry storm 抑制
 - 詳細: `~/.claude/settings.json` (engineer-claude-kit が generate)
 
+## 8. Context awareness (`/compact` 運用)
+
+Claude Code の context window は有限。長時間 session で statusline の context % が
+高くなった場合、auto-compact (内部 ~95% trigger) を待つよりも **早めに手動で `/compact`**
+する方が summary 品質が高い (auto-compact は summary loss リスクがある)。
+
+- statusline で context % を常時確認する (緑 / 黄 / 赤 で警告色。ADR-0012)
+  - 緑 (< 75%): 通常運用
+  - 黄 (75-90%): 区切りの良いタイミングで `/compact` を推奨
+  - 赤 (>= 90%): **即座に `/compact`** を推奨 (auto-compact 95% を回避)
+- 重要な context (進行中タスク、未完成の決定) が消えるリスクを減らすため、
+  `/compact` 前に MEMORY 保存や PR 作成等の節目を意識する
+- Claude Code には `/compact` の **真の auto-trigger は存在しない** (hooks は slash command
+  を発火できず、Claude 自身は context % をリアルタイムに把握できない)。視覚的な statusline 色分けと
+  本ガイドラインの組合せで半自動的に気づかせる設計 (ADR-0012)
+
+設定: statusline 色分けは setup wizard (ADR-0010) で deploy される statusLine 設定に
+含まれる (色分けの仕様は ADR-0012)。threshold は `~/.claude/settings.json` の statusLine を
+user 自身で編集して調整可能。
+
 ---
 
 このファイルは template です。配布時に `apply-claude-kit.ps1` が以下を substitution します:
