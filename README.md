@@ -280,6 +280,7 @@ bootstrap.ps1 および同梱スクリプトはすべて **ユーザ権限で動
 | [ADR-0008](docs/adr/0008-privilege-aware-bootstrap.md) | bootstrap スクリプトの非管理者権限実行強制 (Administrator 検出で fail-fast) | Accepted |
 | [ADR-0009](docs/adr/0009-repository-governance.md) | repository governance (branch protection + leak protection dogfood + CODEOWNERS、P9) | Accepted |
 | [ADR-0010](docs/adr/0010-interactive-settings-wizard.md) | 対話的 settings wizard (opt-in deep merge、ADR-0007 hands-off の明示承認例外、P11) | Accepted |
+| [ADR-0012](docs/adr/0012-context-awareness-convention.md) | context awareness convention (statusline 色分け + CLAUDE.md ガイドラインで `/compact` を半自動化、P13) | Accepted |
 
 ## 5. モデル戦略 (要約)
 
@@ -291,6 +292,17 @@ bootstrap.ps1 および同梱スクリプトはすべて **ユーザ権限で動
 - コスト観測: `scripts/cost-observe-bedrock.ps1` が AWS Cost Explorer から weekly report を生成、`config/cost-budget.yaml` のしきい値で予算監視 (Phase 3.2)
 
 根拠: 実環境での Bedrock 1h cache 実測検証 (cost 54% 削減実証)
+
+### 5.1 context awareness (`/compact` 運用)
+
+Claude Code には `/compact` の真の auto-trigger 機構が無い (hooks は slash command を発火できず、
+Claude 自身は context % をリアルタイムに把握できない)。kit は半自動化として 2 つを配布する (ADR-0012):
+
+- **statusline 色分け**: context % を緑 (< 75%) / 黄 (75-90%) / 赤 (>= 90%) で表示し、満杯前に視覚的に警告
+  (setup wizard で deploy される statusLine の default。`docs/setup/statusline-powershell.example.json` 参照)
+- **CLAUDE.md ガイドライン**: 「context % が高い場合は早めに手動 `/compact`」を `templates/CLAUDE.md` §8 に明記
+
+詳細は [ADR-0012](docs/adr/0012-context-awareness-convention.md) / [docs/setup/settings-setup.md](docs/setup/settings-setup.md)。
 
 ## 6. 制約・前提
 
