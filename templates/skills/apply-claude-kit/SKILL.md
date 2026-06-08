@@ -2,13 +2,28 @@
 name: apply-claude-kit
 description: |
   engineer-claude-kit の最新内容を ~/.claude/ または指定プロジェクトに反映する skill。
-  user が「設定を更新したい」「kit を再適用」と言ったときに起動。
+  user が「設定を更新したい」「kit を再適用」「.claude/ を最新化」と自然言語で言ったときの入口。
+  内部処理は /apply slash command と同一 (apply-claude-kit.ps1 を起動)。
+  引数 (-Project / -DryRun) を明示する場合は /apply <path> または /apply --dry-run を直接使う方が確実。
 ---
 
 # apply-claude-kit
 
 engineer-claude-kit リポジトリ内の SSoT (templates / config / source/rules) から、
 最新の設定をユーザ環境 (~/.claude/ または <project>/.claude/) に配布する。
+
+## /apply slash command との関係 (責務分離)
+
+このスキルは `/apply` slash command と **同一処理** (apply-claude-kit.ps1 起動) を行う。
+両者は入口が異なるだけで、最終的に呼ぶ script・配布結果は同じ:
+
+- **skill (本ファイル)** = 文脈検出の入口。「kit を再適用」「.claude/ を最新化」のような
+  自然言語の依頼を受けて、適切な引数を推定し `/apply` 相当の処理へ誘導する。
+- **`/apply` command** = 実行系の入口。引数 (`-Project` / `-DryRun`) を **明示的に** 指定したい
+  場合は、`/apply <path>` または `/apply --dry-run` を直接使う方が確実 (推定を挟まない)。
+
+迷ったとき: 引数を自分で決められるなら `/apply`、曖昧な自然言語依頼ならこの skill。
+引数仕様の詳細は [docs/setup/apply-command-reference.md](../../../docs/setup/apply-command-reference.md) を参照。
 
 ## 起動条件
 
