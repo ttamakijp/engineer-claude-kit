@@ -4,11 +4,39 @@
 
 ## 背景: hands-off ポリシー
 
-kit は `~/.claude/settings.json` を生成・上書きしません (ADR-0007)。理由:
+kit は `~/.claude/settings.json` を**無確認で**生成・上書きしません (ADR-0007)。理由:
 
 - Bedrock 接続設定や推奨 model ID は動的 (AWS region、cache 仕様、新 model release で変わる)
 - settings.json は user environment config の領域 (個人 preference や機密を含む)
 - CLAUDE.md / rules / agents / skills (kit が ship する部品) とは責務の質が違う
+
+## 対話的セットアップ wizard (opt-in、ADR-0010)
+
+手動コピーの摩擦を減らすため、`bootstrap.ps1` 末尾と `apply-claude-kit.ps1 -Global` 末尾で**対話的 wizard** が起動します。これは hands-off ポリシーの**明示承認例外**であり、以下を厳守します:
+
+- **項目ごとに Y/N 確認** (default = Y、Enter で追加、明示的に N / s で skip)
+- **欠落 key のみ deep merge** — 既存の `theme` / `env` 等の値は決して上書きしない
+- **変更前に backup** (`settings.json.bak-<timestamp>`)
+- **非対話なら自動 skip** — `-NonInteractive` / `$env:CI` / 非対話コンソールでは何もしない (CI / scripted 経路は不変)
+
+対象 key:
+
+| key | 内容 |
+|---|---|
+| `statusLine` | 現在の model 名 + context 使用率を表示 (PowerShell ネイティブ、jq 不要。`docs/setup/statusline-powershell.example.json` 参照) |
+| `env.ANTHROPIC_SMALL_FAST_MODEL` | Haiku 委譲を有効化 (ADR-0004)。Bedrock / Anthropic API 直で形式を出し分け |
+
+### wizard を skip したい場合
+
+```powershell
+# bootstrap 全体で wizard を起動しない
+& "$env:USERPROFILE\.claude-kit\scripts\bootstrap.ps1" -NoSettingsWizard
+
+# 非対話で強制 skip (CI 等。$env:CI でも自動 skip される)
+powershell -NoProfile -File "$env:USERPROFILE\.claude-kit\scripts\apply-claude-kit.ps1" -Global -NonInteractive
+```
+
+wizard を使わず手動で設定したい場合は、以下の環境別手順をそのまま使えます。
 
 ## 環境別の選択
 

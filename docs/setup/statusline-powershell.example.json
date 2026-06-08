@@ -1,0 +1,6 @@
+{
+  "statusLine": {
+    "type": "command",
+    "command": "powershell -NoProfile -Command \"$input | ConvertFrom-Json | ForEach-Object { Write-Host ('[' + $_.model.display_name + '] ' + [Math]::Floor($_.context_window.used_percentage) + '% context') }\""
+  }
+}
