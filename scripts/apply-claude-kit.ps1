@@ -25,6 +25,11 @@ param(
     # console state. Honored only when the wizard would otherwise run (Global).
     [switch]$NonInteractive,
 
+    # Opt-in: deploy the cleanup-orphan-processes scheduled-task spec (ADR-0011).
+    # Off by default; the skill + slash command always ship, but the hourly task
+    # spec is only placed when this is passed (Global mode only).
+    [switch]$EnableCleanupSchedule,
+
     # Default resolved in the body: referencing $PSScriptRoot in a param default
     # is unreliable under Windows PowerShell 5.1 when parameter sets are present.
     [string]$KitRoot
@@ -439,6 +444,40 @@ if ($mode -eq "Global") {
     } elseif (Test-Path $scheduleDest) {
         Write-Host "[skip] $scheduleDest already exists (preserving user customization)"
     }
+}
+
+# Cleanup-orphan-processes scheduled task (Global mode, opt-in only -- ADR-0011)
+# The cleanup skill and /cleanup-processes command always ship (generic skill /
+# command loops above). The hourly scheduled-task spec is heavier-handed (auto
+# kill on a timer), so it is placed only when -EnableCleanupSchedule is passed.
+# Specs live at templates/scheduled-tasks/<name>/<file>.md and deploy to
+# ~/.claude/scheduled-tasks/<name>/<file>.md, preserving the parent dir as the
+# task name (mirrors the skills layout). They carry no role placeholders, so
+# they are copied verbatim.
+if ($mode -eq "Global" -and $EnableCleanupSchedule) {
+    $sourceSchedTasksDir = Join-Path $templatesRoot "scheduled-tasks"
+    $targetSchedTasksDir = Join-Path $homeClaude "scheduled-tasks"
+    if (Test-Path $sourceSchedTasksDir) {
+        $schedTaskFiles = Get-ChildItem -LiteralPath $sourceSchedTasksDir -Recurse -Filter "*.md" -File
+        foreach ($schedTaskFile in $schedTaskFiles) {
+            $taskName = $schedTaskFile.Directory.Name
+            $destSchedTask = Join-Path (Join-Path $targetSchedTasksDir $taskName) $schedTaskFile.Name
+            if ($DryRun) {
+                Write-Host "[dry-run] $($schedTaskFile.FullName) -> $destSchedTask"
+            } else {
+                $schedTaskContent = Read-Utf8NoBom -Path $schedTaskFile.FullName
+                Write-Utf8NoBom -Path $destSchedTask -Content $schedTaskContent
+                Write-Host "[apply] $($schedTaskFile.FullName) -> $destSchedTask"
+            }
+            $appliedFiles += $destSchedTask
+        }
+        if (-not $DryRun) {
+            Write-Host "[hint] Cleanup scheduled-task spec deployed. To run it hourly, register it"
+            Write-Host "       with Windows Task Scheduler (see docs/setup/cleanup-processes.md)."
+        }
+    }
+} elseif ($mode -eq "Global") {
+    Write-Host "[skip] cleanup scheduled-task not deployed (pass -EnableCleanupSchedule to opt in)."
 }
 
 # Write marker file

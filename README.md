@@ -266,6 +266,18 @@ bootstrap.ps1 および同梱スクリプトはすべて **ユーザ権限で動
 
     powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude-kit\scripts\bootstrap.ps1"
 
+### 3.4 孤立プロセスの掃除 (`/cleanup-processes`)
+
+Claude Code を複数並列で運用すると、watch 系コマンド (`gh pr checks --watch` 等) が spawn した bash / gh / git の subprocess が孤立して残り、タスクマネージャに溜まることがある。`/cleanup-processes` で safety filter 付きで一括掃除できる。
+
+| 目的 | コマンド |
+|---|---|
+| 孤立 process を掃除 (kill) | `/cleanup-processes` |
+| 対象のプレビューのみ (kill しない) | `/cleanup-processes --dry-run` |
+| 自然言語で起動 | `cleanup-orphan-processes` skill (「孤立 process を掃除」等) |
+
+safety filter は **全て満たすもののみ kill**: 起動から 10 分以上経過 / CPU 5 秒未満 (idle) / `MainWindowTitle` 空 (background) / 親プロセスが IDE (VS Code 等) でない。kill 対象は **bash / gh / git のみ** で、PowerShell 本体は self-kill 回避のため対象外。毎時自動掃除は `apply-claude-kit.ps1 -Global -EnableCleanupSchedule` で opt-in (既定 OFF)。詳細・しきい値変更・Task Scheduler 登録は [docs/setup/cleanup-processes.md](docs/setup/cleanup-processes.md) / ADR-0011 を参照。
+
 ## 4. 設計判断 (ADR Index)
 
 | ADR | テーマ | ステータス |
@@ -280,6 +292,7 @@ bootstrap.ps1 および同梱スクリプトはすべて **ユーザ権限で動
 | [ADR-0008](docs/adr/0008-privilege-aware-bootstrap.md) | bootstrap スクリプトの非管理者権限実行強制 (Administrator 検出で fail-fast) | Accepted |
 | [ADR-0009](docs/adr/0009-repository-governance.md) | repository governance (branch protection + leak protection dogfood + CODEOWNERS、P9) | Accepted |
 | [ADR-0010](docs/adr/0010-interactive-settings-wizard.md) | 対話的 settings wizard (opt-in deep merge、ADR-0007 hands-off の明示承認例外、P11) | Accepted |
+| [ADR-0011](docs/adr/0011-cleanup-orphan-processes.md) | 孤立 bash/gh/git subprocess の cleanup (safety filter + opt-in scheduled-task、P12) | Accepted |
 | [ADR-0012](docs/adr/0012-context-awareness-convention.md) | context awareness convention (statusline 色分け + CLAUDE.md ガイドラインで `/compact` を半自動化、P13) | Accepted |
 
 ## 5. モデル戦略 (要約)
@@ -318,5 +331,6 @@ Claude 自身は context % をリアルタイムに把握できない)。kit は
 
 ## 8. 関連ドキュメント
 
-- [docs/adr/](docs/adr/): 設計判断の記録 (ADR-0001〜0006)
+- [docs/adr/](docs/adr/): 設計判断の記録 (ADR-0001〜0012)
+- [docs/setup/cleanup-processes.md](docs/setup/cleanup-processes.md): 孤立プロセス掃除 (`/cleanup-processes`) の詳細 / Task Scheduler 登録
 - [docs/manual-verification/](docs/manual-verification/): 手動検証手順 (bootstrap / apply / leak-scan)
