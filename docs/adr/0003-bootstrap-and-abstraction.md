@@ -1,6 +1,6 @@
 # ADR-0003: Bootstrap design + 設定値の抽象化 SSoT 化
 
-**ステータス**: Proposed (2026-06-08 Update: §B 配布元 URL 解決方針を現状実装に合わせて修正 / §C に encoding helper rule を追記)
+**ステータス**: Proposed (2026-06-08 Update: §B 配布元 URL 解決方針を現状実装に合わせて修正 / §C に encoding helper rule を追記 / 2026-06-08 Update P8: §C に PS 5.1 互換 hard rule を追加)
 **日付**: 2026-06-05 (Update: 2026-06-08)
 **Phase**: 1 → 2 (foundation → bootstrap implementation 設計)
 **関連**: ADR-0001 (clean start design) / ADR-0002 (ADR セット取捨選択方針) / ADR-0008 (privilege-aware bootstrap)
@@ -117,6 +117,21 @@ distribution:
   - PS 5.1 の `-Encoding UTF8` は **BOM 付き UTF-8** を出力し (`EF BB BF`)、frontmatter `---` の前に BOM が混入して parse 失敗・git binary marker 警告を招く。この設計上の trap を構造的に防ぐため
 - 例外: log / 一時ファイルでユーザ visible でないもの、および ASCII のみの flat config の行単位読込みは制約外
 - 自動検出 (PSScriptAnalyzer custom rule) は「未解決の問い」6 を参照
+
+**PS 5.1 互換 hard rule (2026-06-08 追記, P8)**:
+
+スクリプト本体 (`scripts/**/*.ps1`, `tests/**/*.tests.ps1`) は **Windows PowerShell 5.1 互換を必須** とする。Windows 既定で同梱されるのは Windows PowerShell 5.1 であり、pwsh (PowerShell 7+) 未 install 環境を排除しないため:
+
+- 以下の **PowerShell 7+ 専用構文を禁止**:
+  - null-conditional `?.` / null-coalescing `??` / null-coalescing 代入 `??=`
+  - ternary `<cond> ? <a> : <b>`
+  - PS 7+ 専用パラメータ (例: `Invoke-WebRequest -SkipHeaderValidation`)
+  - PS 7+ 専用 cmdlet
+  - 置換指針: `?.` → `if ($x) { $x.foo }`、`??` → 明示的な `if (-not $x) { $default }`、ternary → `if`/`else`
+- `[Type]::new(...)` constructor 構文は `New-Object` を優先する (一部 PS 5.1 でも `::new()` は動くが、analyzer profile / 可読性の統一のため `New-Object` に揃える。privilege-check.ps1 の `New-Object Security.Principal.WindowsPrincipal(...)` が範例)
+- doc / 例で `pwsh -File ...` を使う場合は **`powershell -File ...` でも動く** ことを注記する、または「PS 5.1 / pwsh どちらでも可」を明記する。pwsh 推奨理由 (出力 encoding が既定 UTF-8 で文字化け事故が減る / クロスプラットフォーム動作) は 1 行添える
+- **自動検出は導入済**: `PSScriptAnalyzerSettings.psd1` が `PSUseCompatibleSyntax` (`TargetVersions = 5.1`) + `PSUseCompatibleCommands` (PS 5.1 profile) を `IncludeRules` で有効化しており、`scripts/lint.ps1 -Strict` および CI (PS 5.1 + PS 7 matrix) で PS 7+ 構文を exit 1 で検出する。これにより本 hard rule は規約と機械検査の両面で担保される
+- 理由: Windows 既定の Windows PowerShell 5.1 で動作することを保証し、pwsh 未 install 環境を排除しない
 
 ### D. ADO の `_git` URL 形式
 

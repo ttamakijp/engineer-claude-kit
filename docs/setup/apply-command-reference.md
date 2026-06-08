@@ -25,16 +25,20 @@ engineer-claude-kit を現在の環境へ配布する `/apply` slash command と
 
 ### 直接呼出 (Claude Code を介さない場合)
 
+スクリプトは **Windows PowerShell 5.1 (`powershell`、Windows 既定で同梱) / PowerShell 7+ (`pwsh`) のどちらでも動作** する。以下は PS 5.1 でそのまま動く形:
+
 ```powershell
 # Global 再適用
-pwsh -NoProfile -File "$env:USERPROFILE\.claude-kit\scripts\apply-claude-kit.ps1" -Global
+powershell -NoProfile -File "$env:USERPROFILE\.claude-kit\scripts\apply-claude-kit.ps1" -Global
 
 # プロジェクト個別配置
-pwsh -NoProfile -File "$env:USERPROFILE\.claude-kit\scripts\apply-claude-kit.ps1" -Project C:\dev\my-project
+powershell -NoProfile -File "$env:USERPROFILE\.claude-kit\scripts\apply-claude-kit.ps1" -Project C:\dev\my-project
 
 # dry-run (Project mode)
-pwsh -NoProfile -File "$env:USERPROFILE\.claude-kit\scripts\apply-claude-kit.ps1" -Project C:\dev\my-project -DryRun
+powershell -NoProfile -File "$env:USERPROFILE\.claude-kit\scripts\apply-claude-kit.ps1" -Project C:\dev\my-project -DryRun
 ```
+
+> **pwsh (PowerShell 7+) 推奨**: 上記の `powershell` を `pwsh` に置き換えても同一処理が動く。pwsh は出力 encoding が既定 UTF-8 で文字化け事故が減り、クロスプラットフォームで動作するため、利用可能なら pwsh を推奨。未 install 環境でも PS 5.1 で動くため必須ではない。
 
 ## 2. 出力例
 

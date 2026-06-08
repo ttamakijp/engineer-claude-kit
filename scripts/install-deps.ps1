@@ -1,14 +1,17 @@
 #requires -Version 5.1
 # install-deps.ps1
-# Installs the tools engineer-claude-kit relies on (gitleaks / gh / pwsh / node)
-# via winget in one shot. Already-installed tools are skipped (idempotent).
+# Installs the tools engineer-claude-kit relies on (gitleaks / gh / node) via
+# winget in one shot. Already-installed tools are skipped (idempotent).
+# pwsh (PowerShell 7+) is optional and opt-in via -InstallPwsh: the kit's
+# baseline is Windows PowerShell 5.1, so pwsh is recommended but never required.
 # ASCII only (no Japanese in code, comments, or strings).
 # See ADR-0001.
 [CmdletBinding()]
 param(
     [switch]$DryRun,
     [switch]$Quiet,
-    [switch]$AllowElevated
+    [switch]$AllowElevated,
+    [switch]$InstallPwsh
 )
 
 $ErrorActionPreference = 'Stop'
@@ -87,10 +90,12 @@ if (-not (Test-WingetAvailable)) {
     exit 1
 }
 
+# pwsh (PowerShell 7+) is intentionally NOT in this list. The kit targets
+# Windows PowerShell 5.1 as its baseline, so pwsh is never required -- only
+# recommended. It is handled separately below, opt-in via -InstallPwsh.
 $tools = @(
     @{ name = 'gitleaks'; wingetId = 'gitleaks.gitleaks';    required = $true;  hint = 'Required for leak detection hooks (Group C)' },
     @{ name = 'gh';       wingetId = 'GitHub.cli';           required = $true;  hint = 'Required for PR operations from CLI' },
-    @{ name = 'pwsh';     wingetId = 'Microsoft.PowerShell'; required = $false; hint = 'Recommended for stable script execution (PS 7+)' },
     @{ name = 'node';     wingetId = 'OpenJS.NodeJS';        required = $false; hint = 'Required for Claude Code CLI (install separately via npm)' }
 )
 
@@ -127,6 +132,39 @@ foreach ($t in $tools) {
             Write-Info "  [skip] optional tool $($t.name) failed to install (continuing)"
         }
     }
+}
+
+# pwsh (PowerShell 7+): optional, opt-in via -InstallPwsh.
+# The kit runs on Windows PowerShell 5.1 by default, so pwsh is never required.
+# It is only recommended: UTF-8 output by default (fewer encoding mishaps) and
+# cross-platform execution. Default behavior only prints a hint, so running this
+# script never silently installs PowerShell 7.
+$pwshCmd = Get-Command pwsh -ErrorAction SilentlyContinue
+if ($pwshCmd) {
+    Write-Info "[skip] pwsh already installed: $($pwshCmd.Source)"
+    $skipped++
+} elseif ($InstallPwsh) {
+    Write-Info ""
+    Write-Info "[pwsh] Recommended (PS 7+, UTF-8 default output, cross-platform)"
+    if ($DryRun) {
+        Write-Info "[dry-run] would install: winget install --id Microsoft.PowerShell"
+    } else {
+        Write-Info "Installing pwsh via winget (id: Microsoft.PowerShell) ..."
+        winget install --id Microsoft.PowerShell --silent --accept-source-agreements --accept-package-agreements
+        $pwshCmd = Get-Command pwsh -ErrorAction SilentlyContinue
+        if ($pwshCmd) {
+            Write-Info "  [ok] pwsh installed"
+            $installed++
+        } else {
+            Write-Warning "  [skip] pwsh install did not complete (winget exit / PATH update pending)"
+        }
+    }
+} else {
+    Write-Info ""
+    Write-Info "[hint] pwsh (PowerShell 7+) not found. It is optional -- the kit runs on"
+    Write-Info "       Windows PowerShell 5.1. To install pwsh (recommended for UTF-8 default):"
+    Write-Info "         winget install --id Microsoft.PowerShell"
+    Write-Info "       or re-run this script with: -InstallPwsh"
 }
 
 # PSScriptAnalyzer (separate path: PowerShell module via Install-Module, not winget)
