@@ -185,9 +185,11 @@ engineer-claude-kit/
 | `README.md` (本ファイル) | プロジェクト概要 + 配置構成 + Quick start | ✅ Phase 1 |
 | `LICENSE` / `.gitignore` | リポ初期セット | ✅ Phase 1 |
 
-## 3. Quick Start (Phase 2 完成後の想定)
+## 3. Quick Start
 
-### 3.1 clone して bootstrap
+初回の **install** (Claude Code を起動できる状態にする) と、その後の **日常運用** (kit 更新の反映・プロジェクト配置) を分離する。日常運用は Claude Code 内の `/apply` slash command に集約され、bootstrap.ps1 を直接叩くのは初回のみ。
+
+### 3.1 初回 install (Claude Code を起動できる状態にする)
 
 ```powershell
 # このリポジトリを clone してから bootstrap.ps1 を実行
@@ -209,16 +211,33 @@ git clone <repository-url> "$env:USERPROFILE\.claude-kit"
 2. `~/.claude/CLAUDE.md` / `agents/` / `skills/` / `commands/` を配置
 3. (任意) 現在の cwd が git repo なら、その project にも `.claude/` を配置するか提案 (yes なら `apply-claude-kit.ps1 -Project (Get-Location)` を内部呼出)
 
-### 3.2 新規プロジェクトでの利用
+これで Claude Code 起動時に kit の skill / agent / command が利用可能になる。**以降の操作はすべて Claude Code 内の `/apply` で完結し、bootstrap.ps1 を再実行する必要はない。**
 
-bootstrap 完了後、任意のプロジェクトディレクトリで `claude` 起動時に skill / agent が自動で利用可能。
+### 3.2 日常運用 (Claude Code 内で)
 
-プロジェクト個別の `.claude/` 配置を行うには:
+kit を更新したとき (`git -C "$env:USERPROFILE\.claude-kit" pull` 後) や、新しいプロジェクトに `.claude/` を配置したいときは、Claude Code 内で `/apply` slash command を使う。
+
+| 目的 | コマンド |
+|---|---|
+| Global 再適用 (kit 更新を `~/.claude/` に反映) | `/apply` |
+| プロジェクト個別 `.claude/` 配置 | `/apply C:\dev\my-project` |
+| 事前検証 (何が変更されるかプレビュー) | `/apply --dry-run` |
+
+`/apply` は `apply-claude-kit.ps1` を起動する slash command (定義は `commands/apply.md`、引数の詳細は [docs/setup/apply-command-reference.md](docs/setup/apply-command-reference.md))。自然言語 (「kit を再適用」「.claude/ を最新化」等) で同じ処理を呼び出す `apply-claude-kit` skill も用意されている。skill (文脈検出の入口) と `/apply` command (引数明示の実行系) の責務分離は [docs/setup/apply-command-reference.md](docs/setup/apply-command-reference.md) を参照。
+
+#### 自動化向け (CI/CD 等、Claude Code を介さない場合)
+
+Claude Code を起動しないコンテキスト (CI/CD パイプライン、スクリプトからの一括配置) では `apply-claude-kit.ps1` を直接呼び出す:
 
 ```powershell
-cd <your-project>
-& "$env:USERPROFILE\.claude-kit\scripts\apply-claude-kit.ps1" -Project (Get-Location)
+# Global 再適用
+pwsh -NoProfile -File "$env:USERPROFILE\.claude-kit\scripts\apply-claude-kit.ps1" -Global
+
+# プロジェクト個別配置
+pwsh -NoProfile -File "$env:USERPROFILE\.claude-kit\scripts\apply-claude-kit.ps1" -Project <path>
 ```
+
+`/apply` は内部的にこの script を呼ぶラッパであり、両者の処理は同一。引数対応 (`-Global` / `-Project` / `-DryRun`) は [docs/setup/apply-command-reference.md](docs/setup/apply-command-reference.md) を参照。
 
 ### 3.3 実行権限について
 
