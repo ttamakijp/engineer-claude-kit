@@ -11,85 +11,85 @@ tags: [settings, backend, hands-off, responsibility-separation]
 
 ## Context
 
-螳滓ｩ滓､懆ｨｼ (2026-06-07) 縺ｧ莉･荳九・驥榊､ｧ蝠城｡後′蛻､譏・
+実機検証 (2026-06-07) で以下の重大問題が判明:
 
-- 迴ｾ迥ｶ templates/settings.json 縺ｯ Bedrock 蟆ら畑繧ｭ繝ｼ繧偵ワ繝ｼ繝峨さ繝ｼ繝・(CLAUDE_CODE_USE_BEDROCK=1, AWS_REGION, ENABLE_PROMPT_CACHING_1H_BEDROCK=1, AWS_MAX_ATTEMPTS=2, Bedrock 蠖｢蠑・model ID)
-- Anthropic API 逶ｴ迺ｰ蠅・↓ apply 縺吶ｋ縺ｨ縲，laude Code 縺梧ｬ｡蝗櫁ｵｷ蜍墓凾縺ｫ Bedrock 謗･邯壹ｒ隧ｦ縺ｿ縲、WS credentials 縺檎┌縺・◆繧・Could not load credentials from any providers 繧ｨ繝ｩ繝ｼ縺ｧ襍ｷ蜍穂ｸ崎・
-- user 縺ｮ譌｢蟄・settings.json (萓・ theme, autoUpdatesChannel) 繧ゆｸ頑嶌縺阪〒遐ｴ螢翫＆繧後ｋ
+- 現状 templates/settings.json は Bedrock 専用キーをハードコード (CLAUDE_CODE_USE_BEDROCK=1, AWS_REGION, ENABLE_PROMPT_CACHING_1H_BEDROCK=1, AWS_MAX_ATTEMPTS=2, Bedrock 形式の model ID)
+- Anthropic API 直環境に apply すると、Claude Code が次回起動時に Bedrock 接続を試み、AWS credentials が無いため Could not load credentials from any providers エラーで起動不能
+- user の既存 settings.json (例: theme, autoUpdatesChannel) も上書きで破壊される
 
-蜉縺医※莉･荳九・譛ｬ雉ｪ逧・撫鬘・
+加えて以下の本質的な問題:
 
-- Bedrock 謗･邯夊ｨｭ螳壹ｄ謗ｨ螂ｨ model ID 縺ｯ蜍慕噪: AWS region縲…ache 莉墓ｧ倥∵眠 model release 縺ｧ螟峨ｏ繧・
-- settings.json 縺ｯ user environment config 縺ｮ鬆伜沺: 蛟倶ｺｺ preference (theme) 繧・ｩ溷ｯ・(API key) 繧貞性繧
-- 縺薙ｌ縺ｯ CLAUDE.md / rules / agents / skills / commands (kit 縺・ship 縺吶ｋ Claude Code 驛ｨ蜩・ 縺ｨ縺ｯ雋ｬ蜍吶・雉ｪ縺碁＆縺・
+- Bedrock 接続設定や推奨 model ID は動的: AWS region、cache 仕様、新 model release で変わる
+- settings.json は user environment config の領域: 個人 preference (theme) や機密 (API key) を含む
+- これは CLAUDE.md / rules / agents / skills / commands (kit が ship する Claude Code 部品) とは責務の質が違う
 
 ## Decision
 
-kit 縺ｯ ~/.claude/settings.json 繧堤函謌舌・荳頑嶌縺阪＠縺ｪ縺・(hands-off)
+kit は ~/.claude/settings.json を生成・上書きしない (hands-off)
 
-### 1. templates/settings.json 繧貞炎髯､
+### 1. templates/settings.json を削除
 
-apply 譎ゅ・ settings.json 驟榊ｸ・Ο繧ｸ繝・け繧貞ｮ悟・縺ｫ髯､蜴ｻ縲・
+apply 時の settings.json 配布ロジックを完全に除去。
 
-### 2. 莉｣繧上ｊ縺ｫ docs/setup/ 縺ｫ險ｭ螳壻ｾ九ｒ驟咲ｽｮ
+### 2. 代わりに docs/setup/ に設定例を配置
 
-- docs/setup/settings-bedrock.example.json: Bedrock 迺ｰ蠅・髄縺題ｨｭ螳壻ｾ・(Sonnet 4.5 + Haiku + 1h cache)
-- docs/setup/settings-anthropic.example.json: Anthropic API 逶ｴ蜷代￠險ｭ螳壻ｾ・(Sonnet 4.5 + Haiku)
-- docs/setup/settings-setup.md: 驕ｸ縺ｳ譁ｹ繧ｬ繧､繝・+ 驕ｩ逕ｨ謇矩・
+- docs/setup/settings-bedrock.example.json: Bedrock 環境向け設定例 (Sonnet 4.5 + Haiku + 1h cache)
+- docs/setup/settings-anthropic.example.json: Anthropic API 直向け設定例 (Sonnet 4.5 + Haiku)
+- docs/setup/settings-setup.md: 選び方ガイド + 適用手順
 
-user 縺梧焔蜍輔〒隧ｲ蠖・example 繧・~/.claude/settings.json 縺ｫ繧ｳ繝斐・ + 蠢・ｦ√↓蠢懊§縺ｦ邱ｨ髮・☆繧九・
+user が手動で該当 example を ~/.claude/settings.json にコピー + 必要に応じて編集する。
 
-### 3. apply-claude-kit.ps1 縺ｧ hint 繝｡繝・そ繝ｼ繧ｸ
+### 3. apply-claude-kit.ps1 で hint メッセージ
 
-apply 螳御ｺ・凾縺ｫ "settings.json 縺ｯ user 閾ｪ霄ｫ縺瑚ｨｭ螳壹＠縺ｦ縺上□縺輔＞縲りｨｭ螳壻ｾ九・ docs/setup/ 繧貞盾辣ｧ" 縺ｨ陦ｨ遉ｺ縲よ里蟄・settings.json 縺後≠繧九°縺ｩ縺・°縺ｫ髢｢繧上ｉ縺壹「ser 縺ｫ菫・☆縺縺代〒隗ｦ繧峨↑縺・・
+apply 完了時に "settings.json は user 自身が設定してください。設定例は docs/setup/ を参照" と表示。既存 settings.json があるかどうかに関わらず、user に促すだけで触らない。
 
-### 4. config/models.yaml 縺ｮ蠖ｹ蜑ｲ
+### 4. config/models.yaml の役割
 
-- model ID 縺ｯ險ｭ螳壻ｾ九・荳ｭ縺ｧ蜿ら・縺輔ｌ繧句ｮ壽焚縺ｨ縺励※菫晄戟
-- apply.ps1 縺九ｉ settings.json 縺ｸ縺ｮ蜿ら・縺ｯ蜑企勁
-- 蟆・擂 cost-observe-bedrock.ps1 遲峨〒蜿ら・縺吶ｋ蝣ｴ蜷医↓谿九☆
+- model ID は設定例の中で参照される定数として保持
+- apply.ps1 から settings.json への参照は削除
+- 将来 cost-observe-bedrock.ps1 等で参照する場合に残す
 
-### 5. README / docs / Appendix A 縺ｮ譖ｴ譁ｰ
+### 5. README / docs / Appendix A の更新
 
-- ﾂｧ2.1 settings.json 陦後ｒ蜑企勁
-- ﾂｧ5 model strategy 縺ｫ kit 縺ｯ settings.json 繧呈署萓帙＠縺ｪ縺・ｒ譏手ｨ・
-- bootstrap-installation.md Appendix A 縺ｮ謇矩・°繧・settings.json 閾ｪ蜍暮・蟶・ｒ蜑企勁縲∵焔蜍輔そ繝・ヨ繧｢繝・・繧定ｿｽ蜉
+- §2.1 settings.json 行を削除
+- §5 model strategy に kit は settings.json を提供しないことを明記
+- bootstrap-installation.md Appendix A の手順から settings.json 自動配布を削除、手動セットアップを追加
 
 ## Alternatives
 
-| 譯・| 謗｡逕ｨ縺励↑縺九▲縺溽炊逕ｱ |
+| 案 | 採用しなかった理由 |
 |---|---|
-| 讀懷・ + 蜍慕噪逕滓・ (譌ｧ ADR-0007 譯・ | 讀懷・繝ｭ繧ｸ繝・け縺ｫ遨ｴ縲［erge 繝舌げ縲∵里蟄倩ｨｭ螳夂ｴ螢翫∽ｿ｡鬆ｼ繝ｪ繧ｹ繧ｯ縲ょｮ滓ｩ滓､懆ｨｼ縺ｧ螳溷ｮｳ逋ｺ逕・|
-| Multiple template files | 邨仙ｱ驕ｸ謚・logic 縺悟ｿ・ｦ√〔it 鬆伜沺螟悶・雋ｬ蜍・|
-| User prompt during apply (interactive) | apply 縺ｯ髱槫ｯｾ隧ｱ蜑肴署 (CI 莠呈鋤)縲∝ｯｾ隧ｱ豺ｷ蜈･ NG |
-| Hybrid (model ID 縺ｮ縺ｿ譖ｸ縺・ | model ID 蠖｢蠑上′ backend 縺ｧ驕輔≧縺ｮ縺ｧ讀懷・縺ｯ蠢・ｦ√∽ｸｭ騾泌濠遶ｯ |
-| Skip-on-existing | 蛻晏屓 install 縺ｧ Bedrock 蠑ｷ蛻ｶ縺ｫ縺ｪ繧贋ｸ榊・蟷ｳ |
-| 遨ｺ {} fallback | 闕偵＞ workaround |
+| 検出 + 動的生成 (旧 ADR-0007 案) | 検出ロジックに穴、merge バグ、既存設定破壊、信頼リスク。実機検証で実害発生 |
+| Multiple template files | 結局選択 logic が必要、kit 領域外の責務 |
+| User prompt during apply (interactive) | apply は非対話前提 (CI 互換)、対話混入 NG |
+| Hybrid (model ID のみ書く) | model ID 形式が backend で違うので検出は必要、中途半端 |
+| Skip-on-existing | 初回 install で Bedrock 強制になり不公平 |
+| 空 {} fallback | 荒い workaround |
 
 ## Open questions
 
-- 險ｭ螳壻ｾ九・ format: 荳｡ backend 縺ｧ 1h cache (Bedrock 逕ｨ) 繧貞ｼｷ隱ｿ縺励※譖ｸ縺上°縲∵怙蟆城剞縺ｫ逡吶ａ繧九°
-- scripts/validate-settings.ps1 縺ｮ繧医≧縺ｪ讀懆ｨｼ helper 繧呈署萓帙☆繧九° (model ID 縺ｨ CLAUDE_CODE_USE_BEDROCK 縺ｮ謨ｴ蜷医メ繧ｧ繝・け遲・
-- bootstrap.ps1 縺ｧ apply 蠕後↓縲瑚ｨｭ螳壻ｾ九ｒ隕九ｋ?縲阪→閨槭￥ UI 繧貞・繧後ｋ縺・(蝓ｺ譛ｬ逧・↓蟇ｾ隧ｱ謗帝勁譁ｹ驥昴↑縺ｮ縺ｧ蜈･繧後↑縺・婿驥昴°)
-- docs/setup/ 繧・templates/ 驟堺ｸ九↓遘ｻ縺励※ apply 縺ｧ蜿り・・鄂ｮ縺吶ｋ縺・(user 縺檎峩謗･繧ｳ繝斐・縺励ｄ縺吶＞)
+- 設定例の format: 両 backend で 1h cache (Bedrock 用) を強調して書くか、最小限に留めるか
+- scripts/validate-settings.ps1 のような検証 helper を提供するか (model ID と CLAUDE_CODE_USE_BEDROCK の整合チェック等)
+- bootstrap.ps1 で apply 後に「設定例を見る?」と聞く UI を入れるか (基本的に対話排除方針なので入れない方針か)
+- docs/setup/ や templates/ 配下に移して apply で参照配置するか (user が直接コピーしやすい)
 
 ## Implementation plan
 
-(Accepted 譏・ｼ蠕後・蛻･ PR 縺ｧ螳滓命)
+(Accepted 昇格後の別 PR で実施)
 
-1. templates/settings.json 繧貞炎髯､
-2. scripts/apply-claude-kit.ps1 縺九ｉ settings.json 驟榊ｸ・Ο繧ｸ繝・け蜑企勁 + hint 繝｡繝・そ繝ｼ繧ｸ霑ｽ蜉
-3. docs/setup/settings-bedrock.example.json 譁ｰ隕・(Bedrock 逕ｨ險ｭ螳・
-4. docs/setup/settings-anthropic.example.json 譁ｰ隕・(Anthropic 逕ｨ險ｭ螳・
-5. docs/setup/settings-setup.md 譁ｰ隕・(驕ｸ縺ｳ譁ｹ + 謇矩・+ 豕ｨ諢冗せ)
-6. tests/apply-claude-kit.tests.ps1 縺九ｉ settings.json 髢｢騾｣ test 繧貞炎髯､縲”int 繝｡繝・そ繝ｼ繧ｸ縺ｮ test 繧定ｿｽ蜉
-7. README ﾂｧ2.1 (settings.json 陦悟炎髯､) / ﾂｧ5 (hands-off 繝昴Μ繧ｷ繝ｼ譏手ｨ・ / ﾂｧ4 (ADR-0007 霑ｽ蜉)
-8. docs/manual-verification/bootstrap-installation.md Appendix A 譖ｴ譁ｰ
-9. ADR-0007 繧・Proposed 竊・Accepted縲〉ename 0007-hands-off-settings.md
+1. templates/settings.json を削除
+2. scripts/apply-claude-kit.ps1 から settings.json 配布ロジック削除 + hint メッセージ追加
+3. docs/setup/settings-bedrock.example.json 新規 (Bedrock 用設定)
+4. docs/setup/settings-anthropic.example.json 新規 (Anthropic 用設定)
+5. docs/setup/settings-setup.md 新規 (選び方 + 手順 + 注意点)
+6. tests/apply-claude-kit.tests.ps1 から settings.json 関連 test を削除、hint メッセージの test を追加
+7. README §2.1 (settings.json 行削除) / §5 (hands-off ポリシー明記) / §4 (ADR-0007 追加)
+8. docs/manual-verification/bootstrap-installation.md Appendix A 更新
+9. ADR-0007 を Proposed → Accepted、rename 0007-hands-off-settings.md
 
 ## Refs
 
-- 逶ｴ謗･縺ｮ蜍墓ｩ・ 2026-06-07 螳滓ｩ滓､懆ｨｼ縺ｧ Could not load credentials from any providers 繧ｨ繝ｩ繝ｼ
-- ADR-0001 (kit clean-start design): settings.json 繧呈怙蟆乗ｧ区・縺ｨ縺励※菴懊▲縺溽ｵ檎ｷｯ縲∝・隧穂ｾ｡
-- ADR-0004 (auto model routing): model 驕ｸ謚槭・ kit 鬆伜沺縺縺後‘nv 縺ｸ縺ｮ譖ｸ霎ｼ縺ｯ user 鬆伜沺
-- 譽・唆縺励◆譌ｧ ADR-0007 譯・(讀懷・ + 蜍慕噪逕滓・): 險ｭ險亥愛譁ｭ縺ｮ邨檎ｷｯ險倬鹸
+- 直接の動機: 2026-06-07 実機検証で Could not load credentials from any providers エラー
+- ADR-0001 (kit clean-start design): settings.json を最小構成として作った経緯、再評価
+- ADR-0004 (auto model routing): model 選択は kit 領域だが、env への書込は user 領域
+- 棄却した旧 ADR-0007 案 (検出 + 動的生成): 設計判断の経緯記録

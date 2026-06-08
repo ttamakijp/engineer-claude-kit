@@ -1,6 +1,6 @@
 # ADR-0003: Bootstrap design + 設定値の抽象化 SSoT 化
 
-**ステータス**: Proposed (2026-06-08 Update: §B 配布元 URL 解決方針を現状実装に合わせて修正)
+**ステータス**: Proposed (2026-06-08 Update: §B 配布元 URL 解決方針を現状実装に合わせて修正 / §C に encoding helper rule を追記)
 **日付**: 2026-06-05 (Update: 2026-06-08)
 **Phase**: 1 → 2 (foundation → bootstrap implementation 設計)
 **関連**: ADR-0001 (clean start design) / ADR-0002 (ADR セット取捨選択方針) / ADR-0008 (privilege-aware bootstrap)
@@ -106,6 +106,18 @@ distribution:
 - 日本語はドキュメント (`.md`) と config (`.yaml` で UTF-8 BOM なし保存可能なフィールド) に限定
 - CI で `Get-ChildItem -Recurse -Include *.ps1 | Select-String -Pattern '[^\x00-\x7F]'` で違反を検出 (Phase 2 後半で導入)
 
+**ファイル encoding hard rule (2026-06-08 追記, P6)**:
+
+スクリプト本体の ASCII only 規約に加え、スクリプトが**生成・書込み・読込みするファイル** (`.md` / `.json` / `.yaml`) は **UTF-8 (no BOM)** を強制する:
+
+- PS スクリプト内の書込みは必ず `scripts/lib/encoding-helper.ps1` の `Write-Utf8NoBom` 経由とする
+- 読込みも同 helper の `Read-Utf8NoBom` 経由とする
+  - PS 5.1 の `Get-Content` 既定 encoding はシステム ANSI codepage (日本語 Windows = CP932) で、UTF-8 ソースを誤デコードして mojibake 化する。これを書込み側で正しく UTF-8 保存すると二重エンコード化けが確定する (実害: デプロイ済 `~/.claude/CLAUDE.md` / `docs/adr/0007-*.md`)
+- 直接 `Out-File` / `Set-Content -Encoding UTF8` / `[System.IO.File]::WriteAllText` / encoding 指定なしの `Get-Content -Raw` を使ってはならない
+  - PS 5.1 の `-Encoding UTF8` は **BOM 付き UTF-8** を出力し (`EF BB BF`)、frontmatter `---` の前に BOM が混入して parse 失敗・git binary marker 警告を招く。この設計上の trap を構造的に防ぐため
+- 例外: log / 一時ファイルでユーザ visible でないもの、および ASCII のみの flat config の行単位読込みは制約外
+- 自動検出 (PSScriptAnalyzer custom rule) は「未解決の問い」6 を参照
+
 ### D. ADO の `_git` URL 形式
 
 bootstrap.ps1 の clone は ADO の repo URL 形式 (`https://dev.azure.com/<org>/<proj>/_git/<repo>`) を前提とする。認証は以下優先順:
@@ -139,6 +151,7 @@ ADR-0001 §H で「ADO 固定」を決定したが、現在 engineer-claude-kit 
 3. `config/*.yaml` の schema validation (`scripts/validate-config.ps1`) を Phase 2 / Phase 3 のどちらで導入するか
 4. ASCII only 規約の **自動検出** を pre-commit hook で行うか、CI でのみ行うか
 5. コスト最適化スクリプト (Sonnet 自動委譲 logic) を Phase 2 で実装するか、再設計するか
+6. (2026-06-08 追記, P6) ファイル encoding hard rule の **自動検出**: `Out-File` / `Set-Content -Encoding UTF8` / 生 `[System.IO.File]::WriteAllText` / encoding 指定なし `Get-Content -Raw` の直接使用を PSScriptAnalyzer custom rule で warn 検出するか。P6 時点では規約のみ整備し、自動検出 rule は別 Issue に切り出して見送り (helper 自体は suppress 対象)
 
 ## 結果
 
