@@ -41,6 +41,8 @@ cd .claude-kit
 
 ## 検証項目 V1-V6
 
+> **PowerShell バージョンについて**: 以下の手順は `pwsh` (PowerShell 7+) で記載しているが、同梱スクリプトはすべて **Windows PowerShell 5.1 互換** (ADR-0003 §C) のため、`pwsh` を `powershell` に置き換えても同じ検証が行える。pwsh 未 install 環境では `powershell -NoProfile -File ...` で実施すること。pwsh が利用可能なら出力 encoding が既定 UTF-8 になり文字化け事故が減るため推奨。
+
 ### V1: build-rules.ps1 の単独動作 (env-agnostic)
 
 **目的**: `source/rules/` から `dist/.claude/rules/` への build が正常に完了するか
@@ -246,7 +248,7 @@ dry-run まで動作確認するだけでも以下が確認可能:
 
 | 項目 | 検証方法 | 期待結果 |
 |---|---|---|
-| `install-deps.ps1` | `pwsh scripts/install-deps.ps1 -DryRun` で確認後、`-DryRun` を外して実行 | winget 経由で gitleaks / gh / pwsh / node がインストール (既存は skip) |
+| `install-deps.ps1` | `powershell scripts/install-deps.ps1 -DryRun` で確認後、`-DryRun` を外して実行 (pwsh も install したい場合は `-InstallPwsh` を付与) | winget 経由で gitleaks / gh / node がインストール (既存は skip)。pwsh は `-InstallPwsh` 指定時のみ install、既定では hint 表示のみ |
 | `scripts/lint.ps1 -Strict` | `pwsh scripts/lint.ps1 -Strict` (PSScriptAnalyzer 自動 install) | PS 5.1 互換性違反があれば exit 1 |
 | `bootstrap.ps1` clone + 配置 | `git clone … ~/.claude-kit` → `./bootstrap.ps1` | `~/.claude/` 配下に CLAUDE.md / agents / skills / commands / work-schedule.yaml が出現 (settings.json は user 手動、docs/setup/ 参照) |
 | `apply-claude-kit.ps1 -Global -DryRun` | コマンド実行 | dry-run 出力で 12+ ファイルの配置先表示 |

@@ -37,7 +37,8 @@ engineer-claude-kit リポジトリ内の SSoT (templates / config / source/rule
 1. Kit のパスを確認:
    - `$env:ENGINEER_CLAUDE_KIT_GIT_URL` が設定されていれば、その配布元から kit を取得済と仮定
    - Kit の標準配置先: `$env:USERPROFILE\.claude-kit\`
-2. `pwsh -NoProfile -File $env:USERPROFILE\.claude-kit\scripts\apply-claude-kit.ps1 -Global` を実行
+2. `powershell -NoProfile -File $env:USERPROFILE\.claude-kit\scripts\apply-claude-kit.ps1 -Global` を実行
+   - スクリプトは Windows PowerShell 5.1 (`powershell`、既定で同梱) / PowerShell 7+ (`pwsh`) のどちらでも動作する。pwsh が利用可能なら `powershell` を `pwsh` に置き換えてもよい (UTF-8 既定で文字化け事故が減る)
 3. (任意) 現在の作業ディレクトリが git repo なら、`apply-claude-kit.ps1 -Project (Get-Location)` も提案
 4. 結果を user に報告: 配置されたファイル数 / 配置先パス / marker JSON の生成確認
 

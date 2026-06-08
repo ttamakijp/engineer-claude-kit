@@ -169,7 +169,7 @@ engineer-claude-kit/
 | `scripts/apply-claude-kit.ps1` | 配布実装 | ✅ Phase 2 |
 | `scripts/build-rules.ps1` | `source/rules/` -> `.claude/rules/` build | ✅ Phase 2 |
 | `scripts/cost-observe-bedrock.ps1` | AWS Cost Explorer から Bedrock コストを取得し markdown report 生成 | ✅ Phase 3.2 |
-| `scripts/install-deps.ps1` | 必要ツール (gitleaks / gh / pwsh / node) を winget で一括インストール + PSScriptAnalyzer を Install-Module (非対話) で導入 (既存は skip) | ✅ Phase 4 |
+| `scripts/install-deps.ps1` | 必要ツール (gitleaks / gh / node) を winget で一括インストール + PSScriptAnalyzer を Install-Module (非対話) で導入 (既存は skip)。pwsh (PS 7+) は任意で `-InstallPwsh` opt-in (既定は hint のみ、PS 5.1 baseline) | ✅ Phase 4 / Phase 8 |
 | `config/cost-budget.yaml` | Bedrock コスト予算しきい値 | ✅ Phase 3.2 |
 | `reports/bedrock-cost-<date>.md` | weekly cost report (auto-generated, gitignored) | ✅ Phase 3.2 |
 | `templates/` | `~/.claude` 配布素材 (CLAUDE.md / agents / skills / commands) | ✅ Phase 3.1 (skills) / ✅ Phase 2 (agents) |
@@ -227,15 +227,17 @@ kit を更新したとき (`git -C "$env:USERPROFILE\.claude-kit" pull` 後) や
 
 #### 自動化向け (CI/CD 等、Claude Code を介さない場合)
 
-Claude Code を起動しないコンテキスト (CI/CD パイプライン、スクリプトからの一括配置) では `apply-claude-kit.ps1` を直接呼び出す:
+Claude Code を起動しないコンテキスト (CI/CD パイプライン、スクリプトからの一括配置) では `apply-claude-kit.ps1` を直接呼び出す。スクリプトは **Windows PowerShell 5.1 (`powershell`、Windows 既定で同梱) / PowerShell 7+ (`pwsh`) のどちらでも動作** する:
 
 ```powershell
-# Global 再適用
-pwsh -NoProfile -File "$env:USERPROFILE\.claude-kit\scripts\apply-claude-kit.ps1" -Global
+# Windows PowerShell 5.1 (既定で入っている) でそのまま実行可
+powershell -NoProfile -File "$env:USERPROFILE\.claude-kit\scripts\apply-claude-kit.ps1" -Global
 
 # プロジェクト個別配置
-pwsh -NoProfile -File "$env:USERPROFILE\.claude-kit\scripts\apply-claude-kit.ps1" -Project <path>
+powershell -NoProfile -File "$env:USERPROFILE\.claude-kit\scripts\apply-claude-kit.ps1" -Project <path>
 ```
+
+> **pwsh (PowerShell 7+) 推奨**: 上記の `powershell` を `pwsh` に置き換えても同じ処理が動く。pwsh は出力 encoding が既定 UTF-8 で文字化け事故が減り、クロスプラットフォームで動作するため、利用可能なら pwsh を推奨。pwsh が未 install の環境でも PS 5.1 で動くため必須ではない (pwsh の install は `scripts/install-deps.ps1 -InstallPwsh`)。
 
 `/apply` は内部的にこの script を呼ぶラッパであり、両者の処理は同一。引数対応 (`-Global` / `-Project` / `-DryRun`) は [docs/setup/apply-command-reference.md](docs/setup/apply-command-reference.md) を参照。
 
