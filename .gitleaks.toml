@@ -1,0 +1,44 @@
+# gitleaks configuration - engineer-claude-kit (repository top-level, ADR-0009)
+# This is the kit's OWN config (dogfooding the leak protection it ships).
+# Mirrors templates/.gitleaks.toml; kept as a separate source of truth so the
+# repository root has a config that gitleaks/gitleaks-action@v2 can discover.
+# Format: gitleaks v8+. See https://github.com/gitleaks/gitleaks
+title = "engineer-claude-kit gitleaks config"
+
+[[rules]]
+id = "aws-access-key-id"
+description = "AWS Access Key ID"
+regex = '''AKIA[0-9A-Z]{16}'''
+tags = ["aws", "credentials"]
+
+[[rules]]
+id = "anthropic-api-key"
+description = "Anthropic API key (sk-ant-)"
+regex = '''sk-ant-[A-Za-z0-9_-]{20,}'''
+tags = ["anthropic", "credentials"]
+
+[[rules]]
+id = "openai-api-key"
+description = "OpenAI API key (sk-)"
+regex = '''sk-[A-Za-z0-9]{20,}'''
+tags = ["openai", "credentials"]
+
+[[rules]]
+id = "github-pat"
+description = "GitHub Personal Access Token (ghp_ / gho_ / ghs_ / ghr_)"
+regex = '''gh[posr]_[A-Za-z0-9]{36}'''
+tags = ["github", "credentials"]
+
+[allowlist]
+description = "Global allowlist - generated, vendored, and self-referential paths"
+paths = [
+    '''dist/''',
+    '''reports/''',
+    '''node_modules/''',
+    '''tests/fixtures/''',
+    # The gitleaks configs themselves contain the detection regexes above as
+    # literal strings; exclude them so the rules do not match their own source.
+    '''\.gitleaks\.toml''',
+    '''templates/\.gitleaks\.toml''',
+    '''templates/git-hooks/pre-commit''',
+]
