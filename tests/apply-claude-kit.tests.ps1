@@ -146,6 +146,24 @@ Describe "apply-claude-kit.ps1" {
     It "applies skill-installer skill in Project mode" {
         Test-Path (Join-Path (Join-Path (Join-Path $MockProject ".claude") "skills") "skill-installer") | Should Be $true
     }
+
+    It "applies cleanup-processes command in Project mode" {
+        Test-Path (Join-Path (Join-Path (Join-Path $MockProject ".claude") "commands") "cleanup-processes.md") | Should Be $true
+    }
+
+    It "applies cleanup-orphan-processes skill in Project mode" {
+        Test-Path (Join-Path (Join-Path (Join-Path $MockProject ".claude") "skills") "cleanup-orphan-processes") | Should Be $true
+    }
+
+    It "does NOT deploy the cleanup scheduled-task without -EnableCleanupSchedule (Global DryRun)" {
+        $output = & powershell -NoProfile -File $ScriptPath -AllowElevated -Global -DryRun 2>&1 | Out-String
+        $output | Should Match 'scheduled-task not deployed'
+    }
+
+    It "deploys the cleanup scheduled-task with -EnableCleanupSchedule (Global DryRun)" {
+        $output = & powershell -NoProfile -File $ScriptPath -AllowElevated -Global -DryRun -EnableCleanupSchedule 2>&1 | Out-String
+        $output | Should Match 'cleanup-orphan-processes'
+    }
 }
 
 if (Test-Path $MockGlobal) { Remove-Item -Recurse -Force $MockGlobal }
