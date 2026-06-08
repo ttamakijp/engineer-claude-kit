@@ -29,6 +29,11 @@ $ScriptVersion = "0.1.0"
 . (Join-Path (Join-Path $PSScriptRoot "lib") "privilege-check.ps1")
 Assert-NonElevated -AllowElevated:$AllowElevated
 
+# UTF-8 (no BOM) file I/O helpers. All reads/writes of templates, rules, config,
+# and generated files go through these so source content is never decoded with
+# the host's default codepage (CP932 on PS 5.1 -> mojibake). See ADR-0003 section C.
+. (Join-Path (Join-Path $PSScriptRoot "lib") "encoding-helper.ps1")
+
 if (-not $KitRoot) {
     $KitRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 }
@@ -47,7 +52,7 @@ function Read-ConfigYaml {
     #   key: [a, b, c]
     # Indentation is 2 spaces. Comments start with #. No anchors, no multi-line scalars.
 
-    $content = Get-Content -LiteralPath $Path -Raw
+    $content = Read-Utf8NoBom -Path $Path
     $lines = $content -split "`r?`n"
     $root = @{}
     $stack = @(@{ Indent = -1; Map = $root })
@@ -163,7 +168,7 @@ function Copy-Template {
         [switch]$IsDryRun
     )
 
-    $content = Get-Content -LiteralPath $SourceFile -Raw
+    $content = Read-Utf8NoBom -Path $SourceFile
     $rendered = Invoke-TemplateSubstitution -TemplateContent $content -ModelsConfig $ModelsConfig
 
     if ($IsDryRun) {
@@ -175,9 +180,8 @@ function Copy-Template {
     if (-not (Test-Path $destDir)) {
         New-Item -ItemType Directory -Force -Path $destDir | Out-Null
     }
-    # UTF-8 without BOM; -NoNewline avoids Set-Content appending a trailing newline.
-    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-    [System.IO.File]::WriteAllText($DestFile, $rendered, $utf8NoBom)
+    # UTF-8 without BOM on every PowerShell version (see encoding-helper.ps1).
+    Write-Utf8NoBom -Path $DestFile -Content $rendered
     Write-Host "[apply] $SourceFile -> $DestFile"
     return $DestFile
 }
@@ -198,8 +202,7 @@ function Write-AppliedMarker {
         applied_at = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssK")
         applied_files = $AppliedFiles
     } | ConvertTo-Json -Depth 5
-    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-    [System.IO.File]::WriteAllText($markerPath, $marker, $utf8NoBom)
+    Write-Utf8NoBom -Path $markerPath -Content $marker
     Write-Host "[marker] $markerPath"
 }
 
@@ -347,9 +350,8 @@ if ($mode -eq "Project") {
                     New-Item -ItemType Directory -Force -Path $targetRulesDir | Out-Null
                 }
                 # Verbatim UTF-8 (no BOM) copy; rules contain no role placeholders.
-                $ruleContent = Get-Content -LiteralPath $ruleFile.FullName -Raw
-                $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-                [System.IO.File]::WriteAllText($destRule, $ruleContent, $utf8NoBom)
+                $ruleContent = Read-Utf8NoBom -Path $ruleFile.FullName
+                Write-Utf8NoBom -Path $destRule -Content $ruleContent
                 Write-Host "[apply] $($ruleFile.FullName) -> $destRule"
             }
             $appliedFiles += $destRule
@@ -420,9 +422,8 @@ if ($mode -eq "Global") {
             Write-Host "[dry-run] $scheduleSource -> $scheduleDest"
         } else {
             # Plain YAML, no role placeholders: verbatim UTF-8 (no BOM) copy.
-            $scheduleContent = Get-Content -LiteralPath $scheduleSource -Raw
-            $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-            [System.IO.File]::WriteAllText($scheduleDest, $scheduleContent, $utf8NoBom)
+            $scheduleContent = Read-Utf8NoBom -Path $scheduleSource
+            Write-Utf8NoBom -Path $scheduleDest -Content $scheduleContent
             Write-Host "[apply] $scheduleSource -> $scheduleDest"
             Write-Host "[hint] To enable work-end reminder, edit ~/.claude/work-schedule.yaml with your work schedule."
         }

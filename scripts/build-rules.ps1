@@ -13,6 +13,11 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# UTF-8 (no BOM) file I/O helpers. Source rules contain Japanese, so reading them
+# with the host default codepage (CP932 on PS 5.1) would mojibake every rule.
+# See ADR-0003 section C.
+. (Join-Path (Join-Path $PSScriptRoot "lib") "encoding-helper.ps1")
+
 function Parse-Frontmatter {
     param([string]$Content)
 
@@ -100,7 +105,7 @@ function Build-Rule {
         [switch]$IsDryRun
     )
 
-    $content = Get-Content -Raw -LiteralPath $SourceFile
+    $content = Read-Utf8NoBom -Path $SourceFile
     $parsed = Parse-Frontmatter -Content $content
 
     $id = $parsed.Frontmatter.id
@@ -125,7 +130,7 @@ function Build-Rule {
 
     # Reassemble the file: keep frontmatter as-is, append body.
     # For simplicity, write the original content (frontmatter included).
-    Set-Content -LiteralPath $outFile -Value $content -Encoding UTF8 -NoNewline
+    Write-Utf8NoBom -Path $outFile -Content $content
     Write-Host "[build] $SourceFile -> $outFile"
     return $outFile
 }
