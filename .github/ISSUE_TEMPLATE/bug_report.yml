@@ -1,0 +1,73 @@
+name: バグ報告 (Bug report)
+description: engineer-claude-kit の不具合を報告する
+title: "fix: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        不具合の報告ありがとうございます。再現に必要な情報を記入してください。
+        secrets / API キー / 個人情報は貼り付けないでください (ログは redact 推奨)。
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: 概要
+      description: 何が起きたかを 1〜2 行で
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: 再現手順
+      description: 実行したコマンド / 操作を順に
+      placeholder: |
+        1. `powershell -NoProfile -File scripts/bootstrap.ps1` を実行
+        2. ...
+        3. エラー発生
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期待する挙動
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 実際の挙動 / エラー出力
+      description: スタックトレースやログ (redact 済み) を貼り付け
+      render: text
+    validations:
+      required: true
+
+  - type: dropdown
+    id: ps-version
+    attributes:
+      label: PowerShell バージョン
+      options:
+        - Windows PowerShell 5.1
+        - PowerShell 7+
+        - 両方 / 不明
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: OS / 環境
+      placeholder: "Windows 11 Home 26200 / Claude Code (Bedrock)"
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: 補足
+      description: 関連 ADR / PR / スクリーンショットなど
+    validations:
+      required: false
