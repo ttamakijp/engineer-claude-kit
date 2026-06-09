@@ -1,8 +1,17 @@
+---
+status: Accepted
+date: 2026-06-05
+deciders: [Tetsuya]
+tags: [foundation, design, clean-start, models, persona]
+---
+
 # ADR-0001: engineer-claude-kit clean start 設計
 
-**ステータス**: Proposed
+**ステータス**: Accepted
 **日付**: 2026-06-05
 **Phase**: 1 (foundation)
+
+> **昇格メモ (2026-06-09)**: 本 ADR は起票時 Proposed だったが、Phase 1〜4 で本 ADR の決定に基づく実装が完了しており実態は Accepted。G3 audit で frontmatter (`status: Accepted`) を付与し 0005-0012 とスタイルを整合させた。
 
 ## コンテキスト
 

@@ -1,9 +1,18 @@
+---
+status: Accepted
+date: 2026-06-05
+deciders: [Tetsuya]
+tags: [routing, models, claude-md, haiku, sonnet]
+---
+
 # ADR-0004: CLAUDE.md による Haiku / Sonnet 4.5 自動使い分け
 
-**ステータス**: Proposed
+**ステータス**: Accepted
 **日付**: 2026-06-05
 **Phase**: 2 (runtime routing 設計)
 **関連**: ADR-0001 (モデル戦略) / ADR-0003 (config/models.yaml SSoT)
+
+> **昇格メモ (2026-06-09)**: 本 ADR は起票時 Proposed だったが、CLAUDE.md の自動使い分けルールは Phase 2 で配布済みであり実態は Accepted。G3 audit で frontmatter (`status: Accepted`) を付与し 0005-0012 とスタイルを整合させた。
 
 ## コンテキスト
 
