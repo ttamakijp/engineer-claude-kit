@@ -1,6 +1,6 @@
 {
   "statusLine": {
     "type": "command",
-    "command": "powershell -NoProfile -Command \"$input | ConvertFrom-Json | ForEach-Object { $p=[Math]::Floor($_.context_window.used_percentage); $c=if($p -ge 90){'31'}elseif($p -ge 75){'33'}else{'32'}; Write-Host ([char]27 + '[' + $c + 'm[' + $_.model.display_name + '] ' + $p + '% context' + [char]27 + '[0m') }\""
+    "command": "powershell -NoProfile -File \"C:/Users/<your-username>/.claude/statusline.ps1\""
   }
 }

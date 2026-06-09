@@ -137,9 +137,28 @@ function Invoke-SettingsSetupWizard {
         Write-Host "    (green < 75%, yellow 75-90%, red >= 90%; see ADR-0012)"
         $ans = Read-Host "    [Y]es / [n]o (default: Y)"
         if ([string]::IsNullOrWhiteSpace($ans) -or $ans -match '^[Yy]') {
+            # Deploy the companion script next to settings.json and reference it via
+            # -File. An inline -Command is corrupted by Git Bash $-expansion on
+            # Windows (the $ tokens are eaten before PowerShell runs), producing a
+            # silent blank statusline. -File carries no $ tokens for bash to touch.
+            # See ADR-0012 (2026-06-09 amendment).
+            $scriptSrc = Join-Path (Join-Path (Split-Path -Parent $PSScriptRoot) 'templates') 'statusline.ps1'
+            $scriptDst = Join-Path (Split-Path -Parent $Path) 'statusline.ps1'
+            $dstDir = Split-Path -Parent $scriptDst
+            if ($dstDir -and -not (Test-Path $dstDir)) {
+                New-Item -ItemType Directory -Force -Path $dstDir | Out-Null
+            }
+            if (Test-Path $scriptSrc) {
+                Copy-Item -LiteralPath $scriptSrc -Destination $scriptDst -Force
+                Write-Host "[OK] statusline.ps1 deployed to $scriptDst"
+            } else {
+                Write-Warning "statusline.ps1 template not found at $scriptSrc; the command path may need manual adjustment."
+            }
+            # Forward slashes so the path survives both PowerShell and Git Bash.
+            $scriptFwd = $scriptDst -replace '\\', '/'
             $settings['statusLine'] = @{
                 type    = 'command'
-                command = 'powershell -NoProfile -Command "$input | ConvertFrom-Json | ForEach-Object { $p=[Math]::Floor($_.context_window.used_percentage); $c=if($p -ge 90){''31''}elseif($p -ge 75){''33''}else{''32''}; Write-Host ([char]27 + ''['' + $c + ''m['' + $_.model.display_name + ''] '' + $p + ''% context'' + [char]27 + ''[0m'') }"'
+                command = "powershell -NoProfile -File `"$scriptFwd`""
             }
             $modified = $true
             Write-Host "[OK] statusLine added"
