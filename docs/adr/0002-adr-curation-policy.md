@@ -1,10 +1,19 @@
+---
+status: Accepted
+date: 2026-06-05
+deciders: [Tetsuya]
+tags: [foundation, adr, curation, policy]
+---
+
 # ADR-0002: ADR セットの取捨選択方針
 
-**ステータス**: Proposed
+**ステータス**: Accepted
 **日付**: 2026-06-05
 **Phase**: 1 (foundation)
 **関連**: ADR-0001 (clean start design)
 **更新 (2026-06-06)**: 0017 cost-observation-kit を D 保留 → B 変形採用に格上げ (Phase 3.2 で Bedrock 縮小版を実装済)。
+
+> **昇格メモ (2026-06-09)**: 本 ADR は起票時 Proposed だったが、本 ADR の分類方針に基づく実装が Phase 2 以降で完了しており実態は Accepted。G3 audit で frontmatter (`status: Accepted`) を付与し 0005-0012 とスタイルを整合させた。
 
 ## コンテキスト
 

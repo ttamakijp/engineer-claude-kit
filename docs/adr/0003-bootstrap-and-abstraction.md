@@ -1,9 +1,18 @@
+---
+status: Accepted
+date: 2026-06-05
+deciders: [Tetsuya]
+tags: [foundation, bootstrap, config, ssot, powershell]
+---
+
 # ADR-0003: Bootstrap design + 設定値の抽象化 SSoT 化
 
-**ステータス**: Proposed (2026-06-08 Update: §B 配布元 URL 解決方針を現状実装に合わせて修正 / §C に encoding helper rule を追記 / 2026-06-08 Update P8: §C に PS 5.1 互換 hard rule を追加)
+**ステータス**: Accepted (2026-06-08 Update: §B 配布元 URL 解決方針を現状実装に合わせて修正 / §C に encoding helper rule を追記 / 2026-06-08 Update P8: §C に PS 5.1 互換 hard rule を追加)
 **日付**: 2026-06-05 (Update: 2026-06-08)
 **Phase**: 1 → 2 (foundation → bootstrap implementation 設計)
 **関連**: ADR-0001 (clean start design) / ADR-0002 (ADR セット取捨選択方針) / ADR-0008 (privilege-aware bootstrap)
+
+> **昇格メモ (2026-06-09)**: 本 ADR は起票時 Proposed だったが、bootstrap.ps1 / config SSoT / PS 5.1 互換規約は Phase 2 以降で実装済みであり実態は Accepted。G3 audit で frontmatter (`status: Accepted`) を付与し 0005-0012 とスタイルを整合させた。
 
 > **2026-06-08 Update (P5)**: 当初 §B で `config/distribution.yaml` に `url_default` (ハードコードされた配布元 URL の最終 fallback) を持たせる設計だったが、`bootstrap.ps1` はこれを参照せず、clone 済み作業ツリーの `git remote get-url origin` から配布元 URL を導出する実装になっている。実装が無い設定を残すと混乱の元になるため **`url_default` フィールドを削除** し、配布元 URL 解決の優先順位を「環境変数 > `-GitUrl` 引数 > `git remote` 導出」に修正する。配布先別の clone URL (GitHub / Azure DevOps `_git` / self-hosted) は kit 内に埋め込まず、README で generic な `<repository-url>` 表記 + 配布先別注釈で示す方針とする。本 Update は Superseded ではなく、現状実装への整合 (追記修正) である。下記 §B / §A 詳細フェーズの該当箇所に Update 注記を付す。
 
