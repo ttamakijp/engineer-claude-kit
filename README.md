@@ -392,6 +392,10 @@ Claude 自身は context % をリアルタイムに把握できない)。kit は
 - **配布**: 配布元は問わず、clone コマンドは generic な `<repository-url>` で表記し配布先別 URL は注釈で示す (GitHub / Azure DevOps `_git` / self-hosted、ADR-0003)
 - **PowerShell スクリプト**: ASCII only (UTF-8 BOM 剥落による文字化け回避、ADR-0003 §C)
 
+### 6.1 スコープ外の依存 (oletools など)
+
+Office / VBA マクロ解析ツール (`oletools` / `olevba` 等) は engineer-claude-kit の依存に **含めません** (`scripts/install-deps.ps1` でも install しません)。これらは VBA/Office マクロ診断という別ドメインの関心事であり、専用プロジェクト **vba-doctor** 側へ移管済みのためです。本 kit は Claude Code の環境構築 (グローバル / プロジェクト設定の配布) に scope を限定し、ドメイン特化のツールチェーンは各プロジェクト側が own します。将来 kit から VBA 解析を呼び出す必要が生じた場合は、依存を直接持たず vba-doctor を別途参照する方針です。
+
 ## 7. ライセンス
 
 [MIT](LICENSE)
