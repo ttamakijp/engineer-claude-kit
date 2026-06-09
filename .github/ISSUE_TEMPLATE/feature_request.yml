@@ -1,0 +1,64 @@
+name: 機能要望 (Feature request)
+description: engineer-claude-kit への機能追加・改善を提案する
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        提案ありがとうございます。背景と狙いが分かるように記入してください。
+        architecture-impacting な提案は ADR 起票が前提になる場合があります (CONTRIBUTING.md 参照)。
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: 解決したい課題 / 背景
+      description: 現状の何が不便か、なぜ必要か
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 提案内容
+      description: どう解決するか (案が複数あれば併記)
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 検討した代替案
+      description: 他の方法・見送った理由など
+    validations:
+      required: false
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: 想定スコープ
+      options:
+        - bootstrap / apply (配布)
+        - templates (CLAUDE.md / rules / skills / commands)
+        - config (models / cost / work-schedule など)
+        - CI / lint / テスト
+        - ドキュメント (README / ADR / setup)
+        - その他 / 不明
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: adr
+    attributes:
+      label: ADR の要否
+      options:
+        - label: architecture-impacting なため ADR 起票が必要そう
+          required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: 補足
+      description: 関連 ADR / Issue / 参考リンクなど
+    validations:
+      required: false

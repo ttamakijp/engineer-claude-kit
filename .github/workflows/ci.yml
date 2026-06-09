@@ -72,7 +72,12 @@ jobs:
 
     - name: Run lint
       shell: powershell
-      run: pwsh -NoProfile -File scripts/lint.ps1 -Strict
+      # Run under the same Windows PowerShell 5.1 host the install step used, so
+      # PSScriptAnalyzer (installed to the 5.1 CurrentUser module path above) is
+      # actually resolvable. Spawning `pwsh` (PS 7) here would use a different
+      # module path and miss the freshly-installed module -- and the job is
+      # explicitly the "PS 5.1 target" lint. lint.ps1 declares #requires 5.1.
+      run: .\scripts\lint.ps1 -Strict
 
   leakscan:
     name: Leak Scan
