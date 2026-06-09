@@ -40,9 +40,19 @@ deploy される statusLine は context 使用率に応じて ANSI escape で色
 Claude 自身は context % をリアルタイム不可視)、auto-compact は内部 ~95% でのみ動作し summary loss
 リスクがある。色分けで満杯前に user が能動的に compact できるようにする半自動化です (ADR-0012)。
 
-threshold を変えたい場合は `~/.claude/settings.json` の `statusLine.command` 内の `90` / `75` を
-編集してください。ANSI escape の prefix は `[char]27` (PS 5.1 互換) で記述しています。
+統計ロジックは inline (`statusLine.command` の中) ではなく、wizard が deploy する
+`~/.claude/statusline.ps1` に置かれます。`statusLine.command` は
+`powershell -NoProfile -File "<...>/statusline.ps1"` の形でこのスクリプトを参照するだけです
+(ADR-0012 の 2026-06-09 amendment)。threshold を変えたい場合は `~/.claude/statusline.ps1` 内の
+`90` / `75` を編集してください。ANSI escape の prefix は `[char]27` (PS 5.1 互換) で記述しています。
 Windows Terminal は ANSI 対応、legacy cmd.exe console は非対応 (Claude Code は Windows Terminal 推奨)。
+
+> **なぜ inline `-Command` でなく `-File` か (-File 採用理由)**: Windows で Git Bash が入っていると
+> Claude Code は statusLine command を Git Bash 経由で実行する。inline
+> `powershell -Command "...$_..."` は PowerShell が読む前に bash が `$input` / `$_` 等の `$` トークンを
+> 展開してコマンドを破壊し、statusline が**無音で空表示 (blank)** になる。`-File <path>` は `$` トークンを
+> 持たないため bash 経由でも壊れない。既に inline 版を設定済みの場合は、
+> `statusLine.command` を上記 `-File` 形に書き換えてください (wizard は既存 `statusLine` を上書きしない)。
 
 ### wizard を skip したい場合
 

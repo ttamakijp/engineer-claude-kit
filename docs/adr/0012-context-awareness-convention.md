@@ -37,7 +37,29 @@ CLAUDE.md ガイドラインを定義する。
    (`templates/CLAUDE.md` §8) に明記し、新規 user にも自然に伝わるようにする。
 
 setup wizard (ADR-0010) で deploy される statusLine は **色分け版を default** とする
-(`docs/setup/statusline-powershell.example.json` と `scripts/setup-wizard.ps1` で同一の command を ship)。
+(`templates/statusline.ps1` を `~/.claude/statusline.ps1` へ deploy し、`statusLine.command` は
+`-File` でそれを参照する。`docs/setup/statusline-powershell.example.json` も同形)。
+
+### Amendment (2026-06-09): inline `-Command` から `-File` script へ
+
+当初は色分けロジックを `statusLine.command` の **inline `-Command`** に直接埋め込んで ship していた
+(`powershell -NoProfile -Command "$input | ConvertFrom-Json | ForEach-Object { ... }"`)。これは
+**Windows で Git Bash が入っている環境では機能しない** ことが判明した:
+
+- Claude Code は Windows で Git Bash が存在する場合、statusLine command を **Git Bash 経由で実行**する。
+- inline command 内の `$input` / `$_` / `$p` 等の `$` トークンは、PowerShell が解釈する前に **bash が先に
+  展開**してしまい (`$_` は bash の `/usr/bin/sh` に化け、`$input` は空になり EmptyPipeElement エラー)、
+  コマンドが壊れて **stdout が空 → statusline が無音で表示されない**。
+- cmd 経由なら動くため発覚しにくいが、Git Bash 経路では再現性 100% で blank になる。
+
+対策として色分けロジックを独立スクリプト `templates/statusline.ps1` に切り出し、`statusLine.command` は
+`powershell -NoProfile -File "<abs-path>/statusline.ps1"` でそれを参照する形に変更した。`-File` の
+引数 path には `$` トークンが無いため、bash 経由でもコマンドが壊れない (Claude Code 公式の Windows 向け
+推奨も `-File`)。path は forward slash の絶対パスとする (`~` は `powershell -File` 直呼びで解決されない)。
+
+color threshold / `[char]27` / if-expression 互換の仕様 (下記「実装上の制約」) は不変で、置き場所が
+command 文字列から `statusline.ps1` に移っただけ。drift 防止テスト (`tests/statusline-color.tests.ps1`) も
+`templates/statusline.ps1` を検証対象に更新した。
 
 実装上の制約:
 
