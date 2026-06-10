@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- README に「なぜ engineer-claude-kit が必要か」セクション + `docs/cost-analysis.md`
+  を追加 (G6d): 実測 workload (432 turn / 44 session) を Bedrock 3 構成で projection し、
+  cost 削減主因 (1h TTL + Haiku 委譲、−80%) が Anthropic / Bedrock の設定機能である点と、
+  kit 固有の付加価値 (1 cmd 自動化 / hands-off / 構造的保護) を分離して説明。
 - kit self-update mechanism (ADR-0013): `apply-claude-kit.ps1` が起動時に kit
   checkout 自身の behind を検出し hint を表示。`-Update` で fast-forward pull、
   `-UpdateForce` で hard-reset escape hatch、`-NoUpdateCheck` で検出 skip。
