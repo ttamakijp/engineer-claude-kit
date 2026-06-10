@@ -17,11 +17,35 @@ engineer-claude-kit を現在の環境へ配布する `/apply` slash command と
 | (引数なし) | `-Global` | `~/.claude/` に配布 (全プロジェクト共通設定) | ✅ 既定 |
 | `/apply <path>` | `-Project <path>` | 指定プロジェクトの `<path>/.claude/` に配布 | — |
 | `/apply --dry-run` | `-DryRun` | 配置内容のプレビューのみ (実書き込みなし) | off |
+| `/apply --update` | `-Update` | 配布前に kit を origin に fast-forward pull (ADR-0013) | off |
+| (直接呼出のみ) | `-UpdateForce` | `git reset --hard origin/<branch>` で強制最新化 (escape hatch、ローカル編集破棄) | off |
+| (直接呼出のみ) | `-NoUpdateCheck` | 起動時の behind 検出 (fetch) 自体を skip (CI / オフライン用) | off |
 
 - `--dry-run` は `-Global` / `-Project` のどちらとも併用可能。
   - `/apply --dry-run` → Global mode の dry-run
   - `/apply C:\dev\my-project --dry-run` → Project mode の dry-run
 - `-Global` と `-Project` は排他。パスを指定すれば Project、省略すれば Global。
+
+### kit self-update (ADR-0013)
+
+`apply-claude-kit.ps1` は起動時に kit checkout 自身が origin より古い (behind) かを検出する:
+
+- 起動時に `git fetch --quiet origin` を **timeout 5 秒** (background job) で実行。失敗・タイムアウト・非 git checkout は **silent skip** (検出不能扱い、apply は通常どおり継続)。
+- behind > 0 を検出すると behind commit 数 + `-Update` hint を表示 (**表示のみ。デフォルトでは更新しない**)。
+- `-Update` 指定時のみ `git pull --ff-only origin <branch>` を実行 (divergent history では loud に失敗し、merge commit / conflict を回避)。
+- `-UpdateForce` は `git reset --hard origin/<branch>` でローカル編集を破棄して強制最新化 (escape hatch)。
+- `-NoUpdateCheck` は fetch を含め検出を完全に skip。CI / オフライン環境で network 待ちを避けたいときに使う。
+
+実装は `scripts/lib/kit-updater.ps1` (`Test-KitBehind` / `Invoke-KitUpdate`)。
+`bootstrap.ps1` も `-Update` を受け、`apply -Global` subprocess に伝播する。
+
+```powershell
+# kit を最新化してから Global 配置 (PS 5.1)
+powershell -NoProfile -File "$env:USERPROFILE\.claude-kit\scripts\apply-claude-kit.ps1" -Global -Update
+
+# CI 等、network 待ちを避けたい場合は検出を skip
+powershell -NoProfile -File "$env:USERPROFILE\.claude-kit\scripts\apply-claude-kit.ps1" -Global -NoUpdateCheck
+```
 
 ### 直接呼出 (Claude Code を介さない場合)
 

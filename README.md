@@ -293,6 +293,9 @@ kit を更新したとき (`git -C "$env:USERPROFILE\.claude-kit" pull` 後) や
 | Global 再適用 (kit 更新を `~/.claude/` に反映) | `/apply` |
 | プロジェクト個別 `.claude/` 配置 | `/apply C:\dev\my-project` |
 | 事前検証 (何が変更されるかプレビュー) | `/apply --dry-run` |
+| kit 自身を最新化してから配置 (ADR-0013) | `/apply --update` (直接呼出: `pwsh apply-claude-kit.ps1 -Global -Update`) |
+
+> 起動時に kit が origin より古い (behind) と検出すると hint を表示する。実際の更新は明示的 opt-in (`--update` / `-Update`) のときのみ fast-forward pull で行う (ADR-0013)。ネットワーク失敗・タイムアウト・非 git checkout は silent skip。検出自体を無効化するには `-NoUpdateCheck`。
 
 `/apply` は `apply-claude-kit.ps1` を起動する slash command (定義は `commands/apply.md`、引数の詳細は [docs/setup/apply-command-reference.md](docs/setup/apply-command-reference.md))。自然言語 (「kit を再適用」「.claude/ を最新化」等) で同じ処理を呼び出す `apply-claude-kit` skill も用意されている。skill (文脈検出の入口) と `/apply` command (引数明示の実行系) の責務分離は [docs/setup/apply-command-reference.md](docs/setup/apply-command-reference.md) を参照。
 

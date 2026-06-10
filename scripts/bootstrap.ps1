@@ -13,7 +13,10 @@ param(
     [switch]$NoEnvPersist,
     [switch]$AllowElevated,
     [switch]$NonInteractive,
-    [switch]$NoSettingsWizard
+    [switch]$NoSettingsWizard,
+    # Kit self-update (ADR-0013): forwarded to apply-claude-kit.ps1 -Global so a
+    # fast-forward pull happens before deployment when the checkout is behind.
+    [switch]$Update
 )
 
 $ErrorActionPreference = 'Stop'
@@ -144,6 +147,8 @@ if ($AllowElevated) { $applyArgs += "-AllowElevated" }
 # avoid prompting twice. Direct `apply-claude-kit.ps1 -Global` still runs it.
 $applyArgs += "-NoSettingsWizard"
 if ($NonInteractive) { $applyArgs += "-NonInteractive" }
+# Forward kit self-update opt-in (ADR-0013) to the -Global apply subprocess.
+if ($Update) { $applyArgs += "-Update" }
 
 & powershell @applyArgs
 if ($LASTEXITCODE -ne 0) {

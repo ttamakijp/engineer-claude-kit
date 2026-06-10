@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- kit self-update mechanism (ADR-0013): `apply-claude-kit.ps1` が起動時に kit
+  checkout 自身の behind を検出し hint を表示。`-Update` で fast-forward pull、
+  `-UpdateForce` で hard-reset escape hatch、`-NoUpdateCheck` で検出 skip。
+  `bootstrap.ps1` は `-Update` を `apply -Global` へ伝播。`/apply --update` で
+  Claude Code からも起動可能。実装は `scripts/lib/kit-updater.ps1`
+  (`Test-KitBehind` / `Invoke-KitUpdate`、injection-point ベースの Pester 19 件)。
+
 ### Changed
 
 - GitHub Actions を Node24 対応版に更新: `actions/checkout@v4` -> `@v5`、

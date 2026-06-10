@@ -30,6 +30,14 @@ param(
     # spec is only placed when this is passed (Global mode only).
     [switch]$EnableCleanupSchedule,
 
+    # Kit self-update (ADR-0013). On startup the kit checks whether its own
+    # checkout is behind origin and prints an opt-in hint. -Update performs a
+    # fast-forward pull; -UpdateForce hard-resets to origin (escape hatch);
+    # -NoUpdateCheck skips the check entirely (CI / offline).
+    [switch]$Update,
+    [switch]$UpdateForce,
+    [switch]$NoUpdateCheck,
+
     # Default resolved in the body: referencing $PSScriptRoot in a param default
     # is unreliable under Windows PowerShell 5.1 when parameter sets are present.
     [string]$KitRoot
@@ -54,6 +62,31 @@ Assert-NonElevated -AllowElevated:$AllowElevated
 
 if (-not $KitRoot) {
     $KitRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
+}
+
+# Kit self-update check (ADR-0013). Detect whether this kit checkout is behind
+# origin and, depending on the switches, hint / pull / hard-reset. A network
+# failure, timeout, or non-git checkout returns -1 and is silently ignored so a
+# flaky network never blocks apply. -NoUpdateCheck skips the check entirely.
+if (-not $NoUpdateCheck) {
+    . (Join-Path (Join-Path $PSScriptRoot "lib") "kit-updater.ps1")
+    $behind = Test-KitBehind -KitRoot $KitRoot
+    if ($behind -gt 0) {
+        Write-Host ""
+        Write-Host "[hint] kit is $behind commit(s) behind origin."
+        if ($Update) {
+            Invoke-KitUpdate -KitRoot $KitRoot
+        } elseif ($UpdateForce) {
+            Invoke-KitUpdate -KitRoot $KitRoot -Force
+        } else {
+            Write-Host "       Run with -Update to pull (fast-forward only)."
+            Write-Host "       Or update manually: git -C `"$KitRoot`" pull"
+        }
+        Write-Host ""
+    } elseif ($Update -or $UpdateForce) {
+        Write-Host "[OK] kit is already up-to-date."
+    }
+    # behind == -1 (network failure / timeout / non-git checkout): stay silent.
 }
 
 # --- deployment ---
