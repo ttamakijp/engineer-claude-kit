@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **README.md** — クイックインストール callout を冒頭追加、「なぜ engineer-claude-kit が必要か」section を §0 の前へ移動 (新規訪問者が install command と Why に即到達する構造へ)。
 - **`.mailmap`** — root 配置に集約 (Git 標準 convention、`git log --use-mailmap` /
   `git shortlog` 自動認識)。kit 自身の committer identity を正規化 (個人メアド commit
   を GitHub noreply identity へ集約、bot は `Claude <noreply@anthropic.com>` 統一)。
