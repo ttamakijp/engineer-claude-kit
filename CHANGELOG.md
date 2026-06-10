@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- GitHub Actions を Node24 対応版に更新: `actions/checkout@v4` -> `@v5`、
+  `gitleaks/gitleaks-action@v2` -> `@v3` (2026-06-16 の runner Node24 強制切替に
+  伴う deprecation 対応, #60)。
+
 ## [0.1.0] - 2026-06-10
 
 初版リリース。Phase 1-13 と Group 1-5 の全作業を統合した最初のタグ付きリリースです。
