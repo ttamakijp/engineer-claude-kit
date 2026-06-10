@@ -1,0 +1,12 @@
+# .mailmap — committer identity normalization (Git native, root placement per Git convention)
+#
+# `git log --use-mailmap` and `git shortlog -sne` collapse the identities below to
+# one canonical entry each. Past commit objects are immutable — this affects display
+# and aggregation only, never history.
+# See: https://git-scm.com/docs/gitmailmap
+#
+# Maintainer — canonical = GitHub noreply identity
+ttamakijp <46277407+ttamakijp@users.noreply.github.com> <t_tamaki@icloud.com>
+#
+# Bot / AI agents — normalize to a single canonical Claude identity
+Claude <noreply@anthropic.com> <noreply@anthropic.com>

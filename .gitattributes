@@ -7,3 +7,6 @@ templates/git-hooks/pre-push text eol=lf
 templates/.gitleaks.toml text eol=lf
 templates/.mailmap text eol=lf
 templates/.gitignore text eol=lf
+
+# Kit-own root identity map (Git native, root placement per Git convention).
+.mailmap text eol=lf

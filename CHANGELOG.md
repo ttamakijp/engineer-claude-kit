@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`.mailmap`** — root 配置に集約 (Git 標準 convention、`git log --use-mailmap` /
+  `git shortlog` 自動認識)。kit 自身の committer identity を正規化 (個人メアド commit
+  を GitHub noreply identity へ集約、bot は `Claude <noreply@anthropic.com>` 統一)。
+  配布テンプレート `templates/.mailmap` は別物として温存。
 - GitHub Actions を Node24 対応版に更新: `actions/checkout@v4` -> `@v5`、
   `gitleaks/gitleaks-action@v2` -> `@v3` (2026-06-16 の runner Node24 強制切替に
   伴う deprecation 対応, #60)。
