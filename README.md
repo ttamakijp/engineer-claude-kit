@@ -255,6 +255,37 @@ engineer-claude-kit/
 | `README.md` (本ファイル) | プロジェクト概要 + 配置構成 + Quick start | ✅ Phase 1 |
 | `LICENSE` / `.gitignore` | リポ初期セット | ✅ Phase 1 |
 
+## なぜ engineer-claude-kit が必要か
+
+Bedrock のデフォルト設定は **会話 bot 向け**に最適化されており、
+engineering 用途 (turn 間隔 5-15min) では prompt cache が毎 turn 切れて高コストになります。
+
+実測 workload (1 日 432 turn / 44 session) を Bedrock 上の 3 構成で比較:
+
+| 構成 | engineering 想定 cost | 削減率 |
+|---|--:|--:|
+| Bedrock デフォルト (Sonnet 4.6 / 5m TTL / Haiku) | $310 | 基準 |
+| Sonnet 4.5 + **1h TTL** + Haiku | $60 | **−80%** |
+| 上記 + **engineer-claude-kit** | $60 + 質的改善 | **−80% + α** |
+
+cost 削減の主因 (**1h TTL + Haiku 委譲**) は Anthropic / Bedrock の **設定機能**であり、
+kit はそれを「**1 コマンドで安全に・継続的に・複数 PJ に展開する自動化**」と
+「**運用面の構造的保護**」を担当します。
+
+| 効果 | 手動可能性 | kit の付加価値 |
+|---|---|---|
+| 1h TTL + Haiku 委譲 | 手動 settings.json で可能 | 1 cmd 自動適用 (ADR-0010 interactive wizard) |
+| 設定破壊リスク回避 | 手動注意要 | hands-off (ADR-0007) で既存値を絶対温存 |
+| kit 自体の最新化 | 手動 git pull | `-Update` 1 cmd で fast-forward pull (ADR-0013) |
+| 新 PJ への展開 | 毎回手動セットアップ | `bootstrap.ps1 -Global` 1 cmd |
+| 漏洩防御 5 層 | 自前構築 | pre-commit / CI / leak scan / CODEOWNERS / branch protection 自動 deploy |
+| stuck process 回収 | 手動監視 | `cleanup-orphan-processes` skill (ADR-0011) |
+| context 使用率可視化 | カスタム実装要 | statusLine 色分け 緑/黄/赤 (ADR-0012) |
+
+> 注: orchestration 中心 (子タスク並行) の workload では削減は **−7%** 程度に縮小。
+> kit の真価は **human-pace** (思考しながらの単独セッション) で発揮されます。
+> 実測詳細・計算根拠・pricing 概算は [docs/cost-analysis.md](docs/cost-analysis.md) を参照。
+
 ## 3. Quick Start
 
 初回の **install** (Claude Code を起動できる状態にする) と、その後の **日常運用** (kit 更新の反映・プロジェクト配置) を分離する。日常運用は Claude Code 内の `/apply` slash command に集約され、bootstrap.ps1 を直接叩くのは初回のみ。
