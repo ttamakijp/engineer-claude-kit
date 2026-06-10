@@ -16,7 +16,7 @@ jobs:
         ps-version: ['5.1', '7']
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Install Pester 3.4 (PS 5.1)
       if: matrix.ps-version == '5.1'
@@ -64,7 +64,7 @@ jobs:
     name: PSScriptAnalyzer (PS 5.1 target)
     runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Install PSScriptAnalyzer
       shell: powershell
@@ -83,12 +83,12 @@ jobs:
     name: Leak Scan
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         fetch-depth: 0  # full history so gitleaks can scan past commits
 
     - name: Run gitleaks
-      uses: gitleaks/gitleaks-action@v2
+      uses: gitleaks/gitleaks-action@v3
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GITLEAKS_CONFIG: .gitleaks.toml
