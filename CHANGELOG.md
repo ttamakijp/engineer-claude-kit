@@ -38,6 +38,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`scripts/usage-insights.ps1` (G6g)** — `Format-InsightsReport` に人間語併記を追加。
+  技術メトリクスはそのまま残し、各 finding 直後に blockquote で対人類比を提示
+  (Opus 偏重 / Haiku 委譲ゼロ / cache cold / token 浪費 / stuck / 反復依頼 / cost 増加)。
+  日本語原文は `scripts/lib/plain-language-hints.json` に外出しし、ASCII-only の renderer
+  `scripts/lib/plain-language.ps1` (`Get-PlainLanguageHint`) が `Read-Utf8NoBom` 経由で読む
+  (PS 5.1 の BOM 無し `.ps1` mojibake を回避、encoding 単一系統を維持)。
+- **`docs/adr/0014`** — 出力形式 (技術 + 人間語併記) と日本語原文外出しの設計判断を追記。
 - **README.md** — クイックインストール callout を冒頭追加、「なぜ engineer-claude-kit が必要か」section を §0 の前へ移動 (新規訪問者が install command と Why に即到達する構造へ)。
 - **`.mailmap`** — root 配置に集約 (Git 標準 convention、`git log --use-mailmap` /
   `git shortlog` 自動認識)。kit 自身の committer identity を正規化 (個人メアド commit

@@ -34,6 +34,9 @@ $ScriptVersion = "0.1.0"
 # a BOM on every PowerShell version (CP932 default on PS 5.1 would mojibake). See
 # ADR-0003 section C. Dot-sourced so the helper functions land in this scope.
 . (Join-Path (Join-Path $PSScriptRoot "lib") "encoding-helper.ps1")
+# Plain-language hint renderer (Get-PlainLanguageHint). Loaded after the encoding
+# helper so its Read-Utf8NoBom dependency is in scope. See ADR-0014.
+. (Join-Path (Join-Path $PSScriptRoot "lib") "plain-language.ps1")
 
 # --- helpers ---
 
@@ -332,15 +335,41 @@ function Format-InsightsReport {
     [void]$sb.AppendLine("Window: last $WindowDays day(s). Assistant turns: $($Metrics.WindowTurns). User prompts: $($Metrics.UserPrompts).")
     [void]$sb.AppendLine("")
 
+    # Append a plain-language blockquote (Get-PlainLanguageHint) after a finding when
+    # that finding's condition holds. The technical metric line is always emitted
+    # separately first; the hint augments it, never replaces it. See ADR-0014.
+    $appendHint = {
+        param([bool]$When, [string]$Cat)
+        if ($When) { [void]$sb.AppendLine((Get-PlainLanguageHint -Category $Cat)) }
+    }
+
+    # Opus share of model cost (drives the OpusHeavy hint; cost-aware only).
+    $opusCost = 0.0; $modelCost = 0.0
+    foreach ($k in $Metrics.PerModel.Keys) {
+        $modelCost += [double]$Metrics.PerModel[$k].Cost
+        if ($k -eq 'Opus') { $opusCost = [double]$Metrics.PerModel[$k].Cost }
+    }
+    $opusPct = if ($modelCost -gt 0) { [math]::Round(100.0 * $opusCost / $modelCost, 1) } else { 0.0 }
+    $costRising = $CostTrend.StartsWith('+') -and ($CostTrend -notmatch '^\+0(\.0+)?\s')
+
     # Key findings (first 3-5 lines are what the session-start hint surfaces).
     [void]$sb.AppendLine("## Key findings")
     [void]$sb.AppendLine("")
     $costLine = if ($Metrics.CostAvailable) { "Est. cost: USD $($Metrics.TotalCost) ($CostTrend)" } else { "Est. cost: unavailable (pricing.psd1 not loaded)" }
     [void]$sb.AppendLine("- $costLine")
+    & $appendHint ($Metrics.CostAvailable -and $costRising) 'CostRising'
+    if ($Metrics.CostAvailable) {
+        [void]$sb.AppendLine("- Opus cost share: $opusPct% of model cost")
+        & $appendHint ($opusPct -ge 60) 'OpusHeavy'
+    }
     [void]$sb.AppendLine("- Haiku delegation: $($Metrics.HaikuRatePct)% ($($Metrics.HaikuTurns)/$($Metrics.WindowTurns) turns)")
+    & $appendHint ($Metrics.WindowTurns -gt 0 -and $Metrics.HaikuTurns -eq 0) 'HaikuZero'
     [void]$sb.AppendLine("- Cache cold-read share: $($Metrics.ColdReadPct)% (higher = more cache misses)")
+    & $appendHint ($Metrics.ColdReadPct -ge 50) 'ColdHeavy'
     [void]$sb.AppendLine("- Token-waste score: $($Metrics.WasteScore)/100 ($($Metrics.HeavyTurns) heavy-output turns)")
+    & $appendHint ($Metrics.WasteScore -ge 30) 'WasteHigh'
     [void]$sb.AppendLine("- Stuck candidates: $($Metrics.StuckCandidates.Count)")
+    & $appendHint ($Metrics.StuckCandidates.Count -gt 0) 'StuckSession'
     [void]$sb.AppendLine("")
 
     [void]$sb.AppendLine("## Model usage")
@@ -379,6 +408,7 @@ function Format-InsightsReport {
             $safe = ($p.Prefix -replace '\|', '\|')
             [void]$sb.AppendLine("| $($p.Count) | $safe |")
         }
+        & $appendHint $true 'RepeatedPattern'
         [void]$sb.AppendLine("")
     }
 

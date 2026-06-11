@@ -240,3 +240,76 @@ Describe "Format-InsightsReport" {
         } finally { Remove-Item -Recurse -Force $root -ErrorAction SilentlyContinue }
     }
 }
+
+# Plain-language hints (G6g). The Japanese hint text lives in
+# scripts/lib/plain-language-hints.json and is rendered as a Markdown blockquote.
+# Assertions stay ASCII: they check the blockquote marker (^>) and gating, never
+# the translated copy itself.
+Describe "Get-PlainLanguageHint" {
+    $categories = @('OpusHeavy','HaikuZero','ColdHeavy','WasteHigh','StuckSession','RepeatedPattern','CostRising')
+
+    It "returns a non-empty blockquote for every known category" {
+        foreach ($c in $categories) {
+            $hint = Get-PlainLanguageHint -Category $c
+            $hint | Should Not BeNullOrEmpty
+            $hint | Should Match "(?m)^>"
+        }
+    }
+    It "returns empty string for an unknown category" {
+        (Get-PlainLanguageHint -Category 'NoSuchCategory') | Should Be ''
+    }
+    It "returns empty string when the hints file is absent" {
+        $missing = Join-Path $env:TEMP "no-such-hints-xyz.json"
+        (Get-PlainLanguageHint -Category 'OpusHeavy' -HintsFile $missing) | Should Be ''
+    }
+    It "begins with a blank line so the blockquote separates from the metric" {
+        (Get-PlainLanguageHint -Category 'OpusHeavy').StartsWith("`n") | Should Be $true
+    }
+}
+
+Describe "Format-InsightsReport plain-language hints" {
+    function New-Metrics {
+        param($PerModel, $HaikuTurns, $HaikuRate, $Cold, $Waste, $Heavy, $Stuck, $Patterns, $CostAvailable)
+        return [ordered]@{
+            WindowTurns = 10; UserPrompts = 4
+            PerModel = $PerModel
+            TotalCost = 9.0; CostAvailable = $CostAvailable
+            ColdReadPct = $Cold; TotalReadTokens = 8000
+            StuckCandidates = $Stuck
+            HaikuRatePct = $HaikuRate; HaikuTurns = $HaikuTurns
+            WasteScore = $Waste; HeavyTurns = $Heavy
+            Patterns = $Patterns
+        }
+    }
+    $opusHeavyModel = @{
+        Opus  = [ordered]@{ Family='Opus';  Turns=9; Input=100; Output=5000; CacheCreate=0; CacheRead=0; Cost=9.0 }
+        Haiku = [ordered]@{ Family='Haiku'; Turns=1; Input=10;  Output=50;   CacheCreate=0; CacheRead=0; Cost=0.01 }
+    }
+    $healthyModel = @{
+        Haiku = [ordered]@{ Family='Haiku'; Turns=5; Input=10; Output=50; CacheCreate=0; CacheRead=0; Cost=0.5 }
+    }
+
+    It "appends a blockquote when Haiku delegation is zero" {
+        $m = New-Metrics $opusHeavyModel 0 0.0 70.0 40.0 4 @([PSCustomObject]@{Minutes=95.0;Timestamp=$script:NowUtc}) @([PSCustomObject]@{Prefix='x';Count=3}) $true
+        $report = Format-InsightsReport -Metrics $m -Kind 'weekly' -DateStr '2026-06-11' -WindowDays 7 -CostTrend '+1.5 vs prev weekly (2026-06-04)'
+        $report | Should Match "(?m)^>"
+        $report | Should Match "Haiku delegation: 0%"
+    }
+    It "emits an Opus cost share line and OpusHeavy hint when Opus dominates" {
+        $m = New-Metrics $opusHeavyModel 0 0.0 70.0 40.0 4 @() @() $true
+        $report = Format-InsightsReport -Metrics $m -Kind 'weekly' -DateStr '2026-06-11' -WindowDays 7 -CostTrend 'n/a'
+        $report | Should Match "Opus cost share:"
+        ([regex]::Matches($report, "(?m)^>")).Count | Should BeGreaterThan 0
+    }
+    It "omits all hints when every metric is healthy" {
+        $m = New-Metrics $healthyModel 3 60.0 0.0 0.0 0 @() @() $true
+        $report = Format-InsightsReport -Metrics $m -Kind 'weekly' -DateStr '2026-06-11' -WindowDays 7 -CostTrend '+0 vs prev weekly (2026-06-04)'
+        ([regex]::Matches($report, "(?m)^>")).Count | Should Be 0
+    }
+    It "preserves the technical metric lines alongside the hints" {
+        $m = New-Metrics $opusHeavyModel 0 0.0 70.0 40.0 4 @() @() $true
+        $report = Format-InsightsReport -Metrics $m -Kind 'weekly' -DateStr '2026-06-11' -WindowDays 7 -CostTrend 'n/a'
+        $report | Should Match "Cache cold-read share: 70%"
+        $report | Should Match "Token-waste score: 40"
+    }
+}
