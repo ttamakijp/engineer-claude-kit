@@ -2,7 +2,7 @@
 # plain-language.ps1
 # Shared helper: render a plain-language (Japanese) blockquote hint for a usage
 # finding category, to be appended after the technical metric in the insights
-# report. Provides: Get-PlainLanguageHint.
+# report. Provides: Get-PlainLanguageHint, Format-KitBehindBanner.
 #
 # Why the hint text lives in an external JSON, not inline here (see ADR-0014):
 #   - This kit enforces ASCII-only PowerShell sources (no Japanese literals in
@@ -20,8 +20,11 @@ function Get-PlainLanguageHint {
     # a leading blank line, then one "> <sentence>" line per mapped sentence. An
     # unknown category, a missing data file, or a malformed file yields '' so the
     # caller appends nothing (the technical metric is always preserved separately).
+    # $Metrics (optional) supplies values for "{key}" placeholders inside the hint
+    # sentences (e.g. "{Behind}" -> $Metrics.Behind), substituted before rendering.
     param(
         [Parameter(Mandatory)][string]$Category,
+        [hashtable]$Metrics,
         [string]$HintsFile
     )
     if (-not $HintsFile) {
@@ -37,6 +40,31 @@ function Get-PlainLanguageHint {
     if (-not $sentences) { return '' }
 
     $out = @('')
-    foreach ($s in $sentences) { $out += "> $s" }
+    foreach ($s in $sentences) {
+        $line = [string]$s
+        if ($Metrics) {
+            foreach ($k in $Metrics.Keys) { $line = $line.Replace('{' + $k + '}', [string]$Metrics[$k]) }
+        }
+        $out += "> $line"
+    }
     return ($out -join "`n")
+}
+
+function Format-KitBehindBanner {
+    # Render the "kit update available" banner for a positive behind count, or ''
+    # when the checkout is up to date / unknown. Combines an ASCII technical line
+    # with the Japanese plain-language blockquote (Get-PlainLanguageHint). See
+    # ADR-0014 (G6h). The leading "kit-behind" count is supplied by the caller
+    # (usage-insights.ps1 -> Test-KitBehind), keeping this renderer side-effect free.
+    param([Parameter(Mandatory)][int]$KitBehind)
+    if ($KitBehind -le 0) { return '' }
+    $cw = if ($KitBehind -eq 1) { 'commit' } else { 'commits' }
+    $lines = @(
+        "## Kit update available ($KitBehind $cw behind)"
+        ''
+        "- Kit checkout is $KitBehind $cw behind origin"
+        '- Apply: `/apply --update` or `pwsh apply-claude-kit.ps1 -Global -Update`'
+        (Get-PlainLanguageHint -Category 'KitBehind' -Metrics @{ Behind = $KitBehind })
+    )
+    return ($lines -join "`n")
 }

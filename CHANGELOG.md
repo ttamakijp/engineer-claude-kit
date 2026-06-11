@@ -45,6 +45,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `scripts/lib/plain-language.ps1` (`Get-PlainLanguageHint`) が `Read-Utf8NoBom` 経由で読む
   (PS 5.1 の BOM 無し `.ps1` mojibake を回避、encoding 単一系統を維持)。
 - **`docs/adr/0014`** — 出力形式 (技術 + 人間語併記) と日本語原文外出しの設計判断を追記。
+- **`scripts/usage-insights.ps1` (G6h)** — レポート生成時に kit-behind (ADR-0013
+  `Test-KitBehind`) を検出し、origin より古い場合は冒頭に「kit 更新あり」セクションを追加
+  (技術メトリクス + 人間語 blockquote 併記)。`kit-updater.ps1` 不在 (legacy install) /
+  network 失敗時は silent skip。検出は `Invoke-UsageInsights` に置き、
+  `Format-InsightsReport` は `-KitBehind` を受ける純関数として決定論を維持。banner 描画は
+  `Format-KitBehindBanner` (`scripts/lib/plain-language.ps1`) へ抽出。
+- **`scripts/lib/plain-language.ps1`** — `Get-PlainLanguageHint` に `-Metrics` placeholder
+  置換を追加 (`{Behind}` 等)、`Format-KitBehindBanner` を新設。
+- **`scripts/lib/plain-language-hints.json`** — `KitBehind` category 追加。
+- **`docs/adr/0014`** — kit-behind 統合の設計判断を Decision に追記 (G6h)。
 - **README.md** — クイックインストール callout を冒頭追加、「なぜ engineer-claude-kit が必要か」section を §0 の前へ移動 (新規訪問者が install command と Why に即到達する構造へ)。
 - **`.mailmap`** — root 配置に集約 (Git 標準 convention、`git log --use-mailmap` /
   `git shortlog` 自動認識)。kit 自身の committer identity を正規化 (個人メアド commit

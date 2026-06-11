@@ -313,3 +313,70 @@ Describe "Format-InsightsReport plain-language hints" {
         $report | Should Match "Token-waste score: 40"
     }
 }
+
+# Kit-behind banner (G6h). Format-InsightsReport is kept pure: it renders the banner
+# only from the -KitBehind int passed in (Test-KitBehind runs in Invoke-UsageInsights,
+# not here), so these assertions are deterministic and never touch the network.
+# A healthy metrics set is used so the ONLY possible blockquote is the kit banner.
+Describe "Format-InsightsReport kit-behind banner" {
+    $healthy = [ordered]@{
+        WindowTurns = 5; UserPrompts = 2
+        PerModel = @{ Haiku = [ordered]@{ Family='Haiku'; Turns=5; Input=10; Output=50; CacheCreate=0; CacheRead=0; Cost=0.5 } }
+        TotalCost = 0.5; CostAvailable = $true
+        ColdReadPct = 0.0; TotalReadTokens = 0
+        StuckCandidates = @()
+        HaikuRatePct = 60.0; HaikuTurns = 3
+        WasteScore = 0.0; HeavyTurns = 0
+        Patterns = @()
+    }
+
+    It "prepends the banner with a blockquote when behind by 5 commits" {
+        $report = Format-InsightsReport -Metrics $healthy -Kind 'weekly' -DateStr '2026-06-11' -WindowDays 7 -CostTrend 'n/a' -KitBehind 5
+        $report | Should Match "Kit update available \(5 commits behind\)"
+        $report | Should Match "(?m)^>"
+        # The banner sits before Key findings (report opening).
+        $report.IndexOf("Kit update available") | Should BeLessThan ($report.IndexOf("Key findings"))
+    }
+    It "omits the banner when up to date (behind=0)" {
+        $report = Format-InsightsReport -Metrics $healthy -Kind 'weekly' -DateStr '2026-06-11' -WindowDays 7 -CostTrend 'n/a' -KitBehind 0
+        $report | Should Not Match "Kit update available"
+        ([regex]::Matches($report, "(?m)^>")).Count | Should Be 0
+    }
+    It "omits the banner when detection failed (behind=-1)" {
+        $report = Format-InsightsReport -Metrics $healthy -Kind 'weekly' -DateStr '2026-06-11' -WindowDays 7 -CostTrend 'n/a' -KitBehind -1
+        $report | Should Not Match "Kit update available"
+    }
+    It "omits the banner by default (silent skip when -KitBehind not supplied)" {
+        # Models the legacy-install / Test-KitBehind-absent path: Invoke-UsageInsights
+        # leaves $kitBehind at its -1 default, which Format-InsightsReport renders as no banner.
+        $report = Format-InsightsReport -Metrics $healthy -Kind 'weekly' -DateStr '2026-06-11' -WindowDays 7 -CostTrend 'n/a'
+        $report | Should Not Match "Kit update available"
+    }
+}
+
+Describe "Format-KitBehindBanner" {
+    It "returns empty for non-positive counts" {
+        (Format-KitBehindBanner -KitBehind 0)  | Should Be ''
+        (Format-KitBehindBanner -KitBehind -1) | Should Be ''
+    }
+    It "uses the singular 'commit' for a behind count of 1" {
+        $b = Format-KitBehindBanner -KitBehind 1
+        $b | Should Match "Kit update available \(1 commit behind\)"
+        $b | Should Not Match "1 commits behind"
+    }
+    It "uses the plural 'commits' for counts above 1" {
+        (Format-KitBehindBanner -KitBehind 3) | Should Match "3 commits behind"
+    }
+}
+
+Describe "Get-PlainLanguageHint metrics placeholder" {
+    It "substitutes {Behind} from the -Metrics hashtable" {
+        $hint = Get-PlainLanguageHint -Category 'KitBehind' -Metrics @{ Behind = 7 }
+        $hint | Should Not BeNullOrEmpty
+        $hint | Should Not Match "\{Behind\}"
+        $hint | Should Match "7"
+    }
+    It "leaves the placeholder intact when no metrics are supplied" {
+        (Get-PlainLanguageHint -Category 'KitBehind') | Should Match "\{Behind\}"
+    }
+}

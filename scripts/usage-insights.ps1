@@ -37,6 +37,9 @@ $ScriptVersion = "0.1.0"
 # Plain-language hint renderer (Get-PlainLanguageHint). Loaded after the encoding
 # helper so its Read-Utf8NoBom dependency is in scope. See ADR-0014.
 . (Join-Path (Join-Path $PSScriptRoot "lib") "plain-language.ps1")
+# Optional: kit-updater.ps1 (G6b); absent on legacy installs -> banner skipped (ADR-0014 G6h).
+$kitUpdaterPath = Join-Path (Join-Path $PSScriptRoot "lib") "kit-updater.ps1"
+if (Test-Path -LiteralPath $kitUpdaterPath) { try { . $kitUpdaterPath } catch { } }
 
 # --- helpers ---
 
@@ -325,7 +328,8 @@ function Format-InsightsReport {
         [string]$Kind = 'weekly',
         [string]$DateStr,
         [int]$WindowDays = 7,
-        [string]$CostTrend = 'n/a'
+        [string]$CostTrend = 'n/a',
+        [int]$KitBehind = -1   # commits behind origin; >0 prepends a banner, <=0 omits it
     )
     if (-not $DateStr) { $DateStr = (Get-Date).ToString('yyyy-MM-dd') }
 
@@ -334,6 +338,8 @@ function Format-InsightsReport {
     [void]$sb.AppendLine("")
     [void]$sb.AppendLine("Window: last $WindowDays day(s). Assistant turns: $($Metrics.WindowTurns). User prompts: $($Metrics.UserPrompts).")
     [void]$sb.AppendLine("")
+
+    if ($KitBehind -gt 0) { [void]$sb.AppendLine((Format-KitBehindBanner -KitBehind $KitBehind)); [void]$sb.AppendLine("") }  # G6h kit-behind banner
 
     # Append a plain-language blockquote (Get-PlainLanguageHint) after a finding when
     # that finding's condition holds. The technical metric line is always emitted
@@ -471,8 +477,14 @@ function Invoke-UsageInsights {
     }
     $trend = Get-CostTrend -OutputDir $OutputDir -Kind $kind -TotalCost $metrics.TotalCost -DateStr $dateStr
 
+    # Kit-behind detection (G6h): guarded so legacy installs / network failures omit the banner.
+    $kitBehind = -1
+    if (Get-Command -Name Test-KitBehind -ErrorAction SilentlyContinue) {
+        try { $kitBehind = Test-KitBehind -KitRoot (Split-Path -Parent $PSScriptRoot) } catch { $kitBehind = -1 }
+    }
+
     $report = Format-InsightsReport -Metrics $metrics -Kind $kind -DateStr $dateStr `
-        -WindowDays $windowDays -CostTrend $trend
+        -WindowDays $windowDays -CostTrend $trend -KitBehind $kitBehind
     $path = Write-InsightsReport -Report $report -Kind $kind -OutputDir $OutputDir -DateStr $dateStr
 
     if (-not $Quiet) {
