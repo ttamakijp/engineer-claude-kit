@@ -37,9 +37,21 @@ function Test-IsInteractive {
     # Non-interactive when running under CI, when the process has no interactive
     # console (service / cron), or when stdin is redirected (pipe / background
     # process / slash command). Read-Host is only safe when all three hold.
-    if (Test-CiEnvironment) { return $false }
-    if (-not (Test-HostUserInteractive)) { return $false }
-    if (Test-StdinRedirected) { return $false }
+    #
+    # The three signals are injectable so tests can pin each deterministically
+    # (Pester v3.4 cannot mock nested calls reliably, and the CI runner sets the
+    # CI env var). Production callers pass nothing and read the real signals.
+    param(
+        $Ci = $null,
+        $UserInteractive = $null,
+        $StdinRedirected = $null
+    )
+    $isCi = if ($null -ne $Ci) { [bool]$Ci } else { Test-CiEnvironment }
+    if ($isCi) { return $false }
+    $ui = if ($null -ne $UserInteractive) { [bool]$UserInteractive } else { Test-HostUserInteractive }
+    if (-not $ui) { return $false }
+    $redir = if ($null -ne $StdinRedirected) { [bool]$StdinRedirected } else { Test-StdinRedirected }
+    if ($redir) { return $false }
     return $true
 }
 
