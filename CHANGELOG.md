@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **usage-insights 機能 (ADR-0014, G6f)** — Claude Code transcript
+  (`~/.claude/projects/*.jsonl`) を解析し、model 効率 / cache 効率 (cold-read share) /
+  token 浪費 score / stuck candidates / Haiku 委譲率 / cost trend を Markdown insights
+  として `~/.claude/insights/` に蓄積。日次 (毎日 9:00) + 週次 (月曜 9:00) の
+  scheduled-task が自動生成し、session 開始時に passive 提示 (未 ack 時のみ)。
+  - `scripts/usage-insights.ps1` — 解析エンジン (`Get-InsightsScope` /
+    `Get-UsageMetrics` / `Format-InsightsReport` / `Write-InsightsReport`、dot-source
+    で関数 export、main は直接起動時のみ)
+  - `scripts/pricing.psd1` — Bedrock 概算 pricing (web 確認待ち、相対比較専用)
+  - `templates/skills/usage-insights/` — on-demand 入口 skill
+  - `templates/commands/insights.md` — `/insights` slash command (--window / --ack 等)
+  - `templates/scheduled-tasks/{daily,weekly}-usage-insights/` — 自動生成 trigger
+  - `templates/CLAUDE.md` §9 — session 開始時の insights 確認 instruction
+  - `apply-claude-kit.ps1` — 既定 ON で deploy、`-DisableInsights` で全 artifact skip
+  - `docs/adr/0014-usage-insights.md` — 設計判断記録
+  - `tests/usage-insights.tests.ps1` — Pester (mock JSONL ベース)
 - README に「なぜ engineer-claude-kit が必要か」セクション + `docs/cost-analysis.md`
   を追加 (G6d): 実測 workload (432 turn / 44 session) を Bedrock 3 構成で projection し、
   cost 削減主因 (1h TTL + Haiku 委譲、−80%) が Anthropic / Bedrock の設定機能である点と、

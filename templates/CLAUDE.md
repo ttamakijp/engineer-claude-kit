@@ -102,6 +102,28 @@ Claude Code の context window は有限。長時間 session で statusline の 
 含まれる (色分けの仕様は ADR-0012)。threshold は `~/.claude/settings.json` の statusLine を
 user 自身で編集して調整可能。
 
+## 9. セッション開始時の Usage Insights 確認
+
+新規セッション開始時に、以下を自動的に確認してください (ADR-0014):
+
+1. `~/.claude/insights/latest.md` が存在し、`~/.claude/insights/.acked` より新しい
+   (または `.acked` が存在しない) 場合:
+   - latest.md の冒頭 **Key findings** (3-5 行) を読み、要約して user に提示
+   - 「詳しく見る (`/insights`)」「無視 (ack して次回まで非表示)」「相談する」の
+     選択肢を 1 行で提示
+2. user が "ack / 無視" を選んだら `~/.claude/insights/.acked` を touch
+   (timestamp 更新) し、次回まで再提示しない
+3. user が "詳しく" を選んだら latest.md 全文を read して要点を報告
+4. user が "相談" を選んだら insights を踏まえた最適化提案 (model 振り分け /
+   cache 維持 / Haiku 委譲 / 短 turn の集約) を対話的に行う
+
+insights が存在しない、または latest.md が `.acked` と同じ/古い timestamp の場合は
+**何も提示しない** (passive 原則。session 冒頭を侵さない)。
+
+- insights は日次 (毎日 9:00) + 週次 (月曜 9:00) の scheduled-task が自動生成する
+- pricing は概算 (相対比較用、web 確認待ち)。billing 照合には使わない
+- 全機能を無効化するには `apply-claude-kit.ps1 -Global -DisableInsights`
+
 ---
 
 このファイルは template です。配布時に `apply-claude-kit.ps1` が以下を substitution します:
