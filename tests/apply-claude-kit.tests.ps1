@@ -164,6 +164,35 @@ Describe "apply-claude-kit.ps1" {
         $output = & powershell -NoProfile -File $ScriptPath -AllowElevated -Global -DryRun -EnableCleanupSchedule 2>&1 | Out-String
         $output | Should Match 'cleanup-orphan-processes'
     }
+
+    It "auto-creates the scheduled-task parent dir when absent (G6i regression)" {
+        # apply-claude-kit.ps1 has no dot-source guard, so extract just the
+        # Copy-ScheduledTaskDir function text instead of running the whole apply.
+        # The function depends on Read/Write-Utf8NoBom from the encoding helper.
+        . (Join-Path (Join-Path (Join-Path $KitRoot "scripts") "lib") "encoding-helper.ps1")
+        $scriptText = Get-Content -LiteralPath $ScriptPath -Raw
+        $fnMatch = [regex]::Match($scriptText, '(?ms)^function Copy-ScheduledTaskDir.*?^\}')
+        $fnMatch.Success | Should Be $true
+        Invoke-Expression $fnMatch.Value
+
+        # Source: a task subdir with one spec. Target: a brand-new root whose
+        # scheduled-tasks/<name>/ subtree does NOT exist yet (the bug repro).
+        $srcRoot = Join-Path $env:TEMP "eck-g6i-src"
+        $tgtRoot = Join-Path $env:TEMP "eck-g6i-tgt"
+        foreach ($d in @($srcRoot, $tgtRoot)) { if (Test-Path $d) { Remove-Item -Recurse -Force $d } }
+        $srcTask = Join-Path $srcRoot "daily-usage-insights"
+        New-Item -ItemType Directory -Force -Path $srcTask | Out-Null
+        Set-Content -LiteralPath (Join-Path $srcTask "daily-usage-insights.md") -Value "# spec" -Encoding ASCII
+
+        $schedTasksDir = Join-Path $tgtRoot "scheduled-tasks"
+        $deployed = Copy-ScheduledTaskDir -SourceTaskDir $srcTask -TargetSchedTasksDir $schedTasksDir
+
+        $expected = Join-Path (Join-Path $schedTasksDir "daily-usage-insights") "daily-usage-insights.md"
+        Test-Path $expected | Should Be $true
+        ($deployed -contains $expected) | Should Be $true
+
+        foreach ($d in @($srcRoot, $tgtRoot)) { if (Test-Path $d) { Remove-Item -Recurse -Force $d } }
+    }
 }
 
 if (Test-Path $MockGlobal) { Remove-Item -Recurse -Force $MockGlobal }

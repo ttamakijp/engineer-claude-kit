@@ -396,6 +396,13 @@ function Copy-ScheduledTaskDir {
             Write-Host "[dry-run] $($file.FullName) -> $dest"
         } else {
             $body = Read-Utf8NoBom -Path $file.FullName
+            # Ensure ~/.claude/scheduled-tasks/<name>/ exists before writing; the
+            # task subdir is absent on first deploy and Write-Utf8NoBom does not
+            # create parents (same ensure as Copy-Template above).
+            $destDir = Split-Path -Parent $dest
+            if (-not (Test-Path $destDir)) {
+                New-Item -ItemType Directory -Force -Path $destDir | Out-Null
+            }
             Write-Utf8NoBom -Path $dest -Content $body
             Write-Host "[apply] $($file.FullName) -> $dest"
         }
