@@ -189,8 +189,8 @@ function Invoke-SettingsSetupWizard {
             Write-Host "      [1] Bedrock"
             Write-Host "      [2] Anthropic API direct"
             Write-Host "      [s] Skip"
-            $ans = Read-Host "    Selection [1/2/s] (default: 1)"
-            if ([string]::IsNullOrWhiteSpace($ans)) { $ans = '1' }
+            $ans = Read-Host "    Selection [1/2/s] (default: s)"
+            if ([string]::IsNullOrWhiteSpace($ans)) { $ans = 's' }
         }
 
         $haiku = $null

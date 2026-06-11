@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`apply-claude-kit.ps1`** — settings wizard で ANTHROPIC_SMALL_FAST_MODEL の backend 選択 default を `1` (Bedrock) から `s` (Skip) に変更 (G6j)。明示 opt-in 原則に整合。
 - **`scripts/usage-insights.ps1` (G6g)** — `Format-InsightsReport` に人間語併記を追加。
   技術メトリクスはそのまま残し、各 finding 直後に blockquote で対人類比を提示
   (Opus 偏重 / Haiku 委譲ゼロ / cache cold / token 浪費 / stuck / 反復依頼 / cost 増加)。
