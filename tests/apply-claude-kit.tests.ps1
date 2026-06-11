@@ -165,6 +165,16 @@ Describe "apply-claude-kit.ps1" {
         $output | Should Match 'cleanup-orphan-processes'
     }
 
+    It "gates the settings wizard behind Test-IsInteractive with a skip hint (G6k)" {
+        # The wizard block must call Test-IsInteractive and, on the non-interactive
+        # branch, emit the auto-skip hint instead of invoking the wizard (which
+        # would Read-Host and hang under a redirected stdin / slash command).
+        $scriptText = Get-Content -LiteralPath $ScriptPath -Raw
+        $scriptText | Should Match 'Test-IsInteractive'
+        $scriptText | Should Match 'non-interactive context'
+        $scriptText | Should Match '-NoSettingsWizard to silence'
+    }
+
     It "auto-creates the scheduled-task parent dir when absent (G6i regression)" {
         # apply-claude-kit.ps1 has no dot-source guard, so extract just the
         # Copy-ScheduledTaskDir function text instead of running the whole apply.

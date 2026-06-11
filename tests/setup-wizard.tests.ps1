@@ -176,4 +176,49 @@ Describe "Test-IsInteractive" {
             if ($null -eq $orig) { Remove-Item Env:CI -ErrorAction SilentlyContinue } else { $env:CI = $orig }
         }
     }
+
+    It "returns false when stdin is redirected (background process / slash command)" {
+        . $ScriptPath
+        # Isolate the IsInputRedirected branch: not CI, has a console, redirected.
+        Mock Test-CiEnvironment { $false }
+        Mock Test-HostUserInteractive { $true }
+        Mock Test-StdinRedirected { $true }
+        Test-IsInteractive | Should Be $false
+    }
+
+    It "returns false when no interactive console (service / cron)" {
+        . $ScriptPath
+        Mock Test-CiEnvironment { $false }
+        Mock Test-HostUserInteractive { $false }
+        Mock Test-StdinRedirected { $false }
+        Test-IsInteractive | Should Be $false
+    }
+
+    It "returns true only when console present, stdin not redirected, and not CI" {
+        . $ScriptPath
+        Mock Test-CiEnvironment { $false }
+        Mock Test-HostUserInteractive { $true }
+        Mock Test-StdinRedirected { $false }
+        Test-IsInteractive | Should Be $true
+    }
+}
+
+Describe "Settings wizard auto-skip on redirected stdin (G6k)" {
+
+    It "skips and writes nothing when stdin is redirected and -NonInteractive is not passed" {
+        . $ScriptPath
+        # Simulate the /apply background-process case: a real interactive console
+        # but redirected stdin. The wizard must skip (no Read-Host, no file write)
+        # solely because Test-IsInteractive reports non-interactive.
+        Mock Test-CiEnvironment { $false }
+        Mock Test-HostUserInteractive { $true }
+        Mock Test-StdinRedirected { $true }
+        $p = New-TempSettingsPath
+        try {
+            Invoke-SettingsSetupWizard -Path $p | Out-Null
+            Test-Path $p | Should Be $false
+        } finally {
+            if (Test-Path $p) { Remove-Item -LiteralPath $p -Force }
+        }
+    }
 }

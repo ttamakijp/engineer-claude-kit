@@ -472,9 +472,20 @@ if ($DryRun) { Write-Host "Note: -DryRun was specified, no files were modified."
 # Optional interactive settings wizard (ADR-0010), Global mode only.
 # This is the sanctioned exception to the ADR-0007 hands-off policy: it asks
 # before every change and only deep-merges missing keys. Skipped on -DryRun (no
-# modifications), -NoSettingsWizard, and in Project mode. The wizard itself
-# skips in non-interactive contexts, so non-interactive callers are unaffected.
+# modifications), -NoSettingsWizard, and in Project mode.
 if ($mode -eq "Global" -and -not $DryRun -and -not $NoSettingsWizard) {
     . (Join-Path $PSScriptRoot "setup-wizard.ps1")
-    Invoke-SettingsSetupWizard -NonInteractive:$NonInteractive
+    # Auto-detect non-interactive contexts (G6k): Claude Code slash commands (e.g.
+    # /apply), CI, and subprocess callers invoke this script as a background
+    # process with a redirected stdin, where Read-Host would hang forever. Detect
+    # via Test-IsInteractive ([Console]::IsInputRedirected / UserInteractive / CI)
+    # and skip with a hint instead of blocking. -NoSettingsWizard (handled above)
+    # is the explicit opt-out; the two are OR'd.
+    if (Test-IsInteractive) {
+        Invoke-SettingsSetupWizard -NonInteractive:$NonInteractive
+    } else {
+        Write-Host "[skip] non-interactive context (no TTY for input). Settings wizard skipped."
+        Write-Host "       To run the wizard, invoke this script directly in a terminal."
+        Write-Host "       Or use -NoSettingsWizard to silence this hint."
+    }
 }
