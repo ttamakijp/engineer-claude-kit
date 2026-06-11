@@ -139,6 +139,10 @@ $applyScript = Join-Path (Join-Path $kitRoot "scripts") "apply-claude-kit.ps1"
 Write-Host ""
 Write-Host "[invoke] apply-claude-kit.ps1 -Global"
 
+# Determine the PowerShell executable: Windows uses 'powershell' (5.1 baseline),
+# macOS/Linux use 'pwsh' (7+). $IsWindows is unavailable in PS 5.1 (always Windows).
+$psExe = if ((Test-Path variable:IsWindows) -and -not $IsWindows) { 'pwsh' } else { 'powershell' }
+
 $applyArgs = @("-NoProfile", "-File", $applyScript, "-Global")
 if ($DryRun) { $applyArgs += "-DryRun" }
 if ($AllowElevated) { $applyArgs += "-AllowElevated" }
@@ -150,7 +154,7 @@ if ($NonInteractive) { $applyArgs += "-NonInteractive" }
 # Forward kit self-update opt-in (ADR-0013) to the -Global apply subprocess.
 if ($Update) { $applyArgs += "-Update" }
 
-& powershell @applyArgs
+& $psExe @applyArgs
 if ($LASTEXITCODE -ne 0) {
     throw "apply-claude-kit.ps1 -Global failed with exit code $LASTEXITCODE"
 }
@@ -179,7 +183,7 @@ if ($shouldPromptProject) {
         Write-Host "[invoke] apply-claude-kit.ps1 -Project `"$cwd`""
         $projectArgs = @("-NoProfile", "-File", $applyScript, "-Project", $cwd)
         if ($AllowElevated) { $projectArgs += "-AllowElevated" }
-        & powershell @projectArgs
+        & $psExe @projectArgs
         if ($LASTEXITCODE -ne 0) {
             throw "apply-claude-kit.ps1 -Project failed with exit code $LASTEXITCODE"
         }

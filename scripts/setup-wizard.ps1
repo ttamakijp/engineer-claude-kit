@@ -42,7 +42,7 @@ function ConvertTo-HashtableRecursive {
 function Read-CurrentSettings {
     # Load settings.json as a (possibly nested) hashtable. Missing / empty /
     # unparseable file yields an empty hashtable so the caller can merge freely.
-    param([string]$Path = "$env:USERPROFILE\.claude\settings.json")
+    param([string]$Path = [IO.Path]::Combine((if ($env:USERPROFILE) { $env:USERPROFILE } else { $env:HOME }), ".claude", "settings.json"))
 
     if (-not (Test-Path $Path)) { return @{} }
     $raw = Get-Content -LiteralPath $Path -Raw -ErrorAction SilentlyContinue
@@ -81,7 +81,7 @@ function Save-SettingsWithBackup {
     # creating a timestamped backup of any pre-existing file first.
     param(
         [hashtable]$Settings,
-        [string]$Path = "$env:USERPROFILE\.claude\settings.json"
+        [string]$Path = [IO.Path]::Combine(($env:USERPROFILE ?? $env:HOME), ".claude", "settings.json")
     )
 
     . (Join-Path (Join-Path $PSScriptRoot "lib") "encoding-helper.ps1")
@@ -114,7 +114,7 @@ function Invoke-SettingsSetupWizard {
     # item); only an explicit N declines. Skips entirely when non-interactive.
     param(
         [switch]$NonInteractive,
-        [string]$Path = "$env:USERPROFILE\.claude\settings.json"
+        [string]$Path = [IO.Path]::Combine(($env:USERPROFILE ?? $env:HOME), ".claude", "settings.json")
     )
 
     if ($NonInteractive -or -not (Test-IsInteractive)) {

@@ -164,7 +164,7 @@ if ($Project) {
     $mode = "Project"
     Write-Host "Mode: Project ($resolvedProject)"
 } else {
-    $homeClaude = Join-Path $env:USERPROFILE ".claude"
+    $homeClaude = Join-Path (if ($env:USERPROFILE) { $env:USERPROFILE } else { $env:HOME }) ".claude"
     $targetClaudeMd = Join-Path $homeClaude "CLAUDE.md"
     $targetAgentsDir = Join-Path $homeClaude "agents"
     $targetSkillsDir = Join-Path $homeClaude "skills"
