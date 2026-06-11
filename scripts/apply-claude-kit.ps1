@@ -30,6 +30,12 @@ param(
     # spec is only placed when this is passed (Global mode only).
     [switch]$EnableCleanupSchedule,
 
+    # Opt-out: skip all usage-insights artifacts (ADR-0014). Insights ship ON by
+    # default (skill + /insights command + daily/weekly scheduled-task specs). Pass
+    # this to deploy none of them. The analysis script itself ships with the kit
+    # checkout regardless; this only gates the per-user Claude Code artifacts.
+    [switch]$DisableInsights,
+
     # Kit self-update (ADR-0013). On startup the kit checks whether its own
     # checkout is behind origin and prints an opt-in hint. -Update performs a
     # fast-forward pull; -UpdateForce hard-resets to origin (escape hatch);
@@ -204,6 +210,11 @@ if (Test-Path $sourceSkillsDir) {
     $skillFiles = Get-ChildItem -LiteralPath $sourceSkillsDir -Recurse -Filter "SKILL.md" -File
     foreach ($skillFile in $skillFiles) {
         $skillName = $skillFile.Directory.Name
+        # Insights opt-out (ADR-0014): skip the usage-insights skill when disabled.
+        if ($DisableInsights -and $skillName -eq "usage-insights") {
+            Write-Host "[skip] usage-insights skill (-DisableInsights)"
+            continue
+        }
         $destSkill = Join-Path (Join-Path $targetSkillsDir $skillName) "SKILL.md"
         $null = Copy-Template -SourceFile $skillFile.FullName -DestFile $destSkill `
             -ModelsConfig $modelsConfig -IsDryRun:$DryRun
@@ -218,6 +229,11 @@ if (Test-Path $sourceSkillsDir) {
 if (Test-Path $sourceCommandsDir) {
     $commandFiles = Get-ChildItem -LiteralPath $sourceCommandsDir -Filter "*.md" -File
     foreach ($commandFile in $commandFiles) {
+        # Insights opt-out (ADR-0014): skip the /insights command when disabled.
+        if ($DisableInsights -and $commandFile.Name -eq "insights.md") {
+            Write-Host "[skip] insights command (-DisableInsights)"
+            continue
+        }
         $destCommand = Join-Path $targetCommandsDir $commandFile.Name
         $null = Copy-Template -SourceFile $commandFile.FullName -DestFile $destCommand `
             -ModelsConfig $modelsConfig -IsDryRun:$DryRun
@@ -364,38 +380,68 @@ if ($mode -eq "Global") {
     }
 }
 
+# Scheduled-task deploy helper (Global mode). Copies every *.md under one task
+# subdir to ~/.claude/scheduled-tasks/<name>/<file>.md, preserving the parent dir
+# as the task name (mirrors the skills layout). Specs carry no role placeholders,
+# so they are copied verbatim. Returns the deployed dest paths.
+function Copy-ScheduledTaskDir {
+    param([string]$SourceTaskDir, [string]$TargetSchedTasksDir, [switch]$IsDryRun)
+    $deployed = @()
+    if (-not (Test-Path -LiteralPath $SourceTaskDir)) { return $deployed }
+    $taskName = Split-Path -Leaf $SourceTaskDir
+    $files = Get-ChildItem -LiteralPath $SourceTaskDir -Filter "*.md" -File
+    foreach ($file in $files) {
+        $dest = Join-Path (Join-Path $TargetSchedTasksDir $taskName) $file.Name
+        if ($IsDryRun) {
+            Write-Host "[dry-run] $($file.FullName) -> $dest"
+        } else {
+            $body = Read-Utf8NoBom -Path $file.FullName
+            Write-Utf8NoBom -Path $dest -Content $body
+            Write-Host "[apply] $($file.FullName) -> $dest"
+        }
+        $deployed += $dest
+    }
+    return $deployed
+}
+
 # Cleanup-orphan-processes scheduled task (Global mode, opt-in only -- ADR-0011)
 # The cleanup skill and /cleanup-processes command always ship (generic skill /
 # command loops above). The hourly scheduled-task spec is heavier-handed (auto
 # kill on a timer), so it is placed only when -EnableCleanupSchedule is passed.
-# Specs live at templates/scheduled-tasks/<name>/<file>.md and deploy to
-# ~/.claude/scheduled-tasks/<name>/<file>.md, preserving the parent dir as the
-# task name (mirrors the skills layout). They carry no role placeholders, so
-# they are copied verbatim.
 if ($mode -eq "Global" -and $EnableCleanupSchedule) {
     $sourceSchedTasksDir = Join-Path $templatesRoot "scheduled-tasks"
     $targetSchedTasksDir = Join-Path $homeClaude "scheduled-tasks"
-    if (Test-Path $sourceSchedTasksDir) {
-        $schedTaskFiles = Get-ChildItem -LiteralPath $sourceSchedTasksDir -Recurse -Filter "*.md" -File
-        foreach ($schedTaskFile in $schedTaskFiles) {
-            $taskName = $schedTaskFile.Directory.Name
-            $destSchedTask = Join-Path (Join-Path $targetSchedTasksDir $taskName) $schedTaskFile.Name
-            if ($DryRun) {
-                Write-Host "[dry-run] $($schedTaskFile.FullName) -> $destSchedTask"
-            } else {
-                $schedTaskContent = Read-Utf8NoBom -Path $schedTaskFile.FullName
-                Write-Utf8NoBom -Path $destSchedTask -Content $schedTaskContent
-                Write-Host "[apply] $($schedTaskFile.FullName) -> $destSchedTask"
-            }
-            $appliedFiles += $destSchedTask
-        }
-        if (-not $DryRun) {
-            Write-Host "[hint] Cleanup scheduled-task spec deployed. To run it hourly, register it"
-            Write-Host "       with Windows Task Scheduler (see docs/setup/cleanup-processes.md)."
-        }
+    $cleanupTaskDir = Join-Path $sourceSchedTasksDir "cleanup-orphan-processes"
+    $deployed = Copy-ScheduledTaskDir -SourceTaskDir $cleanupTaskDir `
+        -TargetSchedTasksDir $targetSchedTasksDir -IsDryRun:$DryRun
+    $appliedFiles += $deployed
+    if ($deployed.Count -gt 0 -and -not $DryRun) {
+        Write-Host "[hint] Cleanup scheduled-task spec deployed. To run it hourly, register it"
+        Write-Host "       with Windows Task Scheduler (see docs/setup/cleanup-processes.md)."
     }
 } elseif ($mode -eq "Global") {
     Write-Host "[skip] cleanup scheduled-task not deployed (pass -EnableCleanupSchedule to opt in)."
+}
+
+# Usage-insights scheduled tasks (Global mode, ON by default -- ADR-0014)
+# Unlike the cleanup task, the insights daily/weekly specs ship by default: they
+# only read transcripts and write under ~/.claude/insights/ (no destructive side
+# effects), so the default is opt-out via -DisableInsights, not opt-in.
+if ($mode -eq "Global" -and -not $DisableInsights) {
+    $sourceSchedTasksDir = Join-Path $templatesRoot "scheduled-tasks"
+    $targetSchedTasksDir = Join-Path $homeClaude "scheduled-tasks"
+    foreach ($insightsTask in @("daily-usage-insights", "weekly-usage-insights")) {
+        $taskDir = Join-Path $sourceSchedTasksDir $insightsTask
+        $deployed = Copy-ScheduledTaskDir -SourceTaskDir $taskDir `
+            -TargetSchedTasksDir $targetSchedTasksDir -IsDryRun:$DryRun
+        $appliedFiles += $deployed
+    }
+    if (-not $DryRun) {
+        Write-Host "[hint] Usage-insights scheduled-task specs deployed (daily + weekly)."
+        Write-Host "       Reports land in ~/.claude/insights/. Disable with -DisableInsights."
+    }
+} elseif ($mode -eq "Global") {
+    Write-Host "[skip] usage-insights not deployed (-DisableInsights)."
 }
 
 # Write marker file
