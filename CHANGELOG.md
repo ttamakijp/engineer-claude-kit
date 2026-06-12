@@ -68,6 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **`apply-claude-kit.ps1`** — scheduled-task deploy が親ディレクトリ不在で失敗していた問題を修正 (G6i)。Write-Utf8NoBom 直前で New-Item で ensure。
+- **`apply-claude-kit.ps1`** — non-interactive context (background process / slash command 経由) を auto-detect し settings wizard を自動 skip (G6k)。`/apply` で wizard が hang する問題を解消。
 
 ## [0.1.0] - 2026-06-10
 

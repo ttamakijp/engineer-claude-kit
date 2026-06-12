@@ -40,6 +40,21 @@ backend 選択 (Bedrock / Anthropic API / Skip) のうち、**default は Skip**
 - user が意識的に backend を選んだ時だけ書き込まれる方が hands-off 精神に近い
 - 後で wizard を再実行すれば opt-in 可能 (損失なし)
 
+### non-interactive context の auto-skip (G6k)
+
+apply-claude-kit.ps1 が **background process として呼ばれる** (Claude Code の
+slash command 経由、CI、subprocess) ケースを auto-detect し wizard を自動 skip。
+
+- 検出: `[Console]::IsInputRedirected` または `-not [Environment]::UserInteractive`
+- 動作: hint 表示のみ、settings 変更なし
+- 明示 opt-out: 従来通り `-NoSettingsWizard` も動作
+
+これにより `/apply` 等で詰まらず、対話 terminal でのみ wizard を起動。
+
+実装上、`Test-IsInteractive` の判定シグナル (`Test-CiEnvironment` /
+`Test-HostUserInteractive` / `Test-StdinRedirected`) を個別関数に分離し、
+静的プロパティ `[Console]::IsInputRedirected` を Pester v3.4 で mock 可能にした。
+
 ## Alternatives considered
 
 | 案 | 内容 | 採否 |

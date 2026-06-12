@@ -176,4 +176,20 @@ Describe "Test-IsInteractive" {
             if ($null -eq $orig) { Remove-Item Env:CI -ErrorAction SilentlyContinue } else { $env:CI = $orig }
         }
     }
+
+    It "returns false when stdin is redirected (background process / slash command)" {
+        . $ScriptPath
+        # Isolate the IsInputRedirected branch: not CI, has a console, redirected.
+        Test-IsInteractive -Ci $false -UserInteractive $true -StdinRedirected $true | Should Be $false
+    }
+
+    It "returns false when no interactive console (service / cron)" {
+        . $ScriptPath
+        Test-IsInteractive -Ci $false -UserInteractive $false -StdinRedirected $false | Should Be $false
+    }
+
+    It "returns true only when console present, stdin not redirected, and not CI" {
+        . $ScriptPath
+        Test-IsInteractive -Ci $false -UserInteractive $true -StdinRedirected $false | Should Be $true
+    }
 }
