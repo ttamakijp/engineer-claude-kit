@@ -18,6 +18,17 @@ user の依頼に以下のキーワードが含まれるとき:
 
 ## 主要コマンド
 
+### Build
+```powershell
+# Build output directory is set in $env:BUILD_OUTPUT_DIR
+# Defaults to: ~/build-artifacts/<project-name>/
+
+npm run build                          # 通常のビルド
+npm run build -- --outDir $env:BUILD_OUTPUT_DIR  # 明示的に出力先指定
+yarn build                             # yarn の場合
+pnpm build                             # pnpm の場合
+```
+
 ### Test
 ```powershell
 npm test                               # package.json の test script

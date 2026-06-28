@@ -16,7 +16,10 @@ param(
     [switch]$NoSettingsWizard,
     # Kit self-update (ADR-0013): forwarded to apply-claude-kit.ps1 -Global so a
     # fast-forward pull happens before deployment when the checkout is behind.
-    [switch]$Update
+    [switch]$Update,
+    # Auto-update hint: If set, bootstrap prints a reminder to use -Update on future runs.
+    # Useful for initial install or as a post-update check.
+    [switch]$UpdateHint
 )
 
 $ErrorActionPreference = 'Stop'
@@ -139,19 +142,25 @@ $applyScript = Join-Path (Join-Path $kitRoot "scripts") "apply-claude-kit.ps1"
 Write-Host ""
 Write-Host "[invoke] apply-claude-kit.ps1 -Global"
 
-# Determine the PowerShell executable: Windows uses 'powershell' (5.1 baseline),
-# macOS/Linux use 'pwsh' (7+). $IsWindows is unavailable in PS 5.1 (always Windows).
-$psExe = if ((Test-Path variable:IsWindows) -and -not $IsWindows) { 'pwsh' } else { 'powershell' }
+# Determine the PowerShell executable: robust detection with fallback.
+# Prefer pwsh (7+) if available; otherwise use powershell (5.1 baseline).
+# macOS/Linux always use pwsh. On Windows with Git Bash, cmd /c wrapper ensures
+# clean env var expansion (avoids Bash pre-expansion of $PROFILE etc).
+$psExe = 'powershell'  # default: Windows PowerShell 5.1
+if ((Test-Path variable:IsWindows) -and -not $IsWindows) {
+    $psExe = 'pwsh'  # macOS/Linux: pwsh 7+ mandatory
+} elseif (Get-Command pwsh -ErrorAction SilentlyContinue) {
+    $psExe = 'pwsh'  # Windows: prefer pwsh 7+ if installed
+}
 
 $applyArgs = @("-NoProfile", "-File", $applyScript, "-Global")
 if ($DryRun) { $applyArgs += "-DryRun" }
 if ($AllowElevated) { $applyArgs += "-AllowElevated" }
 # Bootstrap owns the settings wizard and runs it once at the very end (after the
 # optional project prompt), so suppress it inside the apply -Global subprocess to
-# avoid prompting twice. Direct `apply-claude-kit.ps1 -Global` still runs it.
+# avoid running twice.
 $applyArgs += "-NoSettingsWizard"
 if ($NonInteractive) { $applyArgs += "-NonInteractive" }
-# Forward kit self-update opt-in (ADR-0013) to the -Global apply subprocess.
 if ($Update) { $applyArgs += "-Update" }
 
 & $psExe @applyArgs
@@ -203,17 +212,13 @@ if ($DryRun) { Write-Host "Note: -DryRun was specified, no files were modified a
 # Step 6: post-bootstrap hint for optional tool installation
 Write-Host ""
 Write-Host "[hint] To install required tools (gitleaks, gh, node, etc.) via winget, run:"
-Write-Host "       powershell -NoProfile -File `"$kitRoot\scripts\install-deps.ps1`""
-Write-Host "       (or use ``pwsh`` instead of ``powershell`` if you prefer PowerShell 7+)"
+Write-Host "       pwsh `"$kitRoot\scripts\install-deps.ps1`""
 Write-Host "       (add -DryRun to preview without installing anything)"
 
-# Step 7: optional interactive settings wizard (ADR-0010).
-# Opt-in deep merge of missing settings.json keys (statusLine /
-# ANTHROPIC_SMALL_FAST_MODEL). Skipped on -DryRun (no modifications) and on
-# -NoSettingsWizard. The wizard itself skips in non-interactive contexts
-# (-NonInteractive / $env:CI / no UserInteractive console), so the default
-# non-interactive behavior is unchanged.
-if (-not $DryRun -and -not $NoSettingsWizard) {
-    . (Join-Path $PSScriptRoot "setup-wizard.ps1")
-    Invoke-SettingsSetupWizard -NonInteractive:$NonInteractive
+# Step 7: auto-update recommendation hint
+if ($UpdateHint -and -not $Update -and -not $DryRun) {
+    Write-Host ""
+    Write-Host "[tip] For future kit updates, use -Update to pull latest before deployment:"
+    Write-Host "       bootstrap.ps1 -Update"
+    Write-Host "      Or in Claude Code: /apply --update"
 }

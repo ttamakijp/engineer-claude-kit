@@ -1,0 +1,92 @@
+# Master language list for Android multi-language support
+# Used by: scripts/add-language.py, scripts/remove-language.py
+# Reference: source/rules/android/i18n-android-standard.md
+
+languages_master:
+  en:
+    name: English
+    name_native: English
+    bcp47: en
+    values_dir: (root)
+    longitude: -74
+    tier: 1
+
+  ja:
+    name: Japanese
+    name_native: 日本語
+    bcp47: ja
+    values_dir: values-ja
+    longitude: 139
+    tier: 2
+
+  zh-CN:
+    name: Chinese (Simplified)
+    name_native: 简体中文
+    bcp47: zh-CN
+    values_dir: values-zh-rCN
+    longitude: 116
+    tier: 2
+
+  es:
+    name: Spanish
+    name_native: Español
+    bcp47: es
+    values_dir: values-es
+    longitude: -3
+    tier: 3
+
+  ru:
+    name: Russian
+    name_native: Русский
+    bcp47: ru
+    values_dir: values-ru
+    longitude: 37
+    tier: 3
+
+  th:
+    name: Thai
+    name_native: ภาษาไทย
+    bcp47: th
+    values_dir: values-th
+    longitude: 101
+    tier: 3
+
+  tr:
+    name: Turkish
+    name_native: Türkçe
+    bcp47: tr
+    values_dir: values-tr
+    longitude: 32
+    tier: 3
+
+  it:
+    name: Italian
+    name_native: Italiano
+    bcp47: it
+    values_dir: values-it
+    longitude: 12
+    tier: 3
+
+  pt:
+    name: Portuguese
+    name_native: Português
+    bcp47: pt
+    values_dir: values-pt
+    longitude: -9
+    tier: 3
+
+  zh-TW:
+    name: Chinese (Traditional)
+    name_native: 中文(繁體)
+    bcp47: zh-TW
+    values_dir: values-zh-rTW
+    longitude: 121
+    tier: 3
+
+  ko:
+    name: Korean
+    name_native: 한국어
+    bcp47: ko
+    values_dir: values-ko
+    longitude: 127
+    tier: 3

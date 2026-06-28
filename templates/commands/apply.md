@@ -11,8 +11,10 @@ engineer-claude-kit の最新内容を `~/.claude/` (グローバル) または�
 
 - `$1` (任意): プロジェクトパス。省略時は `-Global` モード (`~/.claude/` に配置)
 - `--dry-run`: 配置内容のプレビューのみ実行 (実書き込みなし)
-- `--update`: 配布前に kit 自身を origin に fast-forward pull (ADR-0013)。
-  起動時の behind 検出 + hint は常時動作し、`--update` 指定時のみ実 pull する
+- `--update`: **kit 自身を最新化してから配置（推奨）**。git fast-forward pull のみ実行 (ADR-0013)
+
+**重要：** デフォルトでは `/apply` はテンプレート配置のみで、kit 自体は更新しません。
+kit を最新化したい場合は `--update` フラグを付けてください。
 
 ## 動作
 

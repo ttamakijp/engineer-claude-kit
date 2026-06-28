@@ -21,15 +21,19 @@ user の依頼に以下のキーワードが含まれるとき:
 
 ### Build
 ```powershell
+# Build output directory is controlled by gradle buildDir property
+# Output path: $env:BUILD_OUTPUT_DIR (defaults to: ~/build-artifacts/<project-name>/build/outputs/apk/)
+
 ./gradlew assembleDebug                # debug APK 生成
 ./gradlew assembleRelease              # release APK
 ./gradlew clean                        # clean
+./gradlew assembleDebug -P buildDir=$env:BUILD_OUTPUT_DIR  # 明示的に出力先指定
 ```
 
 ### ADB
 ```powershell
 adb devices                            # 接続デバイス一覧
-adb install -r build/outputs/apk/debug/app-debug.apk
+adb install -r "$env:BUILD_OUTPUT_DIR/debug/app-debug.apk"
 adb logcat | Select-String "<package>" # logcat フィルタ
 ```
 

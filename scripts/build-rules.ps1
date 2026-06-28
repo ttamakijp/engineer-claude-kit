@@ -6,8 +6,8 @@
 
 [CmdletBinding()]
 param(
-    [string]$SourceDir = (Join-Path (Join-Path (Join-Path $PSScriptRoot "..") "source") "rules"),
-    [string]$DistDir = (Join-Path (Join-Path (Join-Path (Join-Path $PSScriptRoot "..") "dist") ".claude") "rules"),
+    [string]$SourceDir = (Join-Path (Join-Path $PSScriptRoot "..") -ChildPath "source" | Join-Path -ChildPath "rules"),
+    [string]$DistDir = ((Join-Path $PSScriptRoot ".." | Join-Path -ChildPath "dist") | Join-Path -ChildPath ".claude" | Join-Path -ChildPath "rules"),
     [switch]$DryRun
 )
 

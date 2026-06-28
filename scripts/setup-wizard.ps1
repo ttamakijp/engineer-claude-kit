@@ -12,46 +12,11 @@
 # ASCII only (no Japanese in code, comments, or strings). See ADR-0003 section C.
 # PS 5.1 compatible: no -AsHashtable, no PS 6+ syntax.
 
-# The three signals Test-IsInteractive composes are wrapped in their own
-# functions so tests can Mock each in isolation. [Console]::IsInputRedirected is
-# a static .NET property and cannot be mocked directly under Pester v3.4.
-function Test-CiEnvironment {
-    # True when running under a CI runner (GitHub Actions etc. set CI=true).
-    return [bool]$env:CI
-}
-
-function Test-HostUserInteractive {
-    # True when the process has an interactive desktop session (false for
-    # services / scheduled tasks).
-    return [Environment]::UserInteractive
-}
-
-function Test-StdinRedirected {
-    # True when stdin is redirected (pipe / background process). Claude Code's
-    # slash commands invoke apply-claude-kit.ps1 as a background process with a
-    # redirected stdin, so Read-Host would hang forever (G6k).
-    return [Console]::IsInputRedirected
-}
-
 function Test-IsInteractive {
-    # Non-interactive when running under CI, when the process has no interactive
-    # console (service / cron), or when stdin is redirected (pipe / background
-    # process / slash command). Read-Host is only safe when all three hold.
-    #
-    # The three signals are injectable so tests can pin each deterministically
-    # (Pester v3.4 cannot mock nested calls reliably, and the CI runner sets the
-    # CI env var). Production callers pass nothing and read the real signals.
-    param(
-        $Ci = $null,
-        $UserInteractive = $null,
-        $StdinRedirected = $null
-    )
-    $isCi = if ($null -ne $Ci) { [bool]$Ci } else { Test-CiEnvironment }
-    if ($isCi) { return $false }
-    $ui = if ($null -ne $UserInteractive) { [bool]$UserInteractive } else { Test-HostUserInteractive }
-    if (-not $ui) { return $false }
-    $redir = if ($null -ne $StdinRedirected) { [bool]$StdinRedirected } else { Test-StdinRedirected }
-    if ($redir) { return $false }
+    # Non-interactive when running under CI, when caller forces it, or when the
+    # process has no interactive console (service / redirected host).
+    if ($env:CI) { return $false }
+    if (-not [Environment]::UserInteractive) { return $false }
     return $true
 }
 
@@ -77,11 +42,7 @@ function ConvertTo-HashtableRecursive {
 function Read-CurrentSettings {
     # Load settings.json as a (possibly nested) hashtable. Missing / empty /
     # unparseable file yields an empty hashtable so the caller can merge freely.
-    param([string]$Path = '')
-    if (-not $Path) {
-        $_h = if ($env:USERPROFILE) { $env:USERPROFILE } else { $env:HOME }
-        $Path = [IO.Path]::Combine($_h, ".claude", "settings.json")
-    }
+    param([string]$Path = "$env:USERPROFILE\.claude\settings.json")
 
     if (-not (Test-Path $Path)) { return @{} }
     $raw = Get-Content -LiteralPath $Path -Raw -ErrorAction SilentlyContinue
@@ -120,12 +81,8 @@ function Save-SettingsWithBackup {
     # creating a timestamped backup of any pre-existing file first.
     param(
         [hashtable]$Settings,
-        [string]$Path = ''
+        [string]$Path = "$env:USERPROFILE\.claude\settings.json"
     )
-    if (-not $Path) {
-        $_h = if ($env:USERPROFILE) { $env:USERPROFILE } else { $env:HOME }
-        $Path = [IO.Path]::Combine($_h, ".claude", "settings.json")
-    }
 
     . (Join-Path (Join-Path $PSScriptRoot "lib") "encoding-helper.ps1")
 
@@ -157,12 +114,8 @@ function Invoke-SettingsSetupWizard {
     # item); only an explicit N declines. Skips entirely when non-interactive.
     param(
         [switch]$NonInteractive,
-        [string]$Path = ''
+        [string]$Path = "$env:USERPROFILE\.claude\settings.json"
     )
-    if (-not $Path) {
-        $_h = if ($env:USERPROFILE) { $env:USERPROFILE } else { $env:HOME }
-        $Path = [IO.Path]::Combine($_h, ".claude", "settings.json")
-    }
 
     if ($NonInteractive -or -not (Test-IsInteractive)) {
         Write-Host "[skip] Non-interactive mode, settings wizard skipped."
@@ -236,8 +189,8 @@ function Invoke-SettingsSetupWizard {
             Write-Host "      [1] Bedrock"
             Write-Host "      [2] Anthropic API direct"
             Write-Host "      [s] Skip"
-            $ans = Read-Host "    Selection [1/2/s] (default: s)"
-            if ([string]::IsNullOrWhiteSpace($ans)) { $ans = 's' }
+            $ans = Read-Host "    Selection [1/2/s] (default: 1)"
+            if ([string]::IsNullOrWhiteSpace($ans)) { $ans = '1' }
         }
 
         $haiku = $null
@@ -279,7 +232,6 @@ function Invoke-SettingsSetupWizard {
 # skipped: it errors outside a module under $ErrorActionPreference=Stop.
 if ($ExecutionContext.SessionState.Module) {
     Export-ModuleMember -Function `
-        Test-CiEnvironment, Test-HostUserInteractive, Test-StdinRedirected, `
         Test-IsInteractive, ConvertTo-HashtableRecursive, Read-CurrentSettings, `
         Merge-Hashtable, Save-SettingsWithBackup, Get-DefaultHaikuModelId, `
         Invoke-SettingsSetupWizard

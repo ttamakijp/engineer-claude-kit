@@ -30,6 +30,11 @@ param(
     # spec is only placed when this is passed (Global mode only).
     [switch]$EnableCleanupSchedule,
 
+    # Opt-out: disable working-note-checkpoint scheduled-task spec and session-exit
+    # hook (Phase B+). On by default; when passed, skips 10-minute auto-checkpoint
+    # cron job + on-exit hook. Pass this to opt-out entirely (Global mode only).
+    [switch]$DisableWorkingNoteCheckpoint,
+
     # Opt-out: skip all usage-insights artifacts (ADR-0014). Insights ship ON by
     # default (skill + /insights command + daily/weekly scheduled-task specs). Pass
     # this to deploy none of them. The analysis script itself ships with the kit
@@ -66,6 +71,12 @@ Assert-NonElevated -AllowElevated:$AllowElevated
 # file-granularity hard limit (500 lines). Depends on Read-Utf8NoBom above.
 . (Join-Path (Join-Path $PSScriptRoot "lib") "models-config.ps1")
 
+# Settings migration helper: Invoke-SettingsMigration. Handles auto-upgrade of
+# deprecated hook event names (on-exit -> SessionEnd, after-command -> PostToolBatch)
+# and converts hook objects to arrays (schema requirement). Called in Global mode.
+. (Join-Path (Join-Path $PSScriptRoot "lib") "settings-migration.ps1")
+. (Join-Path (Join-Path $PSScriptRoot "lib") "rule-apply-helper.ps1")
+
 if (-not $KitRoot) {
     $KitRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 }
@@ -93,6 +104,126 @@ if (-not $NoUpdateCheck) {
         Write-Host "[OK] kit is already up-to-date."
     }
     # behind == -1 (network failure / timeout / non-git checkout): stay silent.
+}
+
+# --- minimal YAML reader for our config schema ---
+
+function Read-ConfigYaml {
+    param([string]$Path)
+
+    # Returns a hashtable. Supports:
+    #   key: value
+    #   key:
+    #     subkey: value
+    #     subkey:
+    #       nestedkey: value
+    #   key: [a, b, c]
+    # Indentation is 2 spaces. Comments start with #. No anchors, no multi-line scalars.
+
+    $content = Read-Utf8NoBom -Path $Path
+    $lines = $content -split "`r?`n"
+    $root = @{}
+    $stack = @(@{ Indent = -1; Map = $root })
+
+    foreach ($rawLine in $lines) {
+        if ($rawLine -match '^\s*#') { continue }
+        if ($rawLine -match '^\s*$') { continue }
+
+        # Remove trailing comments (very simple - does not handle # inside quotes)
+        $line = $rawLine -replace '\s+#.*$', ''
+
+        # Indent count (spaces only)
+        $indent = 0
+        while ($indent -lt $line.Length -and $line[$indent] -eq ' ') { $indent++ }
+
+        # Pop stack until parent indent < current indent
+        while ($stack.Count -gt 1 -and $stack[-1].Indent -ge $indent) {
+            $stack = $stack[0..($stack.Count - 2)]
+        }
+        $current = $stack[-1].Map
+
+        $body = $line.Substring($indent)
+        if ($body -match '^([A-Za-z_][A-Za-z0-9_-]*)\s*:\s*(.*)$') {
+            $key = $Matches[1]
+            $val = $Matches[2].Trim()
+
+            if ($val -eq '') {
+                $child = @{}
+                $current[$key] = $child
+                $stack += @{ Indent = $indent; Map = $child }
+            } elseif ($val -match '^\[(.*)\]$') {
+                $items = $Matches[1] -split ',' | ForEach-Object { $_.Trim().Trim('"').Trim("'") }
+                $current[$key] = $items
+            } else {
+                $clean = $val.Trim('"').Trim("'")
+                $current[$key] = $clean
+            }
+        } elseif ($body -match '^-\s+(.*)$') {
+            # List item under a key whose value started as block.
+            # Phase 2.2 Q only consumes models.yaml (maps only), so list items are
+            # stored as plain strings under a "_list" key for any future caller.
+            if (-not $current.ContainsKey('_list')) { $current['_list'] = @() }
+            $current['_list'] += $Matches[1].Trim()
+        }
+    }
+
+    return $root
+}
+
+# --- model role resolution ---
+
+function Resolve-ModelId {
+    param(
+        [hashtable]$ModelsConfig,
+        [string]$Role
+    )
+
+    $models = $ModelsConfig['models']
+    if ($null -eq $models) {
+        throw "config/models.yaml: missing 'models' key"
+    }
+
+    if ($models.ContainsKey($Role)) {
+        $id = $models[$Role]['id']
+        if (-not $id) {
+            throw "config/models.yaml: model '$Role' has no 'id' field"
+        }
+        return $id
+    }
+
+    # Lookup via roles.<role>.role-of
+    $roles = $ModelsConfig['roles']
+    if ($null -ne $roles -and $roles.ContainsKey($Role)) {
+        $roleOf = $roles[$Role]['role-of']
+        if ($roleOf) {
+            return (Resolve-ModelId -ModelsConfig $ModelsConfig -Role $roleOf)
+        }
+    }
+
+    throw "config/models.yaml: cannot resolve model role '$Role'"
+}
+
+# --- template substitution ---
+
+function Invoke-TemplateSubstitution {
+    param(
+        [string]$TemplateContent,
+        [hashtable]$ModelsConfig
+    )
+
+    $result = $TemplateContent
+
+    # Find all {{role:<name>}} placeholders. {{user.*}} placeholders are reserved
+    # for a future phase and intentionally left untouched here.
+    $pattern = '\{\{role:([a-z][a-z0-9-]*)\}\}'
+    $placeholderMatches = [System.Text.RegularExpressions.Regex]::Matches($result, $pattern)
+    foreach ($m in $placeholderMatches) {
+        $role = $m.Groups[1].Value
+        $id = Resolve-ModelId -ModelsConfig $ModelsConfig -Role $role
+        $result = $result -replace ('\{\{role:' + [regex]::Escape($role) + '\}\}'), $id
+    }
+
+    return $result
 }
 
 # --- deployment ---
@@ -160,18 +291,19 @@ if ($Project) {
     $targetSkillsDir = Join-Path (Join-Path $resolvedProject ".claude") "skills"
     $targetCommandsDir = Join-Path (Join-Path $resolvedProject ".claude") "commands"
     $targetRulesDir = Join-Path (Join-Path $resolvedProject ".claude") "rules"
+    $targetConfigDir = Join-Path (Join-Path $resolvedProject ".claude") "config"
     $markerRoot = $resolvedProject
     $mode = "Project"
     Write-Host "Mode: Project ($resolvedProject)"
 } else {
-    $_userHome = if ($env:USERPROFILE) { $env:USERPROFILE } else { $env:HOME }
-    $homeClaude = Join-Path $_userHome ".claude"
+    $homeClaude = Join-Path $env:USERPROFILE ".claude"
     $targetClaudeMd = Join-Path $homeClaude "CLAUDE.md"
     $targetAgentsDir = Join-Path $homeClaude "agents"
     $targetSkillsDir = Join-Path $homeClaude "skills"
     $targetCommandsDir = Join-Path $homeClaude "commands"
     # Rules are project-specific (Claude Code convention) and are not deployed in Global mode.
     $targetRulesDir = $null
+    $targetConfigDir = $null
     $markerRoot = $homeClaude
     $mode = "Global"
     Write-Host "Mode: Global ($homeClaude)"
@@ -192,6 +324,68 @@ $null = Copy-Template -SourceFile $sourceClaudeMd -DestFile $targetClaudeMd `
     -ModelsConfig $modelsConfig -IsDryRun:$DryRun
 $appliedFiles += $targetClaudeMd
 
+# Project mode: detect project type and set up build output directory
+if ($mode -eq "Project") {
+    Write-Host ""
+    Write-Host "[project-setup] Detecting project type and configuring build output directory..."
+
+    function Detect-ProjectType {
+        param([string]$ProjectRoot)
+        $types = @()
+        if (Test-Path (Join-Path $ProjectRoot "package.json")) { $types += "web" }
+        if (Test-Path (Join-Path $ProjectRoot "build.gradle") -o (Test-Path (Join-Path $ProjectRoot "build.gradle.kts"))) { $types += "android" }
+        if (Test-Path (Join-Path $ProjectRoot "pyproject.toml") -o (Test-Path (Join-Path $ProjectRoot "setup.py"))) { $types += "python" }
+        if (Test-Path (Join-Path $ProjectRoot "Podfile")) { $types += "ios" }
+        if (Test-Path (Join-Path $ProjectRoot "Cargo.toml")) { $types += "rust" }
+        if (Test-Path (Join-Path $ProjectRoot "go.mod")) { $types += "go" }
+        if (Test-Path (Join-Path $ProjectRoot "CMakeLists.txt")) { $types += "cpp" }
+        return $types
+    }
+
+    $projectTypes = Detect-ProjectType -ProjectRoot $resolvedProject
+    if ($projectTypes.Count -gt 0) {
+        Write-Host "[project-setup] Detected project type(s): $($projectTypes -join ', ')"
+
+        # Deploy build-artifacts.example.yaml to <project>/.claude/config/
+        $buildArtifactsExample = Join-Path $templatesRoot "config" "build-artifacts.example.yaml"
+        if (Test-Path $buildArtifactsExample) {
+            if (-not (Test-Path $targetConfigDir)) {
+                $null = New-Item -ItemType Directory -Force -Path $targetConfigDir
+            }
+            $buildArtifactsDest = Join-Path $targetConfigDir "build-artifacts.yaml"
+            if ($DryRun) {
+                Write-Host "[dry-run] $buildArtifactsExample -> $buildArtifactsDest"
+            } else {
+                # For first time: deploy template. If already exists, preserve user's customization.
+                if (-not (Test-Path $buildArtifactsDest)) {
+                    $content = Read-Utf8NoBom -Path $buildArtifactsExample
+                    # Replace project_type with detected type (first one if multiple)
+                    $content = $content -replace 'project_type: \w+', "project_type: $($projectTypes[0])"
+                    Write-Utf8NoBom -Path $buildArtifactsDest -Content $content
+                    Write-Host "[apply] $buildArtifactsExample -> $buildArtifactsDest (customized)"
+                } else {
+                    Write-Host "[skip] $buildArtifactsDest already exists (preserved)"
+                }
+            }
+            $appliedFiles += $buildArtifactsDest
+
+            # Set up BUILD_OUTPUT_DIR environment variable in settings.json
+            if (-not $DryRun) {
+                $setupScript = Join-Path (Join-Path $KitRoot "scripts") "lib" "setup-build-artifacts.ps1"
+                if (Test-Path $setupScript) {
+                    try {
+                        & $setupScript -ProjectRoot $resolvedProject
+                    } catch {
+                        Write-Warning "setup-build-artifacts.ps1 encountered an error: $_"
+                    }
+                }
+            }
+        }
+    } else {
+        Write-Host "[project-setup] No recognized project type detected. Skipping build-artifacts configuration."
+    }
+    Write-Host ""
+}
 
 # Copy agents/*.md
 $agentFiles = Get-ChildItem -LiteralPath $sourceAgentsDir -Filter "*.md" -File
@@ -211,11 +405,6 @@ if (Test-Path $sourceSkillsDir) {
     $skillFiles = Get-ChildItem -LiteralPath $sourceSkillsDir -Recurse -Filter "SKILL.md" -File
     foreach ($skillFile in $skillFiles) {
         $skillName = $skillFile.Directory.Name
-        # Insights opt-out (ADR-0014): skip the usage-insights skill when disabled.
-        if ($DisableInsights -and $skillName -eq "usage-insights") {
-            Write-Host "[skip] usage-insights skill (-DisableInsights)"
-            continue
-        }
         $destSkill = Join-Path (Join-Path $targetSkillsDir $skillName) "SKILL.md"
         $null = Copy-Template -SourceFile $skillFile.FullName -DestFile $destSkill `
             -ModelsConfig $modelsConfig -IsDryRun:$DryRun
@@ -230,11 +419,6 @@ if (Test-Path $sourceSkillsDir) {
 if (Test-Path $sourceCommandsDir) {
     $commandFiles = Get-ChildItem -LiteralPath $sourceCommandsDir -Filter "*.md" -File
     foreach ($commandFile in $commandFiles) {
-        # Insights opt-out (ADR-0014): skip the /insights command when disabled.
-        if ($DisableInsights -and $commandFile.Name -eq "insights.md") {
-            Write-Host "[skip] insights command (-DisableInsights)"
-            continue
-        }
         $destCommand = Join-Path $targetCommandsDir $commandFile.Name
         $null = Copy-Template -SourceFile $commandFile.FullName -DestFile $destCommand `
             -ModelsConfig $modelsConfig -IsDryRun:$DryRun
@@ -250,9 +434,9 @@ if (Test-Path $sourceCommandsDir) {
 # stale relative to the source, it is rebuilt first. Rules carry no role
 # placeholders, so they are copied verbatim (no Copy-Template substitution).
 if ($mode -eq "Project") {
-    $distRulesDir = Join-Path (Join-Path (Join-Path $KitRoot "dist") ".claude") "rules"
-    $sourceRulesDir = Join-Path (Join-Path $KitRoot "source") "rules"
-    $buildScript = Join-Path (Join-Path $KitRoot "scripts") "build-rules.ps1"
+    $distRulesDir = Join-Path (Join-Path $KitRoot "dist") -ChildPath ".claude" | Join-Path -ChildPath "rules"
+    $sourceRulesDir = Join-Path (Join-Path $KitRoot "source") -ChildPath "rules"
+    $buildScript = Join-Path (Join-Path $KitRoot "scripts") -ChildPath "build-rules.ps1"
 
     # Freshness check: rebuild when dist is absent, empty, or older than source.
     $needBuild = $false
@@ -379,77 +563,111 @@ if ($mode -eq "Global") {
     } elseif (Test-Path $scheduleDest) {
         Write-Host "[skip] $scheduleDest already exists (preserving user customization)"
     }
-}
 
-# Scheduled-task deploy helper (Global mode). Copies every *.md under one task
-# subdir to ~/.claude/scheduled-tasks/<name>/<file>.md, preserving the parent dir
-# as the task name (mirrors the skills layout). Specs carry no role placeholders,
-# so they are copied verbatim. Returns the deployed dest paths.
-function Copy-ScheduledTaskDir {
-    param([string]$SourceTaskDir, [string]$TargetSchedTasksDir, [switch]$IsDryRun)
-    $deployed = @()
-    if (-not (Test-Path -LiteralPath $SourceTaskDir)) { return $deployed }
-    $taskName = Split-Path -Leaf $SourceTaskDir
-    $files = Get-ChildItem -LiteralPath $SourceTaskDir -Filter "*.md" -File
-    foreach ($file in $files) {
-        $dest = Join-Path (Join-Path $TargetSchedTasksDir $taskName) $file.Name
-        if ($IsDryRun) {
-            Write-Host "[dry-run] $($file.FullName) -> $dest"
-        } else {
-            $body = Read-Utf8NoBom -Path $file.FullName
-            # Ensure ~/.claude/scheduled-tasks/<name>/ exists before writing; the
-            # task subdir is absent on first deploy and Write-Utf8NoBom does not
-            # create parents (same ensure as Copy-Template above).
-            $destDir = Split-Path -Parent $dest
-            if (-not (Test-Path $destDir)) {
-                New-Item -ItemType Directory -Force -Path $destDir | Out-Null
+    # Scheduled-tasks deployment (Global mode only, opt-out).
+    # Each task is deployed by default unless explicitly disabled via opt-out flags:
+    # - DisableCleanupSchedule -> skip templates/scheduled-tasks/cleanup-orphan-processes/
+    # - DisableWorkingNoteCheckpoint -> skip templates/scheduled-tasks/working-note-checkpoint/
+    # The spec .md file describes when + how to register with Windows Task Scheduler.
+    # Specs are deployed to ~/.claude/scheduled-tasks/<name>/ for user reference and cron setup.
+    $scheduledTasksSourceDir = Join-Path $templatesRoot "scheduled-tasks"
+    $scheduledTasksDestDir = Join-Path $homeClaude "scheduled-tasks"
+    if (Test-Path $scheduledTasksSourceDir) {
+        # Determine which tasks to deploy (default: all unless disabled)
+        $tasksToEnable = @()
+        $availableTasks = Get-ChildItem -LiteralPath $scheduledTasksSourceDir -Directory | Select-Object -ExpandProperty Name
+        foreach ($taskName in $availableTasks) {
+            $shouldDisable = $false
+            if ($taskName -eq "cleanup-orphan-processes" -and $DisableCleanupSchedule) {
+                $shouldDisable = $true
             }
-            Write-Utf8NoBom -Path $dest -Content $body
-            Write-Host "[apply] $($file.FullName) -> $dest"
+            if ($taskName -eq "working-note-checkpoint" -and $DisableWorkingNoteCheckpoint) {
+                $shouldDisable = $true
+            }
+            if (-not $shouldDisable) {
+                $tasksToEnable += $taskName
+            }
         }
-        $deployed += $dest
-    }
-    return $deployed
-}
 
-# Cleanup-orphan-processes scheduled task (Global mode, opt-in only -- ADR-0011)
-# The cleanup skill and /cleanup-processes command always ship (generic skill /
-# command loops above). The hourly scheduled-task spec is heavier-handed (auto
-# kill on a timer), so it is placed only when -EnableCleanupSchedule is passed.
-if ($mode -eq "Global" -and $EnableCleanupSchedule) {
-    $sourceSchedTasksDir = Join-Path $templatesRoot "scheduled-tasks"
-    $targetSchedTasksDir = Join-Path $homeClaude "scheduled-tasks"
-    $cleanupTaskDir = Join-Path $sourceSchedTasksDir "cleanup-orphan-processes"
-    $deployed = Copy-ScheduledTaskDir -SourceTaskDir $cleanupTaskDir `
-        -TargetSchedTasksDir $targetSchedTasksDir -IsDryRun:$DryRun
-    $appliedFiles += $deployed
-    if ($deployed.Count -gt 0 -and -not $DryRun) {
-        Write-Host "[hint] Cleanup scheduled-task spec deployed. To run it hourly, register it"
-        Write-Host "       with Windows Task Scheduler (see docs/setup/cleanup-processes.md)."
+        foreach ($taskName in $tasksToEnable) {
+            $taskSourceDir = Join-Path $scheduledTasksSourceDir $taskName
+            if (Test-Path $taskSourceDir) {
+                $taskDestDir = Join-Path $scheduledTasksDestDir $taskName
+                if (-not (Test-Path $taskDestDir)) {
+                    $null = New-Item -ItemType Directory -Force -Path $taskDestDir
+                }
+                Get-ChildItem -LiteralPath $taskSourceDir -File | ForEach-Object {
+                    $dest = Join-Path $taskDestDir $_.Name
+                    if ($DryRun) {
+                        Write-Host "[dry-run] $($_.FullName) -> $dest"
+                    } else {
+                        $content = Read-Utf8NoBom -Path $_.FullName
+                        Write-Utf8NoBom -Path $dest -Content $content
+                        Write-Host "[apply] $($_.FullName) -> $dest"
+                    }
+                    $appliedFiles += $dest
+                }
+            }
+        }
     }
-} elseif ($mode -eq "Global") {
-    Write-Host "[skip] cleanup scheduled-task not deployed (pass -EnableCleanupSchedule to opt in)."
-}
 
-# Usage-insights scheduled tasks (Global mode, ON by default -- ADR-0014)
-# Unlike the cleanup task, the insights daily/weekly specs ship by default: they
-# only read transcripts and write under ~/.claude/insights/ (no destructive side
-# effects), so the default is opt-out via -DisableInsights, not opt-in.
-if ($mode -eq "Global" -and -not $DisableInsights) {
-    $sourceSchedTasksDir = Join-Path $templatesRoot "scheduled-tasks"
-    $targetSchedTasksDir = Join-Path $homeClaude "scheduled-tasks"
-    foreach ($insightsTask in @("daily-usage-insights", "weekly-usage-insights")) {
-        $taskDir = Join-Path $sourceSchedTasksDir $insightsTask
-        $deployed = Copy-ScheduledTaskDir -SourceTaskDir $taskDir `
-            -TargetSchedTasksDir $targetSchedTasksDir -IsDryRun:$DryRun
-        $appliedFiles += $deployed
+    # Session-exit hooks (Global mode, deployed by default with working-note-checkpoint).
+    # Hooks are deployed to ~/.claude/hooks/ and are referenced from settings.json.
+    # See templates/config/settings-hooks-working-note.example.md for hook configuration.
+    if (-not $DisableWorkingNoteCheckpoint) {
+        $hooksSourceDir = Join-Path $templatesRoot "hooks"
+        $hooksDestDir = Join-Path $homeClaude "hooks"
+        if (Test-Path $hooksSourceDir) {
+            if (-not (Test-Path $hooksDestDir)) {
+                $null = New-Item -ItemType Directory -Force -Path $hooksDestDir
+            }
+            Get-ChildItem -LiteralPath $hooksSourceDir -File | ForEach-Object {
+                $dest = Join-Path $hooksDestDir $_.Name
+                if ($DryRun) {
+                    Write-Host "[dry-run] $($_.FullName) -> $dest"
+                } else {
+                    $content = Read-Utf8NoBom -Path $_.FullName
+                    Write-Utf8NoBom -Path $dest -Content $content
+                    Write-Host "[apply] $($_.FullName) -> $dest"
+                }
+                $appliedFiles += $dest
+            }
+        }
     }
-    if (-not $DryRun) {
-        Write-Host "[hint] Usage-insights scheduled-task specs deployed (daily + weekly)."
-        Write-Host "       Reports land in ~/.claude/insights/. Disable with -DisableInsights."
+
+    # Example config files (templates/config/). These are reference documentation
+    # for user customization (settings hooks, example settings.json, etc) and are
+    # deployed to ~/.claude/examples/ for easy discovery (Global mode only).
+    # See ADR-0011, ADR-0007.
+    $configSourceDir = Join-Path $templatesRoot "config"
+    $configDestDir = Join-Path $homeClaude "examples"
+    if (Test-Path $configSourceDir) {
+        if (-not (Test-Path $configDestDir)) {
+            $null = New-Item -ItemType Directory -Force -Path $configDestDir
+        }
+        Get-ChildItem -LiteralPath $configSourceDir -Filter "*.md" -File | ForEach-Object {
+            $dest = Join-Path $configDestDir $_.Name
+            if ($DryRun) {
+                Write-Host "[dry-run] $($_.FullName) -> $dest"
+            } else {
+                # Plain markdown, no substitution: verbatim UTF-8 (no BOM) copy.
+                $content = Read-Utf8NoBom -Path $_.FullName
+                Write-Utf8NoBom -Path $dest -Content $content
+                Write-Host "[apply] $($_.FullName) -> $dest"
+            }
+            $appliedFiles += $dest
+        }
     }
-} elseif ($mode -eq "Global") {
-    Write-Host "[skip] usage-insights not deployed (-DisableInsights)."
+
+    # Settings migration: auto-upgrade deprecated hook event names and formats.
+    # Converts on-exit -> SessionEnd, after-command -> PostToolBatch, and ensures
+    # all hooks are arrays (schema requirement). See ADR-0007 (hands-off policy):
+    # the kit does not manage settings.json directly, but migration is a special
+    # case (one-time upgrade, not ongoing management).
+    Write-Host ""
+    Write-Host "[settings-migration] Checking for deprecated hook configurations..."
+    $settingsJsonPath = Join-Path $homeClaude "settings.json"
+    Invoke-SettingsMigration -SettingsPath $settingsJsonPath -IsDryRun:$DryRun
 }
 
 # Write marker file
@@ -459,33 +677,44 @@ if (-not $DryRun) {
 
 Write-Host ""
 # Hands-off settings.json (ADR-0007): the kit no longer manages settings.json.
-# Display a hint pointing users to docs/setup/.
+# Display a hint pointing users to docs/setup/ and deployed examples.
 Write-Host ""
 Write-Host "[hint] settings.json is NOT managed by this kit (hands-off policy, see ADR-0007)."
-Write-Host "       Setup guide and examples: <kit>/docs/setup/settings-setup.md"
+Write-Host "       Configuration examples deployed to: ~/.claude/examples/"
+Write-Host "       Setup guide: <kit>/docs/setup/settings-setup.md"
 Write-Host "       - For Bedrock environment: docs/setup/settings-bedrock.example.json"
 Write-Host "       - For Anthropic API direct: docs/setup/settings-anthropic.example.json"
+Write-Host "       - Orphaned process cleanup hooks: ~/.claude/examples/settings-hooks.example.md"
+Write-Host "       - Working-note checkpoint hooks: ~/.claude/examples/settings-hooks-working-note.example.md"
+Write-Host ""
+Write-Host "[default enabled] working-note-checkpoint (auto-save + workflow resume)"
+if ($DisableWorkingNoteCheckpoint) {
+    Write-Host "                  → disabled via -DisableWorkingNoteCheckpoint"
+} else {
+    Write-Host "                  → scheduled-tasks deployed to ~/.claude/scheduled-tasks/"
+    Write-Host "                  → configure cron job + on-exit hook in settings.json"
+}
 
 Write-Host "Applied $($appliedFiles.Count) file(s) in $mode mode."
 if ($DryRun) { Write-Host "Note: -DryRun was specified, no files were modified." }
 
-# Optional interactive settings wizard (ADR-0010), Global mode only.
-# This is the sanctioned exception to the ADR-0007 hands-off policy: it asks
-# before every change and only deep-merges missing keys. Skipped on -DryRun (no
-# modifications), -NoSettingsWizard, and in Project mode.
-if ($mode -eq "Global" -and -not $DryRun -and -not $NoSettingsWizard) {
-    . (Join-Path $PSScriptRoot "setup-wizard.ps1")
-    # Auto-detect non-interactive contexts (G6k): Claude Code slash commands (e.g.
-    # /apply), CI, and subprocess callers invoke this script as a background
-    # process with a redirected stdin, where Read-Host would hang forever. Detect
-    # via Test-IsInteractive ([Console]::IsInputRedirected / UserInteractive / CI)
-    # and skip with a hint instead of blocking. -NoSettingsWizard (handled above)
-    # is the explicit opt-out; the two are OR'd.
-    if (Test-IsInteractive) {
-        Invoke-SettingsSetupWizard -NonInteractive:$NonInteractive
+# Post-apply: auto-setup working-note hook + cron job (Global mode, if not disabled)
+if ($mode -eq "Global" -and -not $DisableWorkingNoteCheckpoint) {
+    Write-Host ""
+    Write-Host "[post-apply] Setting up working-note on-exit hook + Windows Task Scheduler cron job..."
+    $setupScript = Join-Path (Join-Path $KitRoot "scripts") "lib" "setup-working-note.ps1"
+    if (Test-Path $setupScript) {
+        if ($DryRun) {
+            Write-Host "[dry-run] Would run $setupScript"
+        } else {
+            try {
+                & $setupScript
+            } catch {
+                Write-Warning "setup-working-note.ps1 encountered an error: $_"
+                Write-Host "[hint] You can run setup manually: pwsh $setupScript"
+            }
+        }
     } else {
-        Write-Host "[skip] non-interactive context (no TTY for input). Settings wizard skipped."
-        Write-Host "       To run the wizard, invoke this script directly in a terminal."
-        Write-Host "       Or use -NoSettingsWizard to silence this hint."
+        Write-Warning "setup-working-note.ps1 not found at: $setupScript"
     }
 }

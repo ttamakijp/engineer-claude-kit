@@ -18,6 +18,15 @@ user の依頼に以下のキーワードが含まれるとき:
 
 ## 主要コマンド
 
+### Build & Distribution
+```powershell
+# Build output directory is set in $env:BUILD_OUTPUT_DIR
+# Defaults to: ~/build-artifacts/<project-name>/
+
+python -m build --outdir $env:BUILD_OUTPUT_DIR  # wheel + source distribution
+python -m pip wheel . -w $env:BUILD_OUTPUT_DIR  # wheel のみ
+```
+
 ### venv
 ```powershell
 python -m venv .venv

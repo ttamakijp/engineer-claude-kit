@@ -326,18 +326,37 @@ git clone <repository-url> "$env:USERPROFILE\.claude-kit"
 
 ### 3.2 日常運用 (Claude Code 内で)
 
-kit を更新したとき (`git -C "$env:USERPROFILE\.claude-kit" pull` 後) や、新しいプロジェクトに `.claude/` を配置したいときは、Claude Code 内で `/apply` slash command を使う。
+Claude Code 内で `/apply` コマンドを使い、設定を反映・更新する。
 
 | 目的 | コマンド |
 |---|---|
-| Global 再適用 (kit 更新を `~/.claude/` に反映) | `/apply` |
-| プロジェクト個別 `.claude/` 配置 | `/apply C:\dev\my-project` |
-| 事前検証 (何が変更されるかプレビュー) | `/apply --dry-run` |
-| kit 自身を最新化してから配置 (ADR-0013) | `/apply --update` (直接呼出: `pwsh apply-claude-kit.ps1 -Global -Update`) |
+| グローバル設定を更新 | `/apply` |
+| **グローバル設定を最新化**（推奨）| `/apply --update` |
+| 現在のプロジェクトに配置 | `/apply-project` |
+| **現在のプロジェクトを最新化**（推奨）| `/apply-project --update` |
+| 指定プロジェクトに配置 | `/apply C:\dev\my-project` |
+| 事前検証 (何が変更されるか確認) | `/apply --dry-run` または `/apply-project --dry-run` |
 
-> 起動時に kit が origin より古い (behind) と検出すると hint を表示する。実際の更新は明示的 opt-in (`--update` / `-Update`) のときのみ fast-forward pull で行う (ADR-0013)。ネットワーク失敗・タイムアウト・非 git checkout は silent skip。検出自体を無効化するには `-NoUpdateCheck`。
+**推奨フロー：**
 
-`/apply` は `apply-claude-kit.ps1` を起動する slash command (定義は `commands/apply.md`、引数の詳細は [docs/setup/apply-command-reference.md](docs/setup/apply-command-reference.md))。自然言語 (「kit を再適用」「.claude/ を最新化」等) で同じ処理を呼び出す `apply-claude-kit` skill も用意されている。skill (文脈検出の入口) と `/apply` command (引数明示の実行系) の責務分離は [docs/setup/apply-command-reference.md](docs/setup/apply-command-reference.md) を参照。
+```
+/apply --update         # 初回 install 直後、または週 1 回程度
+/apply                  # 日常的な再適用（キャッシュから高速）
+/apply-project --update # 新規プロジェクトへの初回適用
+/apply-project          # プロジェクト側の日常的な再適用
+```
+
+**機能詳細：**
+
+- `--update` フラグ付きで、kit 自身を git fast-forward pull してから配置
+- `--dry-run` で変更内容をプレビュー（実書き込みなし）
+- 起動時に kit が behind と検出すると hint を表示（`-NoUpdateCheck` で無効化可能）
+
+`/apply` と `/apply-project` は `apply-claude-kit.ps1` を起動する slash command:
+- `/apply`: 任意パスを指定、または `-Global` モード。詳細は `commands/apply.md` 参照
+- `/apply-project`: 現在のプロジェクト（cwd）に自動適用。詳細は `commands/apply-project.md` 参照
+
+自然言語 (「kit を再適用」「.claude/ を最新化」等) で同じ処理を呼び出す `apply-claude-kit` skill も用意されている。skill (文脈検出の入口) と command (引数明示の実行系) の責務分離は [docs/setup/apply-command-reference.md](docs/setup/apply-command-reference.md) を参照。
 
 #### 自動化向け (CI/CD 等、Claude Code を介さない場合)
 
@@ -380,13 +399,36 @@ bootstrap.ps1 および同梱スクリプトはすべて **ユーザ権限で動
 
 Claude Code を複数並列で運用すると、watch 系コマンド (`gh pr checks --watch` 等) が spawn した bash / gh / git の subprocess が孤立して残り、タスクマネージャに溜まることがある。`/cleanup-processes` で safety filter 付きで一括掃除できる。
 
+#### 手動掃除
+
 | 目的 | コマンド |
 |---|---|
 | 孤立 process を掃除 (kill) | `/cleanup-processes` |
 | 対象のプレビューのみ (kill しない) | `/cleanup-processes --dry-run` |
 | 自然言語で起動 | `cleanup-orphan-processes` skill (「孤立 process を掃除」等) |
 
-safety filter は **全て満たすもののみ kill**: 起動から 10 分以上経過 / CPU 5 秒未満 (idle) / `MainWindowTitle` 空 (background) / 親プロセスが IDE (VS Code 等) でない。kill 対象は **bash / gh / git のみ** で、PowerShell 本体は self-kill 回避のため対象外。毎時自動掃除は `apply-claude-kit.ps1 -Global -EnableCleanupSchedule` で opt-in (既定 OFF)。詳細・しきい値変更・Task Scheduler 登録は [docs/setup/cleanup-processes.md](docs/setup/cleanup-processes.md) / ADR-0011 を参照。
+#### 自動掃除 (hook による毎ターン cleanup)
+
+毎ターン終了後に自動で orphan process を掃除したい場合、`~/.claude/settings.json` に `after-command` hook を設定できます:
+
+```json
+{
+  "hooks": {
+    "after-command": {
+      "shell": "powershell",
+      "command": "powershell -NoProfile -Command '. \"$env:USERPROFILE\\.claude-kit\\scripts\\lib\\cleanup-processes.ps1\"; Invoke-ProcessCleanup -IdleMinutes 5 -MaxCpuSeconds 2.0'"
+    }
+  }
+}
+```
+
+設定例・パラメータ調整・トラブルシュートは `/apply` で配布される `~/.claude/examples/settings-hooks.example.md` を参照。
+
+#### Safety filter
+
+**全て満たすもののみ kill**: 起動から 10 分以上経過 / CPU 5 秒未満 (idle) / `MainWindowTitle` 空 (background) / 親プロセスが IDE (VS Code 等) でない。kill 対象は **bash / gh / git のみ** で、PowerShell 本体は self-kill 回避のため対象外。
+
+詳細は [ADR-0011](docs/adr/0011-orphaned-process-cleanup.md) を参照。
 
 ## 4. 設計判断 (ADR Index)
 

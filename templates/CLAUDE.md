@@ -70,6 +70,18 @@
 下位 (1) が上位 (3) を上書き可能。
 
 ## 6. セキュリティ・制約
+### 適用中のルール
+
+以下のルールは engineer-claude-kit の rule registry から自動配布されます。
+プロジェクト固有カスタマイズは `<project>/.claude/rules/` に override を配置して実現します。
+
+- **version-management** — アプリバージョン体系 (SemVer) + in-app 表示 + CI auto-increment
+- **commit-convention** — Conventional Commits + squash merge ワークフロー
+- **file-granularity** — 1 ファイル <= 300 行の設計規約
+- **security-mobile** — OWASP Mobile Top 10 + モバイルセキュリティ標準
+- **bilingual-notation** — 英語表現の日本語併記ガイドライン
+
+詳細は各 rule ファイル (`~/.claude/rules/version-management.md` 等) を参照してください。
 
 - 読込禁止: `.env*`, `**/secrets/**`, `local.properties`, `*.keystore`
 - 通信制約: 新規外部 API 通信を導入する場合は実装前に理由を説明すること
@@ -123,6 +135,12 @@ insights が存在しない、または latest.md が `.acked` と同じ/古い 
 - insights は日次 (毎日 9:00) + 週次 (月曜 9:00) の scheduled-task が自動生成する
 - pricing は概算 (相対比較用、web 確認待ち)。billing 照合には使わない
 - 全機能を無効化するには `apply-claude-kit.ps1 -Global -DisableInsights`
+
+---
+
+## 10. Session 中断・復帰の自動化（詳細: `docs/tier2-session-recovery.md`）
+
+PC shutdown 時の working-note checkpoint と workflow auto-resume を実装。中間データ loss ゼロを目指します。詳細は tier 2 ドキュメントを参照してください。
 
 ---
 

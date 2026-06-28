@@ -1,0 +1,24 @@
+# Build artifacts configuration for project-specific output directory
+# This file is copied to <project>/.claude/config/build-artifacts.yaml during apply-claude-kit
+# and can be customized per-project if the default paths don't fit.
+
+project_type: web              # One of: web, android, python, ios, rust, go, cpp, embedded
+
+# Override default output directory (optional)
+# If not set, defaults from config/env-defaults.yaml will be used
+output_directory: dist         # Relative to project root (or absolute path)
+
+# Platform-specific overrides (optional)
+# Uncomment the relevant section for your platform
+
+# Windows-only override
+# windows:
+#   output_directory: build\dist
+
+# macOS-only override
+# macos:
+#   output_directory: build/dist
+
+# Linux-only override
+# linux:
+#   output_directory: build/dist

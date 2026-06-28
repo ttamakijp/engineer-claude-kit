@@ -48,3 +48,14 @@ engineer-claude-kit リポジトリ内の SSoT (templates / config / source/rule
 - ASCII only PowerShell 規約 (ADR-0003 §C) に従い、エラーメッセージは英語
 - 重要判断 (rollback / 既存設定上書き) は必ず user 確認後に実行
 - `-DryRun` モードを先に試して、変更箇所を user に提示してから実適用を推奨
+
+## 注意 (Bash 環境)
+
+このスキルは Bash 経由で PowerShell を呼び出すため、複雑な環境（例: Git Bash + Windows PowerShell 混在）では不安定な可能性があります。
+**明示的な引数を指定したい場合や不安定な場合は `/apply` コマンドを直接使うことを推奨します：**
+
+```
+/apply --dry-run           # グローバル設定をプレビュー
+/apply C:\path\to\project  # プロジェクト設定を適用
+/apply --update            # Kit 自身を更新してから適用
+```

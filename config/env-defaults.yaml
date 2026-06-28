@@ -1,5 +1,5 @@
 # Default environment variables for Bedrock-based Claude Code
-# bootstrap.ps1 sets these in ~/.claude/settings.json if not already defined.
+# apply-claude-kit.ps1 sets these in ~/.claude/settings.json if not already defined.
 
 env:
   ANTHROPIC_BEDROCK: "1"
@@ -7,3 +7,26 @@ env:
   AWS_MAX_ATTEMPTS: "2"
   AWS_REGION: us-east-1     # override at user level if needed
   AWS_PROFILE: default      # override at user level if needed
+
+# Build output directories by project type
+# applied automatically by apply-claude-kit when project type is detected
+build_output_dirs:
+  web:
+    default: "dist"
+    alternatives: ["build", "out"]
+  android:
+    default: "build/outputs/apk"
+    gradle_property: "buildDir"
+  python:
+    default: "dist"
+    alternatives: ["build"]
+  ios:
+    default: "build"
+  rust:
+    default: "target/release"
+  go:
+    default: "dist"
+  cpp:
+    default: "build"
+  embedded:
+    default: "build"
