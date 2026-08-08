@@ -27,7 +27,7 @@ Conventional Commits 形式 (`<type>(<scope>): <subject>`) のコミットメッ
 
 ## 制約
 
-- `commit-msg` sub-agent が「不明」と返した場合、main agent (Sonnet 4.5) が引き取り、ユーザに追加情報を求める
+- `commit-msg` sub-agent が「不明」と返した場合、main agent (Opus 5) が引き取り、ユーザに追加情報を求める
 - `git commit` の実行は **明示承認後** のみ。skill が自動で commit しない
 - main 直 push は禁止 (commit までで止める)
 - 既存 commit-convention rule (`~/.claude/rules/commit-convention.md`) を必ず参照

@@ -16,7 +16,10 @@ else
 fi
 
 # 2. Minimal PII / credential regex check on staged ADDED lines (lines starting with '+').
-staged_added="$(git diff --cached --no-color --unified=0 | grep '^+' | grep -v '^+++' || true)"
+# NOTE: strip the diff '+' marker before scanning. Without this, '+' is consumed
+# as the local part of an email address and decorators such as @pytest.fixture
+# are falsely flagged ('+@pytest.fixture' matches local='+' domain='pytest.fixture').
+staged_added="$(git diff --cached --no-color --unified=0 | grep '^+' | grep -v '^+++' | sed 's/^+//' || true)"
 
 if [ -n "$staged_added" ]; then
     # Email addresses

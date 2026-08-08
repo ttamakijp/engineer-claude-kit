@@ -1,16 +1,17 @@
-# Bedrock model registry (Phase 1 measured values, t-tamaki-todo §3.1/§8.1)
+# Model registry - LOCAL OVERRIDE for personal Arch Linux (Anthropic direct).
+# The upstream kit ships Bedrock IDs; this checkout is adapted to Anthropic-direct
+# model IDs so `apply -Global` reproduces the adapted deployment (no revert to Bedrock).
 # This is the single source of truth for model IDs.
-# apply-claude-kit.ps1 reads this to generate ~/.claude/settings.json.
 
 models:
   main:
-    id: us.anthropic.claude-sonnet-4-5-20250929-v1:0
-    family: sonnet-4-5
+    id: claude-opus-5
+    family: opus-5
     cache_1h_supported: true
   small-fast:
-    id: us.anthropic.claude-haiku-4-5-20251001-v1:0
+    id: claude-haiku-4-5-20251001
     family: haiku-4-5
-    cache_1h_supported: false  # TBD: measured in Phase 3
+    cache_1h_supported: true
 
 # Role mapping for sub-agents
 # These resolve to model IDs above via "role-of"
