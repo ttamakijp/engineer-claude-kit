@@ -1,6 +1,7 @@
 # CLAUDE.md (user-level, engineer-claude-kit Phase 2 deploy)
 
-このファイルは engineer-claude-kit によって `~/.claude/CLAUDE.md` に配置されます。
+このファイルは engineer-claude-kit を基に `~/.claude/CLAUDE.md` へ配置されたものです。
+本環境 (個人 Arch Linux / Anthropic 直・Opus 5) 向けに、モデル ID と §7 環境節を補正済み。
 変更したい場合は `~/.claude-kit/templates/CLAUDE.md` を編集し、`apply-claude-kit.ps1 -Global` を再実行してください。
 
 ## 1. ペルソナ
@@ -17,9 +18,12 @@
 
 ## 3. モデル使い分けルール (自動判定)
 
-あなたは Sonnet 4.5 で動作する main agent です。各ユーザ要求に対し、以下の判定で Haiku sub-agent への委譲を検討してください。
+あなたは Opus 5 で動作する main agent です。3.1 に該当する作業は **必ず** Haiku sub-agent へ委譲します (判断の余地なし)。
+3.1 に該当しない作業のみ 3.2 / 3.3 で判定します。
 
 ### 3.1 Haiku 委譲する作業 (軽作業)
+
+以下は **Opus 5 自身で処理してはならない**。該当したら即座に Task tool で sub-agent を起動する。
 
 | 作業種別 | 委譲先 sub-agent |
 |---|---|
@@ -28,7 +32,18 @@
 | ログ / エラー要約 (build log, test output, stack trace 等) | `log-summary` |
 | 単純な事実質問 (factual / lookup / 定数値の確認) | 直接 Haiku で処理 (sub-agent 経由不要) |
 
-### 3.2 Sonnet 4.5 で自分が処理する作業 (重作業)
+**発火条件 (これらを検知したら委譲)**
+
+- commit message を書く / 整える → `commit-msg`
+- build / test / lint の出力を要約・エラー抽出する → `log-summary`
+- typo / フォーマット / import 整理の単発編集 → `lint-helper`
+
+**例外 (Opus 自身で処理してよい)**
+
+- 委譲往復のコストが上回る極小作業 (1 行の自明な修正)
+- sub-agent が「不明」を返した場合 (3.4 に従い引き取り)
+
+### 3.2 Opus 5 で自分が処理する作業 (重作業)
 
 | 作業種別 | 経路 |
 |---|---|
@@ -41,14 +56,14 @@
 ### 3.3 判定基準 (グレーゾーン)
 
 - 「読み取り中心、出力が短い、論理分岐が少ない」→ Haiku 委譲
-- 「複数ファイル横断 / 因果推論 / 設計判断」→ Sonnet 4.5
-- 不明な場合は **Sonnet 4.5 を優先** (品質 > コスト)
+- 「複数ファイル横断 / 因果推論 / 設計判断」→ Opus 5
+- 不明な場合は **Opus 5 を優先** (品質 > コスト)。ただし本項は 3.1 非該当時のみ適用し、3.1 該当作業の免罪符にしない
 
 ### 3.4 委譲時の責任分界
 
-- Haiku が「不明」と返した場合、Sonnet 4.5 自身が再処理
-- Haiku の出力品質が疑わしい場合 (出力短すぎ・指示無視) も Sonnet 4.5 が引き取り
-- **重要判断 (commit / push / branch 操作)** は必ず Sonnet 4.5 自身が実行
+- Haiku が「不明」と返した場合、Opus 5 自身が再処理
+- Haiku の出力品質が疑わしい場合 (出力短すぎ・指示無視) も Opus 5 が引き取り
+- **重要判断 (commit / push / branch 操作)** は必ず Opus 5 自身が実行
 
 ## 4. subagent / subtask orchestration
 
@@ -58,8 +73,6 @@
 - sub-agent は **AskUserQuestion 原則禁止** (UI 固着リスク)
 - 結果は必ず main がユーザに転送する (sub-agent 出力のみで終わらない)
 - 同一リポジトリ内の並列 sub-agent は **逐次** を default とし、worktree 分離が成立する場合のみ並列
-
-詳細: `~/.claude/rules/subagent-orchestration.md` (本 kit に含まれる)
 
 ## 5. プロジェクト個別設定の優先順位
 
@@ -77,10 +90,10 @@
 
 ## 7. 環境
 
-- AWS Bedrock 経由 Claude (`ANTHROPIC_BEDROCK=1`)
-- `ENABLE_PROMPT_CACHING_1H_BEDROCK=1` で 1h prompt cache 有効
-- `AWS_MAX_ATTEMPTS=2` で retry storm 抑制
-- 詳細: `~/.claude/settings.json` (engineer-claude-kit が generate)
+- 個人 Arch Linux (GPD Pocket 3)、Anthropic 直の Claude Code。main は Opus 5
+- 職場の Bedrock/Azure DevOps 前提 (元キットの想定環境) とは異なる。AWS 環境変数・Bedrock 設定は本環境では不要
+- `settings.json` は本キットでは管理しない (hands-off ポリシー)。既存の `~/.claude/settings.json` はそのまま
+- prompt cache はこのセッションで 1h TTL が有効 (Anthropic 直の既定)
 
 ## 8. Context awareness (`/compact` 運用)
 

@@ -30,6 +30,12 @@ param(
 $ErrorActionPreference = 'Stop'
 $ScriptVersion = "0.1.0"
 
+# Cross-platform home resolution: this script builds ~/.claude paths from
+# $env:USERPROFILE (Windows). On Linux/macOS that is null, so fall back to $HOME
+# (matches apply-claude-kit.ps1). Needed for systemd/cron unattended runs where the
+# environment is minimal. See engineer-claude-kit Arch adaptation.
+if (-not $env:USERPROFILE) { $env:USERPROFILE = $env:HOME }
+
 # UTF-8 (no BOM) file I/O. The report is user-visible markdown, so write it without
 # a BOM on every PowerShell version (CP932 default on PS 5.1 would mojibake). See
 # ADR-0003 section C. Dot-sourced so the helper functions land in this scope.

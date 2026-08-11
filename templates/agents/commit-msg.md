@@ -2,7 +2,7 @@
 name: commit-msg
 description: |
   Conventional Commits 形式でコミットメッセージを生成する Haiku sub-agent。
-  Sonnet 4.5 main の context を消費せず軽量に処理する。
+  Opus 5 main の context を消費せず軽量に処理する。
 model: "{{role:small-fast}}"
 tools: [Read, Bash]
 ---
