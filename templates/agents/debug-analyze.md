@@ -1,8 +1,8 @@
 ---
 name: debug-analyze
 description: |
-  バグ調査 / 根本原因分析を Opus 5 で実施。因果推論で再現条件を特定する。
-model: "{{role:main}}"
+  バグ調査 / 根本原因分析を Sonnet 5 で実施。因果推論で再現条件を特定する。
+model: "{{role:heavy}}"
 tools: [Read, Bash, Grep, Glob]
 ---
 

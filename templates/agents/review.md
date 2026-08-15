@@ -1,8 +1,8 @@
 ---
 name: review
 description: |
-  コードレビューを Opus 5 で実施。設計判断 / 品質基準 / セキュリティを総合評価。
-model: "{{role:main}}"
+  コードレビューを Sonnet 5 で実施。設計判断 / 品質基準 / セキュリティを総合評価。
+model: "{{role:heavy}}"
 tools: [Read, Bash, Grep, Glob]
 ---
 

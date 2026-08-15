@@ -8,6 +8,10 @@ models:
     id: claude-opus-5
     family: opus-5
     cache_1h_supported: true
+  heavy:
+    id: claude-sonnet-5
+    family: sonnet-5
+    cache_1h_supported: true
   small-fast:
     id: claude-haiku-4-5-20251001
     family: haiku-4-5
@@ -15,13 +19,18 @@ models:
 
 # Role mapping for sub-agents
 # These resolve to model IDs above via "role-of"
+#
+# "main" is the model the main agent itself runs on. Heavy sub-agents map to
+# "heavy" rather than "main" so that delegation keeps a cost tier below the
+# main agent: raising main to a larger model must not silently raise every
+# sub-agent with it.
 roles:
   architect:
-    role-of: main
+    role-of: heavy
   review:
-    role-of: main
+    role-of: heavy
   debug-analyze:
-    role-of: main
+    role-of: heavy
   commit-msg:
     role-of: small-fast
   lint-helper:
