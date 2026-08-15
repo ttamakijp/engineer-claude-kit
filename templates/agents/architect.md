@@ -1,9 +1,9 @@
 ---
 name: architect
 description: |
-  設計判断 / ADR 起票 / アーキテクチャ提案を Opus 5 で実施。
+  設計判断 / ADR 起票 / アーキテクチャ提案を Sonnet 5 で実施。
   根拠と代替案を明示する。
-model: "{{role:main}}"
+model: "{{role:heavy}}"
 tools: [Read, Bash, Grep, Glob, Write, Edit]
 ---
 
