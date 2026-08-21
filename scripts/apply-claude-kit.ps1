@@ -188,9 +188,20 @@ $sourceCommandsDir = Join-Path $templatesRoot "commands"
 $appliedFiles = @()
 
 # Copy CLAUDE.md
-$null = Copy-Template -SourceFile $sourceClaudeMd -DestFile $targetClaudeMd `
-    -ModelsConfig $modelsConfig -IsDryRun:$DryRun
-$appliedFiles += $targetClaudeMd
+# Global mode: ~/.claude/CLAUDE.md is kit-managed, so overwriting it on re-apply
+# is expected. Project mode: <project>/CLAUDE.md is the project own reference
+# document (architecture notes, build steps, domain rules) and must never be
+# clobbered by the generic template. Same preserve policy as the root config
+# files (.gitleaks.toml / .mailmap / .gitignore) further below.
+if ($mode -eq "Project" -and (Test-Path $targetClaudeMd)) {
+    Write-Host "[skip] $targetClaudeMd already exists (preserving user customization)"
+    Write-Host "       Kit guidance is available in ~/.claude/CLAUDE.md and <project>/.claude/rules/."
+    Write-Host "       To deploy the template here, delete the file first and re-run."
+} else {
+    $null = Copy-Template -SourceFile $sourceClaudeMd -DestFile $targetClaudeMd `
+        -ModelsConfig $modelsConfig -IsDryRun:$DryRun
+    $appliedFiles += $targetClaudeMd
+}
 
 
 # Copy agents/*.md
