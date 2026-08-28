@@ -67,6 +67,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`apply-claude-kit.ps1`** — Project mode で `<project>/CLAUDE.md` が既存の場合に
+  上書きせず preserve するよう修正。従来は generic template を無条件配布していたため、
+  プロジェクト固有の参照ドキュメント (アーキテクチャ / ビルド手順 / ドメイン規約) が
+  再 apply のたびに消失していた。root config (`.gitleaks.toml` / `.mailmap` /
+  `.gitignore`) と同じ preserve ポリシーに統一。Global mode (`~/.claude/CLAUDE.md`) は
+  kit 管理対象のため従来どおり上書きする。template を明示配布したい場合は既存ファイルを
+  削除してから再実行する (skip 時に hint を表示)。
+  regression test: `tests/project-mode.tests.ps1`「CLAUDE.md preservation」。
 - **`apply-claude-kit.ps1`** — scheduled-task deploy が親ディレクトリ不在で失敗していた問題を修正 (G6i)。Write-Utf8NoBom 直前で New-Item で ensure。
 - **`apply-claude-kit.ps1`** — non-interactive context (background process / slash command 経由) を auto-detect し settings wizard を自動 skip (G6k)。`/apply` で wizard が hang する問題を解消。
 

@@ -122,3 +122,45 @@ Describe "apply-claude-kit.ps1 Project-mode distribution" {
 }
 
 if (Test-Path $MockProject) { Remove-Item -Recurse -Force $MockProject }
+
+# --- CLAUDE.md preservation (dedicated mock project) ---
+# Regression guard: applying the kit to a project that already owns a CLAUDE.md
+# must never overwrite it with the generic template. A dedicated temp project is
+# used so the suite above (which starts from an empty project) is unaffected.
+$MockProject2 = Join-Path $env:TEMP "eck-test-projmode-preserve"
+if (Test-Path $MockProject2) { Remove-Item -Recurse -Force $MockProject2 }
+New-Item -ItemType Directory -Force -Path $MockProject2 | Out-Null
+& git init -q $MockProject2 2>&1 | Out-Null
+
+$PreservedDoc = Join-Path $MockProject2 "CLAUDE.md"
+$SentinelBody = "# Project own reference doc" + [Environment]::NewLine + "PRESERVE-ME-SENTINEL"
+Set-Content -LiteralPath $PreservedDoc -Value $SentinelBody -Encoding utf8
+$SentinelHash = (Get-FileHash -LiteralPath $PreservedDoc -Algorithm SHA256).Hash
+
+& powershell -NoProfile -File $ScriptPath -AllowElevated -Project $MockProject2 2>&1 | Out-Null
+
+Describe "apply-claude-kit.ps1 Project-mode CLAUDE.md preservation" {
+
+    It "leaves the existing project CLAUDE.md byte-identical" {
+        (Get-FileHash -LiteralPath $PreservedDoc -Algorithm SHA256).Hash | Should Be $SentinelHash
+    }
+
+    It "keeps the project content readable in the preserved file" {
+        $content = Get-Content -LiteralPath $PreservedDoc -Raw
+        $content | Should Match 'PRESERVE-ME-SENTINEL'
+    }
+
+    It "still deploys the rules directory alongside the preserved doc" {
+        $rulesDir = Join-Path (Join-Path $MockProject2 ".claude") "rules"
+        Test-Path (Join-Path $rulesDir "commit-convention.md") | Should Be $true
+    }
+
+    It "omits the preserved CLAUDE.md from the applied marker" {
+        $marker = Join-Path $MockProject2 ".engineer-claude-kit-applied"
+        $data = Get-Content -LiteralPath $marker -Raw | ConvertFrom-Json
+        $hit = @($data.applied_files | Where-Object { $_ -cmatch "CLAUDE\.md$" })
+        $hit.Count | Should Be 0
+    }
+}
+
+if (Test-Path $MockProject2) { Remove-Item -Recurse -Force $MockProject2 }
