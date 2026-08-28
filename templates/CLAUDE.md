@@ -1,7 +1,7 @@
 # CLAUDE.md (user-level, engineer-claude-kit Phase 2 deploy)
 
 このファイルは engineer-claude-kit を基に `~/.claude/CLAUDE.md` へ配置されたものです。
-本環境 (個人 Arch Linux / Anthropic 直・Opus 5) 向けに、モデル ID と §7 環境節を補正済み。
+個人環境 (Anthropic 直・Opus 5、Arch Linux / Windows 等 OS 非依存) 向けに、モデル ID と §7 環境節を補正済み。
 変更したい場合は `~/.claude-kit/templates/CLAUDE.md` を編集し、`apply-claude-kit.ps1 -Global` を再実行してください。
 
 ## 1. ペルソナ
@@ -90,9 +90,9 @@
 
 ## 7. 環境
 
-- 個人 Arch Linux (GPD Pocket 3)、Anthropic 直の Claude Code。main は Opus 5
+- 個人環境 (Arch Linux / Windows 等)、Anthropic 直の Claude Code。main は Opus 5
 - 職場の Bedrock/Azure DevOps 前提 (元キットの想定環境) とは異なる。AWS 環境変数・Bedrock 設定は本環境では不要
-- `settings.json` は本キットでは管理しない (hands-off ポリシー)。既存の `~/.claude/settings.json` はそのまま
+- `settings.json` は本キットでは管理しない (hands-off ポリシー)。既存の `~/.claude/settings.json` の値 (theme 等) はそのまま保持し、`env.ANTHROPIC_SMALL_FAST_MODEL` / `statusLine` のみ追記
 - prompt cache はこのセッションで 1h TTL が有効 (Anthropic 直の既定)
 
 ## 8. Context awareness (`/compact` 運用)
