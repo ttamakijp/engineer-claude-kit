@@ -1,4 +1,6 @@
-# Model registry - LOCAL OVERRIDE for personal Arch Linux (Anthropic direct).
+# Model registry - LOCAL OVERRIDE for personal use, Anthropic direct (no Bedrock).
+# Shared across personal machines (Arch Linux, Windows, ...); OS-independent since
+# Anthropic-direct model IDs are the same regardless of host OS.
 # The upstream kit ships Bedrock IDs; this checkout is adapted to Anthropic-direct
 # model IDs so `apply -Global` reproduces the adapted deployment (no revert to Bedrock).
 # This is the single source of truth for model IDs.
