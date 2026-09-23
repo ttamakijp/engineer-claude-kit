@@ -334,14 +334,17 @@ function Copy-BranchProtectionTask {
     # Deploy templates/scheduled-tasks/check-branch-protection/*.md into
     # <TargetRoot>/scheduled-tasks/check-branch-protection/. Called by
     # apply-claude-kit.ps1 (Global mode, opt-in). Returns the deployed paths.
+    # Project mode is a silent no-op: scheduled tasks are per-user, not per-repo.
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][string]$TemplatesRoot,
         [Parameter(Mandatory)][string]$TargetRoot,
+        [string]$Mode = "Global",
         [switch]$Enabled,
         [switch]$IsDryRun
     )
 
+    if ($Mode -ne "Global") { return @() }
     if (-not $Enabled) {
         Write-Host "[skip] branch-protection scheduled-task not deployed (pass -EnableBranchProtectionSchedule to opt in)."
         return @()

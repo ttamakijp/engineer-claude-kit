@@ -36,6 +36,9 @@ param(
     # checkout regardless; this only gates the per-user Claude Code artifacts.
     [switch]$DisableInsights,
 
+    # Opt-in: read-only check-branch-protection task spec (docs/branch-protection.md).
+    [switch]$EnableBranchProtectionSchedule,
+
     # Kit self-update (ADR-0013). On startup the kit checks whether its own
     # checkout is behind origin and prints an opt-in hint. -Update performs a
     # fast-forward pull; -UpdateForce hard-resets to origin (escape hatch);
@@ -451,6 +454,11 @@ if ($mode -eq "Global" -and -not $DisableInsights) {
 } elseif ($mode -eq "Global") {
     Write-Host "[skip] usage-insights not deployed (-DisableInsights)."
 }
+
+# Branch-protection ruleset scheduled task (Global mode, opt-in; read-only check).
+. (Join-Path (Join-Path $PSScriptRoot "lib") "branch-protection.ps1")
+$appliedFiles += Copy-BranchProtectionTask -Mode $mode -TemplatesRoot $templatesRoot `
+    -TargetRoot $markerRoot -Enabled:$EnableBranchProtectionSchedule -IsDryRun:$DryRun
 
 # Write marker file
 if (-not $DryRun) {
