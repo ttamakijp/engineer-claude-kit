@@ -147,9 +147,13 @@ function Get-RepoRuleset {
         throw "gh api repos/$Repo/rulesets failed (exit $($listed.ExitCode)): $($listed.Output)"
     }
 
+    # PS 5.1 gotcha: ConvertFrom-Json emits a JSON array as ONE object, so
+    # @(... | ConvertFrom-Json) yields a 1-element array holding the whole list.
+    # Where-Object would then member-enumerate `.name` across it and match every
+    # ruleset at once. Re-piping through ForEach-Object forces real enumeration.
     $rulesets = @()
     if ($listed.Output -and $listed.Output.Trim()) {
-        $rulesets = @($listed.Output | ConvertFrom-Json)
+        $rulesets = @(($listed.Output | ConvertFrom-Json) | ForEach-Object { $_ })
     }
     $match = $rulesets | Where-Object { $_.name -eq $Name } | Select-Object -First 1
     if (-not $match) { return $null }
