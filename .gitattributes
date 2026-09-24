@@ -8,5 +8,11 @@ templates/.gitleaks.toml text eol=lf
 templates/.mailmap text eol=lf
 templates/.gitignore text eol=lf
 
+# Branch-protection bash entry points are executed via sh on macOS / Linux and
+# must keep LF even when checked out on Windows with core.autocrlf=true.
+scripts/apply-branch-protection.sh text eol=lf
+scripts/check-branch-protection.sh text eol=lf
+scripts/lib/branch-protection.sh text eol=lf
+
 # Kit-own root identity map (Git native, root placement per Git convention).
 .mailmap text eol=lf
