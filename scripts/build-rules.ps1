@@ -53,6 +53,18 @@ function Parse-Frontmatter {
     #   key:
     #     subkey: subvalue
     # No nested arrays, no anchors, no multi-line scalars (good enough for our schema).
+    #
+    # Frontmatter contract (ADR-0015 step 1). Only two keys are consumed here:
+    #   id        -> dist filename (<id>.md)
+    #   audience  -> build filter; a rule is emitted only when it includes 'claude'
+    # Everything else is passed through verbatim for Claude Code to interpret, and
+    # Claude Code reads exactly one key of its own: 'paths' (glob patterns that
+    # scope the rule to matching files; absent means load unconditionally). Any
+    # other key is ignored by Claude Code without an error, which is why the legacy
+    # applyTo / priority / tags / title / description keys were removed rather than
+    # translated. A 'paths' block list parses to an empty hashtable below (list
+    # items do not match the 'subkey: value' pattern); that is harmless because
+    # nothing in this script reads it and the block is copied through untouched.
     $fm = @{}
     $currentKey = $null
     foreach ($line in $fmLines) {

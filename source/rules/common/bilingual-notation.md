@@ -1,12 +1,9 @@
 ---
 id: bilingual-notation
-title: 英語混じり時の日本語併記
-description: 英語表現を使う場合は初出時に日本語訳を併記し、読者の理解負荷を下げる
 audience: [claude]
-priority: medium
-applyTo:
-  default: "**/*.md"
-tags: [language, documentation, clarity]
+# paths なし = 無条件ロード。本文「適用範囲」がユーザ向け応答とコミットメッセージ本文を
+# 含むため、ファイル種別では絞れない (旧 applyTo: "**/*.md" は本文より狭く、
+# かつ Claude Code では解釈されていなかった)。
 ---
 
 # 英語混じり時の日本語併記

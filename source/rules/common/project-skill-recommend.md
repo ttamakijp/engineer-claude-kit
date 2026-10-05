@@ -1,12 +1,8 @@
 ---
 id: project-skill-recommend
-title: Project type 検出と skill 推薦 (Group F)
-description: Project に入ったとき、type を検出して global skill ライブラリから関連 skill を推薦する
 audience: [claude]
-priority: medium
-applyTo:
-  default: "**"
-tags: [project-detection, skill-recommendation, hospitality]
+# paths なし = 無条件ロード。session 冒頭の 1 回判定でファイル種別に依存しない。
+# 本ルールは ADR-0015 Step 4 で /apply スクリプトへ移管し削除する予定。
 ---
 
 # 要件

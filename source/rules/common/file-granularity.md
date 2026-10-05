@@ -1,12 +1,9 @@
 ---
 id: file-granularity
-title: File granularity rule
-description: Limit per-file line counts to keep AI context efficient and enforce single-responsibility
 audience: [claude]
-priority: high
-applyTo:
-  default: "**/*"
-tags: [code-style, refactor, ai-context]
+paths:
+  - "**/*.{kt,kts,java,swift,ts,tsx,js,jsx,py,go,rs}"
+  - "**/*.{ps1,psm1}"
 ---
 
 # File granularity
