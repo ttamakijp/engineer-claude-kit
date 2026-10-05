@@ -1,8 +1,19 @@
+---
+status: Accepted
+date: 2026-10-05
+deciders: [Tetsuya]
+tags: [rules, context, instruction-surface, observability, paths, statusline]
+---
+
 # ADR-0015: 指示面の削減と「発火の実測」優先 — 散文状態機械の脱却
 
-**ステータス**: Proposed
+**ステータス**: Accepted
 **日付**: 2026-10-05
 **Phase**: 5 (運用品質)
+
+> 起票時は Proposed。「未解決の問い」1 (rules の Global 配布) と 2
+> (`~/.claude/CLAUDE.md` の symlink を本キット管理へ戻す) の両方が user により
+> 承認されたため Accepted に昇格した (2026-10-05)。実装は Step 1-6 の別 PR で進める。
 
 ## コンテキスト
 
@@ -94,17 +105,26 @@ Phase 3 (再適用) は単純な上書きでは成立しないため、別途判
 
 当初案の 4 段から、事実 1 / 事実 2 を踏まえて 5 段に修正する。
 
-| Phase | 内容 | 根拠 |
-|---|---|---|
-| **1** | `paths` 正規化 + rules の Global 配布 (旧項目 7 + 事実 1 の修正) | 測定も削減も、rules が配布されていなければ成立しない |
-| **2** | 発火 metric の実装 + baseline 記録 (旧項目 2) | 削る前に測る |
-| **3** | file-by-file 削減 + 散文状態機械のスクリプト化 (旧項目 3 + 項目 1) | 測定済の状態で削る |
-| **4** | 観察 (1-2 週間) → 戻す / 削除確定 | 「守られなくなった」= 本物の有効ルール |
-| **5** | 残件 (旧項目 4 / 5 / 6) | 余力 |
+user 承認済の実行順序 (2026-10-05)。1 Step = 1 PR を原則とする。
 
-Phase 1 を先行させる理由: `paths` が効いていない状態で security-mobile.md を
+| Step | 内容 | PR | 根拠 |
+|---|---|---|---|
+| **1** | `paths` 正規化 (旧項目 7) | #79 | Global 配布の前提条件 |
+| **2** | 発火 metric 実装 + baseline 記録 (旧項目 2) | #80 | 削る前に測る |
+| **3** | rules の Global 配布 + CLAUDE.md を本キット管理へ (事実 1 / 6 の修正) | #81 | 正しいスコープで配布 |
+| **4** | file-by-file 削減 + 散文状態機械のスクリプト化 (旧項目 3 + 1) | #82 以降 | 測定済の状態で削る |
+| **5** | 観察 (1-2 週間) → 戻す / 削除確定 | — | 「守られなくなった」= 本物の有効ルール |
+| **6** | 残件 (旧項目 4 / 5 / 6) | #83 以降 | 余力 |
+
+Step 1 を先行させる理由: `paths` が効いていない状態で security-mobile.md を
 Global 配布すると、PowerShell / markdown しか触らない session にも 9,189 B が
 無条件ロードされる。先に `paths` を正しくしてから配布しなければ改善が悪化に転じる。
+
+Step 2 (測定) を Step 3 (配布) より前に置くため、baseline は
+**rules 未ロード状態**で取得される。E の 3 指標はいずれも CLAUDE.md 由来の指示
+(§2 / §3.1) を対象とするため baseline 自体は有効だが、Step 3 で rules がロードされると
+指標が動く可能性がある。したがって **Step 3 完了直後に 2 回目の snapshot を取得**し、
+Step 5 の比較対象は「削減前 / 配布後」の snapshot とする (配布と削減の効果を分離する)。
 
 ### B. 削減技法 (3 つに統一)
 
@@ -252,11 +272,11 @@ Phase 4 で「削減後も変化なし」なら元から効いていなかった
 
 ## 未解決の問い
 
-1. 事実 1 の修正方針: rules を Global 配布に切り替えるべきか、
-   それとも Project mode 限定を維持し `~/.claude/rules/` は user 手動運用とするか。
-   前者は user 環境の挙動を変える (今まで載っていなかった指示が載る) ため影響が大きい
-2. 事実 6 の symlink: `~/.claude/CLAUDE.md` を本キット管理へ戻すか、
-   `.dev-templates` 側を正とし本キットの CLAUDE.md 配布を Project mode 限定に降格するか
+1. ~~事実 1 の修正方針: rules を Global 配布に切り替えるべきか~~
+   → **解決 (2026-10-05, user 承認)**: Global 配布に切り替える。Step 3 で実施
+2. ~~事実 6 の symlink: `~/.claude/CLAUDE.md` を本キット管理へ戻すか~~
+   → **解決 (2026-10-05, user 承認)**: 本キット管理へ戻す。Step 3 で実施。
+   既存の手動オーバーライド内容は失わせず、差分は DEFERRED として記録する
 3. `work-end-reminder` の marker file (`~/.claude/.work-end-today`) は存在するが
    rules は未配布である。どの経路で書かれたかは未確認 (調査を user が中断)
 4. `PlanFirstRate` の判定精度。「1-2 行の方針文」をヒューリスティックで取るため
