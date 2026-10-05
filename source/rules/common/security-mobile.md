@@ -1,12 +1,14 @@
 ---
 id: security-mobile
-title: Mobile security (OWASP Mobile Top 10 + supply chain)
-description: API key handling, encryption, auth, permissions, ProGuard, logging, supply-chain hygiene for mobile codebases
 audience: [claude]
-priority: high
-applyTo:
-  default: "**/*"
-tags: [security, owasp-mobile, encryption, auth, supply-chain]
+paths:
+  - "**/*.{kt,kts,java,swift,m,mm}"
+  - "**/*.gradle"
+  - "**/AndroidManifest.xml"
+  - "**/Info.plist"
+  - "**/*.pro"
+  - "**/Podfile"
+  - "**/libs.versions.toml"
 ---
 
 # Mobile security

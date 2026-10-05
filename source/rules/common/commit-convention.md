@@ -1,12 +1,7 @@
 ---
 id: commit-convention
-title: Commit and PR convention
-description: Conventional Commits in Japanese + squash merge + 1 PR per phase
 audience: [claude]
-priority: high
-applyTo:
-  default: "**/*"
-tags: [git, workflow]
+# paths なし = 無条件ロード。commit / PR 操作は扱うファイル種別に依存しないため。
 ---
 
 # Commit and PR convention

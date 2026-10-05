@@ -1,12 +1,8 @@
 ---
 id: work-end-reminder
-title: 終業時刻リマインダ (Claude 使用中のホスピタリティ機能)
-description: ターン毎に時刻を取得し、終業 30 分前以降に軽量 reminder / 大タスク着手前確認を行う
 audience: [claude]
-priority: medium
-applyTo:
-  default: "**"
-tags: [reminder, time-aware, hospitality]
+# paths なし = 無条件ロード。時刻ベースの発火でファイル種別に依存しない。
+# 本文は ADR-0015 Step 4 で statusline へ移管し 3 行へ縮小する予定。
 ---
 
 # 要件
