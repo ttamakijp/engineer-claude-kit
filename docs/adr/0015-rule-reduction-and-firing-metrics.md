@@ -126,6 +126,24 @@ Step 2 (測定) を Step 3 (配布) より前に置くため、baseline は
 指標が動く可能性がある。したがって **Step 3 完了直後に 2 回目の snapshot を取得**し、
 Step 5 の比較対象は「削減前 / 配布後」の snapshot とする (配布と削減の効果を分離する)。
 
+#### snapshot の記録
+
+`usage-insights.ps1 -WriteBaseline` は比較対象の
+`~/.claude/insights/rule-metrics-baseline.json` を上書きしつつ、日付付きの
+`rule-metrics-baseline-<YYYY-MM-DD>.json` を archive として残す
+(単一ファイル上書きでは 3 点比較が成立しないため Step 3 で追加した)。
+
+| # | 時点 | 取得日 | plan-first | strict | delegation | commit-convention |
+|---|---|---|--:|--:|--:|--:|
+| 1 | 配布前 / 削減前 | 2026-10-06 | 55.6% (40/72) | 48.6% | 0% (0/159) | 100% (40/40) |
+| 2 | 配布後 / 削減前 | (apply 実行後に取得) | - | - | - | - |
+| 3 | 削減後 | (Step 4 完了後) | - | - | - | - |
+
+snapshot 1 は Step 3 の実装完了時点、すなわち **rules が user 環境にまだ配布されて
+いない状態**の値である。snapshot 2 は `apply-claude-kit.ps1 -Global` を実行して
+`~/.claude/rules/` が実際に配置された後でなければ意味を持たない。PR の merge では
+なく apply の実行が分界点になる。
+
 ### B. 削減技法 (3 つに統一)
 
 #### B-1. 読む対象を絞る (`paths` 限定)
@@ -279,6 +297,22 @@ Phase 4 で「削減後も変化なし」なら元から効いていなかった
    既存の手動オーバーライド内容は失わせず、差分は DEFERRED として記録する
 3. `work-end-reminder` の marker file (`~/.claude/.work-end-today`) は存在するが
    rules は未配布である。どの経路で書かれたかは未確認 (調査を user が中断)
+
+### DEFERRED (Step 3 で判明、対応は保留)
+
+- **`.dev-templates` が `CLAUDE.user.md` を所有し続けている**: Step 3 以前の
+  `~/.claude/CLAUDE.md` は `.dev-templates/templates/CLAUDE.user.md` への symlink
+  だった。Global mode は書込先を無条件に上書きするため、`Write-Utf8NoBom` が
+  **リンクを貫通して別リポジトリのファイルを書き換えていた** (deployed 内容が
+  旧世代の kit template そのものだったことがその痕跡)。Step 3 でリンクを検出し、
+  backup のうえ実ファイルへ置換するようにしたが、`.dev-templates` 側のファイル
+  そのものは **意図的に残している**。同リポジトリや他の tooling がそれを参照して
+  いる可能性があり、本キットの判断で削除すべきではない。整理は user が
+  `.dev-templates` 側の用途を確認したうえで別途行う
+- **deployed CLAUDE.md に user 独自の編集は無かった**: 置換前に diff した結果、
+  deployed 側にしかない内容は「Sonnet 4.5」表記、削除済みの
+  `subagent-orchestration.md` への dangling 参照、Bedrock 前提の §7 のみで、
+  いずれも kit template 側が意図的に更新・削除済みだった。失われた user 編集は無い
 4. `PlanFirstRate` の判定精度。「1-2 行の方針文」をヒューリスティックで取るため
    false negative が出る。Phase 2 で手動サンプリング照合が必要
 5. Phase 4 の観察期間に他の変更 (model 変更、別 PR) が混入すると差分の帰属が崩れる。
