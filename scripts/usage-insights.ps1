@@ -8,8 +8,14 @@
 # Functions (dot-source friendly; the main body runs only on direct invocation):
 #   Get-InsightsScope   - collect transcript entries within the last N days
 #   Get-UsageMetrics    - aggregate tokens / cost / cache / stuck / delegation
-#   Format-InsightsReport - render metrics as Markdown
 #   Write-InsightsReport  - write <date>-<kind>.md + latest.md
+#
+# Dot-sourced from lib/ (split out to stay inside the kit's own 500-line
+# file-granularity cap once rule-firing metrics landed; see ADR-0015):
+#   lib/insights-report.ps1 - Format-InsightsReport (Markdown rendering)
+#   lib/rule-metrics.ps1    - Get-RuleMetrics / New-RuleMetricsRow /
+#                             Format-RuleMetricsSection / baseline read+write,
+#                             driven by Get-InsightsScope -IncludeRuleMetrics
 #
 # Scope note: only ~/.claude/projects/ (Claude Code transcripts) are read. Dispatch
 # transcripts live outside that tree and are therefore out of scope by construction.
@@ -24,7 +30,11 @@ param(
     [string]$PricingFile,
 
     # Suppress console chatter (for scheduled-task / unattended runs).
-    [switch]$Quiet
+    [switch]$Quiet,
+
+    # Store this run's rule-firing rates as the baseline that later runs compare
+    # against (ADR-0015 step 2). Overwrites any existing baseline, so it is opt-in.
+    [switch]$WriteBaseline
 )
 
 $ErrorActionPreference = 'Stop'
@@ -43,9 +53,17 @@ if (-not $env:USERPROFILE) { $env:USERPROFILE = $env:HOME }
 # Plain-language hint renderer (Get-PlainLanguageHint). Loaded after the encoding
 # helper so its Read-Utf8NoBom dependency is in scope. See ADR-0014.
 . (Join-Path (Join-Path $PSScriptRoot "lib") "plain-language.ps1")
+# Rule-firing metrics (Get-RuleMetrics / Format-RuleMetricsSection / baseline I/O).
+# Loaded after the encoding helper because Write-RuleMetricsBaseline writes via
+# Write-Utf8NoBom. See ADR-0015 section E.
+. (Join-Path (Join-Path $PSScriptRoot "lib") "rule-metrics.ps1")
 # Optional: kit-updater.ps1 (G6b); absent on legacy installs -> banner skipped (ADR-0014 G6h).
 $kitUpdaterPath = Join-Path (Join-Path $PSScriptRoot "lib") "kit-updater.ps1"
 if (Test-Path -LiteralPath $kitUpdaterPath) { try { . $kitUpdaterPath } catch { } }
+# Report renderer (Format-InsightsReport). Loaded last: it calls into
+# Get-PlainLanguageHint, Format-KitBehindBanner and Format-RuleMetricsSection, and
+# reads $ScriptVersion, all of which are established above.
+. (Join-Path (Join-Path $PSScriptRoot "lib") "insights-report.ps1")
 
 # --- helpers ---
 
@@ -77,10 +95,18 @@ function Get-InsightsScope {
     # the historical transcript-*.jsonl pattern is also matched). Returns an array
     # of PSCustomObject rows (Role / Timestamp / Model / token fields / PromptPrefix
     # / SessionId). Robust to malformed lines (skipped) and an absent projects dir.
+    #
+    # -IncludeRuleMetrics additionally emits one Role='meta' row per transcript row
+    # for Get-RuleMetrics (ADR-0015 section E). It is opt-in rather than always on
+    # because the 'assistant' and 'user' rows are a stable contract: callers that
+    # count rows, and the existing cost / cache / stuck aggregation, must see the
+    # exact same array as before. Role='meta' is a third value no existing filter
+    # matches, so switching it on adds rows without altering any existing figure.
     param(
         [int]$WindowDays = 7,
         [string]$ProjectsRoot,
-        [datetime]$Now
+        [datetime]$Now,
+        [switch]$IncludeRuleMetrics
     )
 
     if (-not $ProjectsRoot) {
@@ -97,7 +123,16 @@ function Get-InsightsScope {
         # Cheap pre-filter: skip files untouched since the cutoff entirely.
         if ($file.LastWriteTimeUtc -lt $cutoff) { continue }
 
-        $lines = Get-Content -LiteralPath $file.FullName -ErrorAction SilentlyContinue
+        # Read as UTF-8 explicitly. Get-Content without -Encoding decodes with the
+        # host ANSI codepage on PS 5.1 (CP932 here), which corrupts every line that
+        # carries Japanese text; ConvertFrom-Json then throws and the line is
+        # silently dropped by the catch below. Measured on real transcripts: PS 5.1
+        # saw 896 user rows and 14 real prompts where PS 7 saw 1,027 and 67, because
+        # Japanese-heavy prompt rows were exactly the ones being discarded. ReadLines
+        # is UTF-8 by default on both hosts and streams rather than buffering the
+        # whole file. See ADR-0003 section C and the P6 encoding fix.
+        $lines = @()
+        try { $lines = [System.IO.File]::ReadLines($file.FullName) } catch { continue }
         foreach ($line in $lines) {
             if ([string]::IsNullOrWhiteSpace($line)) { continue }
             if ($line -notmatch '"timestamp"') { continue }
@@ -155,10 +190,16 @@ function Get-InsightsScope {
                     }
                 }
             }
+
+            if ($IncludeRuleMetrics) {
+                $metaRow = New-RuleMetricsRow -Obj $obj -Timestamp $ts
+                if ($metaRow) { $rows += $metaRow }
+            }
         }
     }
     return $rows
 }
+
 
 function Get-UsageMetrics {
     # Aggregate normalized rows into an insights hashtable. Pricing is optional;
@@ -327,110 +368,6 @@ function Get-CostTrend {
     return $trend
 }
 
-function Format-InsightsReport {
-    # Render metrics as a Markdown report string.
-    param(
-        [Parameter(Mandatory)]$Metrics,
-        [string]$Kind = 'weekly',
-        [string]$DateStr,
-        [int]$WindowDays = 7,
-        [string]$CostTrend = 'n/a',
-        [int]$KitBehind = -1   # commits behind origin; >0 prepends a banner, <=0 omits it
-    )
-    if (-not $DateStr) { $DateStr = (Get-Date).ToString('yyyy-MM-dd') }
-
-    $sb = New-Object System.Text.StringBuilder
-    [void]$sb.AppendLine("# Usage Insights ($DateStr, $Kind)")
-    [void]$sb.AppendLine("")
-    [void]$sb.AppendLine("Window: last $WindowDays day(s). Assistant turns: $($Metrics.WindowTurns). User prompts: $($Metrics.UserPrompts).")
-    [void]$sb.AppendLine("")
-
-    if ($KitBehind -gt 0) { [void]$sb.AppendLine((Format-KitBehindBanner -KitBehind $KitBehind)); [void]$sb.AppendLine("") }  # G6h kit-behind banner
-
-    # Append a plain-language blockquote (Get-PlainLanguageHint) after a finding when
-    # that finding's condition holds. The technical metric line is always emitted
-    # separately first; the hint augments it, never replaces it. See ADR-0014.
-    $appendHint = {
-        param([bool]$When, [string]$Cat)
-        if ($When) { [void]$sb.AppendLine((Get-PlainLanguageHint -Category $Cat)) }
-    }
-
-    # Opus share of model cost (drives the OpusHeavy hint; cost-aware only).
-    $opusCost = 0.0; $modelCost = 0.0
-    foreach ($k in $Metrics.PerModel.Keys) {
-        $modelCost += [double]$Metrics.PerModel[$k].Cost
-        if ($k -eq 'Opus') { $opusCost = [double]$Metrics.PerModel[$k].Cost }
-    }
-    $opusPct = if ($modelCost -gt 0) { [math]::Round(100.0 * $opusCost / $modelCost, 1) } else { 0.0 }
-    $costRising = $CostTrend.StartsWith('+') -and ($CostTrend -notmatch '^\+0(\.0+)?\s')
-
-    # Key findings (first 3-5 lines are what the session-start hint surfaces).
-    [void]$sb.AppendLine("## Key findings")
-    [void]$sb.AppendLine("")
-    $costLine = if ($Metrics.CostAvailable) { "Est. cost: USD $($Metrics.TotalCost) ($CostTrend)" } else { "Est. cost: unavailable (pricing.psd1 not loaded)" }
-    [void]$sb.AppendLine("- $costLine")
-    & $appendHint ($Metrics.CostAvailable -and $costRising) 'CostRising'
-    if ($Metrics.CostAvailable) {
-        [void]$sb.AppendLine("- Opus cost share: $opusPct% of model cost")
-        & $appendHint ($opusPct -ge 60) 'OpusHeavy'
-    }
-    [void]$sb.AppendLine("- Haiku delegation: $($Metrics.HaikuRatePct)% ($($Metrics.HaikuTurns)/$($Metrics.WindowTurns) turns)")
-    & $appendHint ($Metrics.WindowTurns -gt 0 -and $Metrics.HaikuTurns -eq 0) 'HaikuZero'
-    [void]$sb.AppendLine("- Cache cold-read share: $($Metrics.ColdReadPct)% (higher = more cache misses)")
-    & $appendHint ($Metrics.ColdReadPct -ge 50) 'ColdHeavy'
-    [void]$sb.AppendLine("- Token-waste score: $($Metrics.WasteScore)/100 ($($Metrics.HeavyTurns) heavy-output turns)")
-    & $appendHint ($Metrics.WasteScore -ge 30) 'WasteHigh'
-    [void]$sb.AppendLine("- Stuck candidates: $($Metrics.StuckCandidates.Count)")
-    & $appendHint ($Metrics.StuckCandidates.Count -gt 0) 'StuckSession'
-    [void]$sb.AppendLine("")
-
-    [void]$sb.AppendLine("## Model usage")
-    [void]$sb.AppendLine("")
-    [void]$sb.AppendLine("| Model | Turns | Input | Output | CacheCreate | CacheRead | Est. Cost (USD) |")
-    [void]$sb.AppendLine("|---|---|---|---|---|---|---|")
-    foreach ($key in ($Metrics.PerModel.Keys | Sort-Object)) {
-        $b = $Metrics.PerModel[$key]
-        [void]$sb.AppendLine("| $($b.Family) | $($b.Turns) | $($b.Input) | $($b.Output) | $($b.CacheCreate) | $($b.CacheRead) | $([math]::Round($b.Cost, 4)) |")
-    }
-    [void]$sb.AppendLine("")
-
-    [void]$sb.AppendLine("## Cache efficiency")
-    [void]$sb.AppendLine("")
-    [void]$sb.AppendLine("- Total cache-read tokens: $($Metrics.TotalReadTokens)")
-    [void]$sb.AppendLine("- Cold-read share: $($Metrics.ColdReadPct)% (reads >5min after the prior turn; likely re-paid)")
-    [void]$sb.AppendLine("")
-
-    if ($Metrics.StuckCandidates.Count -gt 0) {
-        [void]$sb.AppendLine("## Stuck candidates")
-        [void]$sb.AppendLine("")
-        [void]$sb.AppendLine("| Gap (min) | After turn at |")
-        [void]$sb.AppendLine("|---|---|")
-        foreach ($s in $Metrics.StuckCandidates) {
-            [void]$sb.AppendLine("| $([math]::Round($s.Minutes, 1)) | $($s.Timestamp.ToString('yyyy-MM-dd HH:mm')) |")
-        }
-        [void]$sb.AppendLine("")
-    }
-
-    if ($Metrics.Patterns.Count -gt 0) {
-        [void]$sb.AppendLine("## Repeated workflow prompts")
-        [void]$sb.AppendLine("")
-        [void]$sb.AppendLine("| Count | Prompt prefix |")
-        [void]$sb.AppendLine("|---|---|")
-        foreach ($p in $Metrics.Patterns) {
-            $safe = ($p.Prefix -replace '\|', '\|')
-            [void]$sb.AppendLine("| $($p.Count) | $safe |")
-        }
-        & $appendHint $true 'RepeatedPattern'
-        [void]$sb.AppendLine("")
-    }
-
-    [void]$sb.AppendLine("## Notes")
-    [void]$sb.AppendLine("")
-    [void]$sb.AppendLine("- Source: ~/.claude/projects/*.jsonl (Claude Code transcripts; Dispatch out of scope)")
-    [void]$sb.AppendLine("- Pricing: scripts/pricing.psd1 (concept figures, web confirmation pending)")
-    [void]$sb.AppendLine("- Generated by usage-insights.ps1 v$ScriptVersion")
-    return $sb.ToString()
-}
 
 function Write-InsightsReport {
     # Write the report to <OutputDir>/<date>-<kind>.md and copy to latest.md.
@@ -461,7 +398,8 @@ function Invoke-UsageInsights {
         [string]$Window,
         [string]$OutputDir,
         [string]$PricingFile,
-        [switch]$Quiet
+        [switch]$Quiet,
+        [switch]$WriteBaseline
     )
     $kind = $Window.ToLowerInvariant()
     $windowDays = if ($Window -eq 'Daily') { 1 } else { 7 }
@@ -475,8 +413,9 @@ function Invoke-UsageInsights {
     }
 
     $pricing = Import-Pricing -Path $PricingFile
-    $entries = Get-InsightsScope -WindowDays $windowDays
+    $entries = Get-InsightsScope -WindowDays $windowDays -IncludeRuleMetrics
     $metrics = Get-UsageMetrics -Entries $entries -Pricing $pricing
+    $ruleMetrics = Get-RuleMetrics -Entries $entries
 
     if (-not (Test-Path -LiteralPath $OutputDir)) {
         New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
@@ -489,18 +428,32 @@ function Invoke-UsageInsights {
         try { $kitBehind = Test-KitBehind -KitRoot (Split-Path -Parent $PSScriptRoot) } catch { $kitBehind = -1 }
     }
 
+    # Rule-firing baseline (ADR-0015 step 2). Read before writing so a -WriteBaseline
+    # run still shows the delta against the baseline it is about to replace.
+    $baselinePath = Join-Path $OutputDir "rule-metrics-baseline.json"
+    $ruleBaseline = Read-RuleMetricsBaseline -Path $baselinePath
+
     $report = Format-InsightsReport -Metrics $metrics -Kind $kind -DateStr $dateStr `
-        -WindowDays $windowDays -CostTrend $trend -KitBehind $kitBehind
+        -WindowDays $windowDays -CostTrend $trend -KitBehind $kitBehind `
+        -RuleMetrics $ruleMetrics -RuleBaseline $ruleBaseline
     $path = Write-InsightsReport -Report $report -Kind $kind -OutputDir $OutputDir -DateStr $dateStr
+
+    if ($WriteBaseline) {
+        $written = Write-RuleMetricsBaseline -Path $baselinePath -RuleMetrics $ruleMetrics `
+            -DateStr $dateStr -WindowDays $windowDays
+        if (-not $Quiet) { Write-Host "Rule-metrics baseline written: $written" }
+    }
 
     if (-not $Quiet) {
         Write-Host "Report written: $path"
         Write-Host "  Assistant turns: $($metrics.WindowTurns), Haiku rate: $($metrics.HaikuRatePct)%, cold-read: $($metrics.ColdReadPct)%"
+        Write-Host "  Rule adherence: plan-first $($ruleMetrics.PlanFirstRate)%, delegation $($ruleMetrics.DelegationRate)%, commit-convention $($ruleMetrics.CommitRate)%"
     }
     return $path
 }
 
 # Run main only on direct invocation; dot-sourcing (tests) just loads functions.
 if ($MyInvocation.InvocationName -ne '.') {
-    Invoke-UsageInsights -Window $Window -OutputDir $OutputDir -PricingFile $PricingFile -Quiet:$Quiet | Out-Null
+    Invoke-UsageInsights -Window $Window -OutputDir $OutputDir -PricingFile $PricingFile `
+        -Quiet:$Quiet -WriteBaseline:$WriteBaseline | Out-Null
 }

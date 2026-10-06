@@ -1,14 +1,14 @@
 ---
 description: Show usage insights from ~/.claude/insights/
 allowed-tools: Bash, Read
-argument-hint: "[--window daily|weekly] [--regenerate] [--ack]"
+argument-hint: "[--window daily|weekly] [--regenerate] [--ack] [--write-baseline]"
 ---
 
 # /insights
 
 `usage-insights` skill を起動して直近の usage insights を表示します。
 Claude Code transcript を解析した model 効率 / cache 効率 / token 浪費 / stuck
-パターン / Haiku 委譲率 / cost trend のレポートです。
+パターン / Haiku 委譲率 / cost trend / rule 遵守率のレポートです。
 
 ## オプション
 
@@ -16,6 +16,8 @@ Claude Code transcript を解析した model 効率 / cache 効率 / token 浪�
 - `--window daily`: 日次レポート (直近 1 日)
 - `--regenerate`: キャッシュを使わず再生成
 - `--ack`: 現在の insights を確認済 (acked) としてマーク (次回まで非表示)
+- `--write-baseline`: 現在の rule 遵守率を baseline として保存し、以降のレポートに
+  差分を併記させる (ADR-0015 Step 2)。既存 baseline を上書きするため opt-in
 
 ## 動作
 
@@ -34,6 +36,7 @@ Claude Code transcript を解析した model 効率 / cache 効率 / token 浪�
 /insights --window daily       # 日次 insights を表示
 /insights --regenerate         # 再生成してから表示
 /insights --ack                # 現在の insights を確認済にする
+/insights --write-baseline     # 現在の rule 遵守率を baseline として保存
 ```
 
 ## 注意
@@ -44,3 +47,4 @@ Claude Code transcript を解析した model 効率 / cache 効率 / token 浪�
 ## Refs
 
 - ADR-0014 (usage insights)
+- ADR-0015 (rule firing metrics)

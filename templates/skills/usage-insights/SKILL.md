@@ -48,6 +48,24 @@ session) を Markdown レポートにまとめる。`/insights` slash command �
   (日本語原文は `scripts/lib/plain-language-hints.json`、ASCII-only の script からは
   `Read-Utf8NoBom` 経由で読む。ADR-0014)
 
+## Rule firing metrics (ADR-0015)
+
+CLAUDE.md / rule が要求する行動が実際に起きたかの近似指標。削減の可否を
+**baseline との差分**で判断するための計測で、絶対値は参考値として読む。
+
+- **plan-first**: ユーザ prompt 直後の論理ターンで、最初の tool 呼出より前に
+  text block があるか (CLAUDE.md §2「実装前に 1 行の修正方針」)
+- **haiku-delegation**: `git commit` 呼出と大きな tool 出力に対し
+  `commit-msg` / `lint-helper` / `log-summary` へ委譲したか (CLAUDE.md §3.1)
+- **commit-convention**: commit subject が Conventional Commits 形式か
+- `-WriteBaseline` で `~/.claude/insights/rule-metrics-baseline.json` に保存。
+  以降のレポートは各値に baseline からの差分 (pt) を併記する
+- **「not exercised」は削除根拠にならない** (該当イベントが無かっただけ)
+
+論理ターンは transcript の `requestId` で復元する。assistant message は
+content block ごとに 1 行として記録されるため、行単位で数えるとターン数が
+約 1.8 倍に膨らむ。
+
 ## 制約
 
 - pricing は概算。billing 照合には使わない (相対 insight 専用)
@@ -58,5 +76,6 @@ session) を Markdown レポートにまとめる。`/insights` slash command �
 ## Refs
 
 - ADR-0014 (usage insights)
+- ADR-0015 (rule firing metrics / 指示面の削減)
 - ADR-0010 (skill / command 責務分離)
 - ADR-0012 (statusLine context awareness、補完的 visualization)
