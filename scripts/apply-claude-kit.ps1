@@ -66,6 +66,16 @@ Assert-NonElevated -AllowElevated:$AllowElevated
 # file-granularity hard limit (500 lines). Depends on Read-Utf8NoBom above.
 . (Join-Path (Join-Path $PSScriptRoot "lib") "models-config.ps1")
 
+# Link classification + timestamped backups: Get-LinkState, New-KitBackup,
+# Remove-LinkOnly. Needed before any deploy target is overwritten, because a
+# target that is a symlink would otherwise be written THROUGH to whatever it
+# points at. Depends on Write-Utf8NoBom above. See ADR-0015 step 3.
+. (Join-Path (Join-Path $PSScriptRoot "lib") "link-safety.ps1")
+
+# Rule build + deploy: Install-KitRules. Depends on the encoding helpers and on
+# New-KitBackup above. Extracted for the same 500-line reason as models-config.
+. (Join-Path (Join-Path $PSScriptRoot "lib") "rules-deploy.ps1")
+
 if (-not $KitRoot) {
     $KitRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 }
@@ -170,8 +180,12 @@ if ($Project) {
     $targetAgentsDir = Join-Path $homeClaude "agents"
     $targetSkillsDir = Join-Path $homeClaude "skills"
     $targetCommandsDir = Join-Path $homeClaude "commands"
-    # Rules are project-specific (Claude Code convention) and are not deployed in Global mode.
-    $targetRulesDir = $null
+    # User-level rules. Claude Code loads ~/.claude/rules/*.md for every project on
+    # the machine, ahead of a project's own rules. The earlier comment here claimed
+    # rules were project-specific by convention and skipped them in Global mode,
+    # which left them deployed nowhere for a Global-only install: none of the kit's
+    # rules reached any session. See ADR-0015 facts 1 and step 3.
+    $targetRulesDir = Join-Path $homeClaude "rules"
     $markerRoot = $homeClaude
     $mode = "Global"
     Write-Host "Mode: Global ($homeClaude)"
@@ -187,6 +201,13 @@ $sourceCommandsDir = Join-Path $templatesRoot "commands"
 
 $appliedFiles = @()
 
+# One backup directory per apply run, created lazily by New-KitBackup so a run
+# that overwrites nothing leaves no empty folder behind. Backups live beside the
+# deploy target (<target>/backups/<stamp>/) together with a restore-manifest.json
+# recording each original path and, for links, what the link pointed at.
+$backupRoot = Join-Path $markerRoot "backups"
+$backupStamp = (Get-Date).ToString('yyyyMMdd-HHmmss')
+
 # Copy CLAUDE.md
 # Global mode: ~/.claude/CLAUDE.md is kit-managed, so overwriting it on re-apply
 # is expected. Project mode: <project>/CLAUDE.md is the project own reference
@@ -198,6 +219,22 @@ if ($mode -eq "Project" -and (Test-Path $targetClaudeMd)) {
     Write-Host "       Kit guidance is available in ~/.claude/CLAUDE.md and <project>/.claude/rules/."
     Write-Host "       To deploy the template here, delete the file first and re-run."
 } else {
+    # Global mode: the target may be a symlink or junction. Write-Utf8NoBom follows
+    # it, so writing would rewrite whatever it points at -- a file outside
+    # ~/.claude, possibly in an unrelated repository. Back the current content up,
+    # record the link target for rollback, unlink (never delete the target), then
+    # write a real file. Idempotent: a plain file takes the original path.
+    if ($mode -eq "Global") {
+        $claudeMdState = Get-LinkState -Path $targetClaudeMd
+        if ($claudeMdState.IsLink) {
+            Write-Host "[link] $targetClaudeMd is a $($claudeMdState.LinkType) -> $($claudeMdState.Target)"
+            Write-Host "       Replacing it with a kit-managed file. The link target is left untouched."
+            $null = New-KitBackup -Path $targetClaudeMd -BackupRoot $backupRoot -Stamp $backupStamp `
+                -Note "CLAUDE.md was a link; replaced by a kit-managed file (ADR-0015 step 3)" `
+                -IsDryRun:$DryRun
+            $null = Remove-LinkOnly -Path $targetClaudeMd -IsDryRun:$DryRun
+        }
+    }
     $null = Copy-Template -SourceFile $sourceClaudeMd -DestFile $targetClaudeMd `
         -ModelsConfig $modelsConfig -IsDryRun:$DryRun
     $appliedFiles += $targetClaudeMd
@@ -253,69 +290,12 @@ if (Test-Path $sourceCommandsDir) {
     }
 }
 
-# Copy Claude rules (Project mode only)
-# Rules are project-specific by Claude Code convention, so they are deployed to
-# <project>/.claude/rules/ and are intentionally skipped in Global mode.
-# The build pipeline (build-rules.ps1) compiles source/rules/*.md into
-# dist/.claude/rules/<id>.md with audience filtering. If dist is missing or
-# stale relative to the source, it is rebuilt first. Rules carry no role
-# placeholders, so they are copied verbatim (no Copy-Template substitution).
-if ($mode -eq "Project") {
-    $distRulesDir = Join-Path (Join-Path (Join-Path $KitRoot "dist") ".claude") "rules"
-    $sourceRulesDir = Join-Path (Join-Path $KitRoot "source") "rules"
-    $buildScript = Join-Path (Join-Path $KitRoot "scripts") "build-rules.ps1"
 
-    # Freshness check: rebuild when dist is absent, empty, or older than source.
-    $needBuild = $false
-    if (-not (Test-Path $distRulesDir)) {
-        $needBuild = $true
-    } elseif (Test-Path $sourceRulesDir) {
-        $newestSource = Get-ChildItem -LiteralPath $sourceRulesDir -Recurse -Filter "*.md" -File |
-            Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
-        $newestDist = Get-ChildItem -LiteralPath $distRulesDir -Filter "*.md" -File |
-            Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
-        if ($null -eq $newestDist) {
-            $needBuild = $true
-        } elseif ($null -ne $newestSource -and $newestSource.LastWriteTimeUtc -gt $newestDist.LastWriteTimeUtc) {
-            $needBuild = $true
-        }
-    }
-
-    if ($needBuild) {
-        if ($DryRun) {
-            Write-Host "[dry-run] would build rules from source/rules/ (dist missing or stale)"
-        } elseif (Test-Path $buildScript) {
-            Write-Host "[rules] dist is missing or stale; building from source/rules/"
-            # Switch cwd to the kit root while invoking build-rules.ps1, then restore.
-            Push-Location $KitRoot
-            try {
-                & $buildScript | Out-Null
-            } finally {
-                Pop-Location
-            }
-        } else {
-            Write-Warning "build-rules.ps1 not found at: $buildScript"
-        }
-    }
-
-    if (Test-Path $distRulesDir) {
-        $ruleFiles = Get-ChildItem -LiteralPath $distRulesDir -Filter "*.md" -File
-        foreach ($ruleFile in $ruleFiles) {
-            $destRule = Join-Path $targetRulesDir $ruleFile.Name
-            if ($DryRun) {
-                Write-Host "[dry-run] $($ruleFile.FullName) -> $destRule"
-            } else {
-                if (-not (Test-Path $targetRulesDir)) {
-                    New-Item -ItemType Directory -Force -Path $targetRulesDir | Out-Null
-                }
-                # Verbatim UTF-8 (no BOM) copy; rules contain no role placeholders.
-                $ruleContent = Read-Utf8NoBom -Path $ruleFile.FullName
-                Write-Utf8NoBom -Path $destRule -Content $ruleContent
-                Write-Host "[apply] $($ruleFile.FullName) -> $destRule"
-            }
-            $appliedFiles += $destRule
-        }
-    }
+# Claude rules (both modes). Global deploys ~/.claude/rules/, Project deploys
+# <project>/.claude/rules/; see lib/rules-deploy.ps1 for the double-load caveat.
+if ($targetRulesDir) {
+    $appliedFiles += Install-KitRules -KitRoot $KitRoot -TargetRulesDir $targetRulesDir `
+        -Mode $mode -BackupRoot $backupRoot -BackupStamp $backupStamp -IsDryRun:$DryRun
 }
 
 # Leak-protection artifacts (Project mode only)
