@@ -226,6 +226,17 @@ statusline は既に時刻ではなく context % を描画しているため、�
 (`~/.claude/work-schedule.yaml` + `~/.claude/.work-end-today`) と比較を追加する。
 失敗時は無表示 (現行の `$ErrorActionPreference = 'SilentlyContinue'` 方針を踏襲)。
 
+#### 実装時の確定事項 (2026-10-07)
+
+- 指示子は `⏰` ではなく **`EOD <HH:MM>`** (ASCII)。ADR-0003 §C がスクリプトを
+  ASCII only に縛るうえ、絵文字の端末セル幅が一定でなく statusline の桁揃えが
+  崩れるため
+- skill 推薦は「未 install の skill を推薦」ではなく
+  **「検出した project type と関連 skill の提示」**に変更した。apply は Project mode で
+  `<project>/.claude/skills/` へ**全 skill を配布する**ため、推薦時点で「未 install」は
+  常に空になり、`/install-skill` を促す文面が事実と食い違う。
+  `Get-RecommendedSkills -OnlyMissing` として元の意味も残してある
+
 ### D. file-by-file 目標
 
 byte 基準 (UTF-8)。合計 40,142 B → 15,000 B 前後。
