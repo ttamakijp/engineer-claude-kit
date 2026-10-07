@@ -325,11 +325,18 @@ function Write-RuleMetricsBaseline {
     # Persist the current rates as the baseline for later comparison. Only the
     # three rates plus provenance are stored; the full metric object is not, so a
     # later schema change cannot make an old baseline unreadable.
+    #
+    # Two files are written: $Path is the active comparison target (overwritten
+    # each time), and a dated sibling is kept as an archive. ADR-0015 compares
+    # three snapshots -- before distribution, after distribution, after reduction
+    # -- to separate the effect of deploying rules from the effect of trimming
+    # them, which a single overwritten file cannot support.
     param(
         [Parameter(Mandatory)][string]$Path,
         [Parameter(Mandatory)]$RuleMetrics,
         [string]$DateStr,
-        [int]$WindowDays = 7
+        [int]$WindowDays = 7,
+        [switch]$NoArchive
     )
     if (-not $DateStr) { $DateStr = (Get-Date).ToString('yyyy-MM-dd') }
     $payload = [ordered]@{
@@ -347,7 +354,19 @@ function Write-RuleMetricsBaseline {
     if ($dir -and -not (Test-Path -LiteralPath $dir)) {
         New-Item -ItemType Directory -Force -Path $dir | Out-Null
     }
-    Write-Utf8NoBom -Path $Path -Content ($payload | ConvertTo-Json -Depth 3)
+    $json = $payload | ConvertTo-Json -Depth 3
+    Write-Utf8NoBom -Path $Path -Content $json
+
+    if (-not $NoArchive) {
+        # <name>-<date>.json beside the active baseline. Re-running on the same
+        # day replaces that day's archive, which keeps one entry per day rather
+        # than one per invocation.
+        $leaf = [System.IO.Path]::GetFileNameWithoutExtension($Path)
+        $ext = [System.IO.Path]::GetExtension($Path)
+        $archiveName = "$leaf-$DateStr$ext"
+        $archive = if ($dir) { Join-Path $dir $archiveName } else { $archiveName }
+        if ($archive -ne $Path) { Write-Utf8NoBom -Path $archive -Content $json }
+    }
     return $Path
 }
 

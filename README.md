@@ -142,8 +142,38 @@ bootstrap 実行後、以下の 2 層構造で配置される。
 |   |-- resume.md             # /resume state からの再開
 |   |-- install-skill.md      # /install-skill <name> (global skill を project へ)
 |   `-- cleanup-processes.md  # /cleanup-processes 孤立プロセス掃除 (ADR-0011)
+|-- rules/                    # user-level rules。全プロジェクトに適用 (ADR-0015)
+|   `-- <rule-id>.md          # source/rules/ から build。paths 付きは該当ファイル編集時のみロード
+|-- insights/                 # usage insights + rule 遵守率 baseline (ADR-0014 / ADR-0015)
+|-- backups/                  # apply が上書きしたファイルの退避 + restore-manifest.json
 `-- state/                    # checkpoint state (.gitignore)
 ```
+
+#### rules の配置先と二重ロード
+
+Claude Code は rules を 2 箇所から読みます。`~/.claude/rules/` は **machine 上の
+全プロジェクト**に、`<project>/.claude/rules/` は当該プロジェクトにのみ適用され、
+user-level が先にロードされます。**どちらも他方を上書きしません。**
+
+- `apply-claude-kit.ps1 -Global` → `~/.claude/rules/` に配置 (通常はこちら)
+- `apply-claude-kit.ps1 -Project <path>` → `<project>/.claude/rules/` に配置
+  (team に source control 経由で配る場合)
+
+同じ rule を両方に配置すると **同一内容が 2 回 context に載ります**。Project mode は
+`~/.claude/rules/` に同名 rule が既にある場合に警告を出すので、どちらか一方に
+統一してください (project 側を消すには `<project>/.claude/rules/` を削除)。
+
+frontmatter の `paths` を持つ rule は、Claude が該当パターンのファイルを
+Read / Write / Edit したときにのみロードされます。`paths` の無い rule は無条件に
+ロードされます (ADR-0015)。
+
+#### 上書き時の backup
+
+apply は既存ファイルを上書きする前に、内容が異なる場合のみ
+`~/.claude/backups/<timestamp>/` へ退避し、`restore-manifest.json` に元のパスを
+記録します。`~/.claude/CLAUDE.md` が symlink だった場合は、**リンク先を書き換えず**
+にリンク自体を外して実ファイルに置き換え、リンク先パスを manifest に記録します
+(ADR-0015)。rollback は manifest を見て該当ファイルを戻してください。
 
 ### 1.2 プロジェクト (`<project>/`)
 
@@ -275,6 +305,9 @@ engineer-claude-kit/
 | `scripts/bootstrap.ps1` | ADO clone + `~/.claude` 配布 (entry point) | ✅ Phase 2 |
 | `scripts/apply-claude-kit.ps1` | 配布実装 | ✅ Phase 2 |
 | `scripts/build-rules.ps1` | `source/rules/` -> `.claude/rules/` build | ✅ Phase 2 |
+| `scripts/lib/rules-deploy.ps1` | rule の build + 配布 (Global / Project 両対応、二重ロード警告) | ✅ ADR-0015 |
+| `scripts/lib/link-safety.ps1` | symlink 貫通書込の防止 + 上書き前 backup | ✅ ADR-0015 |
+| `scripts/lib/rule-metrics.ps1` | rule 遵守率の実測と baseline | ✅ ADR-0015 |
 | `scripts/cost-observe-bedrock.ps1` | AWS Cost Explorer から Bedrock コストを取得し markdown report 生成 | ✅ Phase 3.2 |
 | `scripts/install-deps.ps1` | 必要ツール (gitleaks / gh / node) を winget で一括インストール + PSScriptAnalyzer を Install-Module (非対話) で導入 (既存は skip)。pwsh (PS 7+) は任意で `-InstallPwsh` opt-in (既定は hint のみ、PS 5.1 baseline) | ✅ Phase 4 / Phase 8 |
 | `config/cost-budget.yaml` | Bedrock コスト予算しきい値 | ✅ Phase 3.2 |

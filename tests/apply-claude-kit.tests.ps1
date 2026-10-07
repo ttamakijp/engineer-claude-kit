@@ -90,9 +90,16 @@ Describe "apply-claude-kit.ps1" {
         Test-Path $ruleFile | Should Be $true
     }
 
-    It "does NOT apply project rules in Global (DryRun) mode" {
+    # Reversed by ADR-0015 step 3. This previously asserted that Global mode
+    # mentions no rules at all, encoding the behaviour that left a Global-only
+    # install with its rules deployed nowhere: Claude Code reads
+    # ~/.claude/rules/*.md for every project, so Global is where user-level rules
+    # belong. DryRun keeps the real ~/.claude untouched.
+    It "applies user-level rules in Global (DryRun) mode" {
         $output = & powershell -NoProfile -File $ScriptPath -AllowElevated -Global -DryRun 2>&1
-        ($output -join "`n") | Should Not Match 'rules'
+        $joined = ($output -join "`n")
+        $joined | Should Match 'commit-convention\.md'
+        $joined | Should Match ([regex]::Escape((Join-Path (Join-Path $env:USERPROFILE ".claude") "rules")))
     }
 
     It "writes applied marker" {
