@@ -167,6 +167,36 @@ frontmatter の `paths` を持つ rule は、Claude が該当パターンのフ�
 Read / Write / Edit したときにのみロードされます。`paths` の無い rule は無条件に
 ロードされます (ADR-0015)。
 
+#### statusline の EOD 表示
+
+`templates/statusline.ps1` は context % の色分け (ADR-0012) に加えて、終業時刻が
+近いと `EOD <HH:MM>` を表示します (ADR-0015)。
+
+```
+[Opus 5] 42% context  engineer-claude-kit git:main  EOD 17:30
+```
+
+- 終業 `warning_window_minutes` 分前以内 → 黄、終業時刻を過ぎている → 赤
+- それ以外の時間帯は**何も表示しません**
+- 終業時刻は `~/.claude/.work-end-today` (当日分、`off` / `skip` / `yaml` も可) を
+  優先し、無ければ `~/.claude/work-schedule.yaml` の曜日別設定を使う。両方無ければ
+  非表示 (時刻を推測しない)
+- 時刻比較・marker 読込・window 判定は**すべてスクリプト**が行います。Claude 側の
+  rule は「`EOD` が出ていたら大きな作業の前に一言確認する」だけです
+
+#### /apply の skill ヒント
+
+`apply-claude-kit.ps1 -Project <path>` は最後に project type を検出し、関連 skill を
+1 回だけ表示します (ADR-0015)。該当なし・全 skill が無関係なら無表示です。
+
+```
+[hint] Detected project type(s): android, web-node
+       Relevant skills available here: android-build, web-test
+```
+
+検出ルールは `config/recommended-skills.yaml` で定義します (project root 直下の
+glob のみを見るため、`node_modules/package.json` は Node project と判定しません)。
+
 #### 上書き時の backup
 
 apply は既存ファイルを上書きする前に、内容が異なる場合のみ
@@ -308,6 +338,7 @@ engineer-claude-kit/
 | `scripts/lib/rules-deploy.ps1` | rule の build + 配布 (Global / Project 両対応、二重ロード警告) | ✅ ADR-0015 |
 | `scripts/lib/link-safety.ps1` | symlink 貫通書込の防止 + 上書き前 backup | ✅ ADR-0015 |
 | `scripts/lib/rule-metrics.ps1` | rule 遵守率の実測と baseline | ✅ ADR-0015 |
+| `scripts/lib/skill-recommend.ps1` | project type 検出と関連 skill ヒント (rule から移管) | ✅ ADR-0015 |
 | `scripts/cost-observe-bedrock.ps1` | AWS Cost Explorer から Bedrock コストを取得し markdown report 生成 | ✅ Phase 3.2 |
 | `scripts/install-deps.ps1` | 必要ツール (gitleaks / gh / node) を winget で一括インストール + PSScriptAnalyzer を Install-Module (非対話) で導入 (既存は skip)。pwsh (PS 7+) は任意で `-InstallPwsh` opt-in (既定は hint のみ、PS 5.1 baseline) | ✅ Phase 4 / Phase 8 |
 | `config/cost-budget.yaml` | Bedrock コスト予算しきい値 | ✅ Phase 3.2 |

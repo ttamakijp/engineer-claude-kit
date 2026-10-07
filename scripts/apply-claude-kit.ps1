@@ -76,6 +76,10 @@ Assert-NonElevated -AllowElevated:$AllowElevated
 # New-KitBackup above. Extracted for the same 500-line reason as models-config.
 . (Join-Path (Join-Path $PSScriptRoot "lib") "rules-deploy.ps1")
 
+# Project-type detection + skill suggestion. Replaces the project-skill-recommend
+# rule, which re-derived this every session unverifiably. See ADR-0015 section C.
+. (Join-Path (Join-Path $PSScriptRoot "lib") "skill-recommend.ps1")
+
 if (-not $KitRoot) {
     $KitRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 }
@@ -458,6 +462,19 @@ Write-Host "       - For Bedrock environment: docs/setup/settings-bedrock.exampl
 Write-Host "       - For Anthropic API direct: docs/setup/settings-anthropic.example.json"
 
 Write-Host "Applied $($appliedFiles.Count) file(s) in $mode mode."
+
+# Skill suggestion (Project mode): one closing hint, silent when there is nothing
+# to suggest.
+if ($mode -eq "Project") {
+    $recommendConfig = Join-Path (Join-Path $KitRoot "config") "recommended-skills.yaml"
+    try {
+        Write-SkillRecommendation -Recommendations (Get-RecommendedSkills `
+            -ProjectRoot $resolvedProject -ConfigPath $recommendConfig)
+    } catch {
+        # A malformed config must never fail an otherwise successful apply.
+        Write-Verbose "skill recommendation skipped: $($_.Exception.Message)"
+    }
+}
 if ($DryRun) { Write-Host "Note: -DryRun was specified, no files were modified." }
 
 # Optional interactive settings wizard (ADR-0010), Global mode only.
