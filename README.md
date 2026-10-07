@@ -197,6 +197,21 @@ Read / Write / Edit したときにのみロードされます。`paths` の無�
 検出ルールは `config/recommended-skills.yaml` で定義します (project root 直下の
 glob のみを見るため、`node_modules/package.json` は Node project と判定しません)。
 
+#### rule 本文と読み物の分離
+
+rule 本文は **要件 / Do / Don't / 例外** の 4 節に揃えてあります。手順・対応表・根拠は
+`docs/` 以下の読み物に分離し、rule からは**素のパスで言及**するだけにしています
+(ADR-0015 §B-2)。
+
+| rule | 分離先 |
+|---|---|
+| `commit-convention.md` | [docs/setup/git-workflow.md](docs/setup/git-workflow.md) |
+| `security-mobile.md` | [docs/rules/security-mobile-reference.md](docs/rules/security-mobile-reference.md) |
+
+`@import` では繋いでいません。import したファイルも launch 時にロードされるため、
+context 削減の効果がゼロになります (Claude Code 公式仕様)。Claude は必要なときに
+`Read` すれば足ります。
+
 #### 上書き時の backup
 
 apply は既存ファイルを上書きする前に、内容が異なる場合のみ
@@ -355,7 +370,9 @@ engineer-claude-kit/
 | `scripts/lint.ps1` | PSScriptAnalyzer runner (local + CI 共通、未導入時は非対話で自己 install) | ✅ Phase 4 |
 | `docs/manual-verification/` | kit 効果測定の手動検証手順 (scenario-comparison: 5 軸比較) | ✅ |
 | `docs/manual-verification/bootstrap-installation.md` | bootstrap chain 動作検証手順 (Windows / Claude MAX 環境対応) | ✅ |
-| `docs/adr/` | Architecture Decision Records (現状 0001-0012、§4 ADR Index 参照) | ✅ Phase 1 |
+| `docs/adr/` | Architecture Decision Records (§4 ADR Index 参照) | ✅ Phase 1 |
+| `docs/setup/git-workflow.md` | PR フロー / TDD / Stacked PR / コミット例 (rule から分離した読み物) | ✅ ADR-0015 |
+| `docs/rules/security-mobile-reference.md` | OWASP 対応表 / 根拠 / リポジトリ段階の PII 検出 (同上) | ✅ ADR-0015 |
 | `README.md` (本ファイル) | プロジェクト概要 + 配置構成 + Quick start | ✅ Phase 1 |
 | `LICENSE` / `.gitignore` | リポ初期セット | ✅ Phase 1 |
 
