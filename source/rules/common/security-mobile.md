@@ -13,57 +13,30 @@ paths:
 
 # Mobile security
 
-## 適用条件
-
-以下を扱う実装では本ルールを必ず参照する:
-
-- API キー・シークレット・認証情報
-- 通信処理・ネットワーク実装
-- データ保存・暗号化処理
-- ユーザ認証・ログイン・セッション管理
-- パーミッション要求
-- ログ出力・デバッグ情報
-- ProGuard ルール設定
-- プライバシーポリシー / GDPR 対応
-- インシデント・障害対応
-- 依存ライブラリ（supply chain）
+対応表と根拠、リポジトリ段階の PII 検出は `docs/rules/security-mobile-reference.md`
+を必要時に読むこと (本文には検証可能な Do / Don't だけを置く)。
 
 ## API キー・シークレット管理
-
-### Do
 
 - API キー / OAuth client secret / エンドポイント URL は `local.properties` または環境変数経由でビルド時に注入する
 - `local.properties` / `*.keystore` / `.env*` を `.gitignore` で確実に除外する
 - release build では `BuildConfig` フィールドにのみ展開し、ソースに残さない
 - 誤コミット発覚時は **即座にシークレットをローテーション** し、`git filter-repo` 等で履歴から削除する
 
-### Don't
+**Don't**
 
 - API キー / シークレットをソースコードへハードコードしない
 - 機密値をログ出力 / Crashlytics レポートに含めない
 - `.env*` / `**/secrets/**` / `local.properties` / `*.keystore` を Claude に直接読ませない
 
-## OWASP Mobile Top 10 対応
-
-| 項目 | 対応 |
-|------|------|
-| M1 不適切な認証情報管理 | API キーの外部化、`BuildConfig` 経由のみ |
-| M2 安全でないデータ保存 | `EncryptedSharedPreferences` / SQLCipher で機密データ保護 |
-| M3 安全でない通信 | 全通信を HTTPS / TLS 1.2 以上に限定 |
-| M5 不十分な暗号化 | AES-256-GCM 等の強固なアルゴリズムを使用 |
-| M8 コード改ざん | ProGuard 難読化、整合性チェック |
-| M9 リバースエンジニアリング | デバッグ情報の release 除外 |
-
 ## データ暗号化
-
-### Do
 
 - 認証情報 / トークン / 機密 PII は `EncryptedSharedPreferences`（Jetpack Security）で保存する
 - SQLite で機密データを扱う場合は SQLCipher を採用する
 - 機密ファイルは `EncryptedFile` を使用する
 - 暗号化キーは Android Keystore System で保護する
 
-### Don't
+**Don't**
 
 - 暗号化キーをアプリコード / 平文 SharedPreferences に保存しない
 - AES-128-ECB 等の脆弱モードを使用しない
@@ -106,25 +79,6 @@ paths:
 - ログ保存期間を定め、不要ログを定期削除する
 - external storage 保存時は Android 10+ のスコープドストレージに対応する
 
-## リポジトリ全体での PII 検出 (TBD: PII detection policy として別途整備予定)
-
-ログ出力規約はランタイム挙動の話だが、**リポジトリ commit / push 段階での PII 混入**
-も同じカテゴリで防御する。engineer-claude-kit では leak-check スクリプト
-(`scripts/check-leakage.ps1`、Phase 2 以降で実装予定: TBD) の pre-commit / CI フックが
-以下を検出する想定:
-
-- 個人メール (noreply 以外は fail)
-- 電話番号 (日本携帯 070/080/090 / +81 / +1 北米)
-- 住所 (〒NNN-NNNN / US street address)
-- 氏名 deny-list (`scripts/.leak-name-denylist` 設定時、リポ毎に opt-in)
-- 社内ドメイン (`*.co.jp` / `*.atlassian.net` 等は warn)
-- クレデンシャルファイル (`.env` / `*.pem` / `*.key` / `local.properties` 等が
-  tracked 化されたら fail)
-
-詳細: PII / クレデンシャルファイル検出ポリシー ADR (TBD, Phase 1 で整備予定)。
-Android アプリ実装では「ログに出すな」「リポにコミットするな」の両層で防御することを
-覚える。
-
 ## ユーザ認証・セッション管理
 
 - OAuth 2.0 / OpenID Connect は **PKCE フロー**（Authorization Code + PKCE）を使う
@@ -144,15 +98,13 @@ Android アプリ実装では「ログに出すな」「リポにコミットす
 
 ## supply chain hygiene
 
-### Do
-
 - 依存ライブラリは公式リポジトリ / 公式 SDK のみを使う
 - 依存追加前にライセンス（OSS license）・メンテナンス状況・最終リリース日を確認する
 - `Gradle Version Catalog`（`libs.versions.toml`）等で依存バージョンを集中管理する
 - 依存のセキュリティアドバイザリ（GitHub Dependabot / Snyk / OSV）を有効化する
 - 重大脆弱性検知時は **24 時間以内** に patch / 代替へ切り替える
 
-### Don't
+**Don't**
 
 - 出所不明な GitHub gist / personal fork を依存に追加しない
 - バージョン pinning なしの `+` / `latest.release` 指定を使わない
@@ -164,13 +116,6 @@ Android アプリ実装では「ログに出すな」「リポにコミットす
 - 脆弱性発見時は **即座に修正リリース** を準備し、影響範囲をユーザへ通知する
 - 認証情報漏洩疑いがある場合は即時ローテーション + 影響ユーザへパスワードリセットを促す
 - 障害対応後は再発防止策をドキュメントに記録する
-
-## 根拠
-
-- OWASP Mobile Top 10 は業界標準で、リスク優先順位の根拠になる
-- 暗号化キーをコードに含めると静的解析で容易に抽出可能なため Keystore 必須
-- supply chain 攻撃は 2020 年以降急増しており、依存の出所確認は基本動作
-- Claude に `.env*` / `*.keystore` を読ませると、トークンが context / 学習データへ流出する経路になる
 
 ## 例外
 

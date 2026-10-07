@@ -11,8 +11,8 @@ audience: [claude]
 - コミットメッセージは Conventional Commits + 日本語本文で記述する
 - 全変更は feature/fix ブランチ → PR 経由でマージする（main/master への直接 push 禁止）
 - 1 Phase = 1 PR を原則とし、レビュー・ロールバック単位を小さく保つ
-- マージ方式は **squash + delete-branch** を標準とし、コミット履歴を線形に保つ
-- squash merge の commit message 戦略は **`PR_TITLE` + `PR_BODY`** を選択し、GitHub default の `(#NN)` 自動付与を無効化する (TBD: durable-references 規約として別途整備予定)
+- マージ方式は **squash + delete-branch** を標準とし、squash message は `PR_TITLE` +
+  `PR_BODY` を使う (GitHub default の `(#NN)` 自動付与は無効化)
 
 ## Conventional Commits フォーマット
 
@@ -24,29 +24,10 @@ audience: [claude]
 <footer — BREAKING CHANGE / Refs / Co-Authored-By>
 ```
 
-### type
-
-| type | 用途 |
-|------|------|
-| `feat` | 新機能追加 |
-| `fix` | バグ修正 |
-| `docs` | ドキュメント変更のみ |
-| `refactor` | 機能変更なしのコード整理 |
-| `test` | テスト追加・修正 |
-| `chore` | ビルド設定・依存更新等の雑務 |
-| `perf` | パフォーマンス改善 |
-| `style` | フォーマット等の見た目のみ |
-| `ci` | CI 設定変更 |
-
-### scope
-
-- 影響範囲を kebab-case で 1 単語（例: `auth`, `network`, `compose-theme`）
-- scope 不要な変更は省略可
-
-### subject
-
-- 50 文字以下、命令形、ピリオドなし
-- 日本語可（社内プロジェクト前提）
+- **type**: `feat` 新機能 / `fix` バグ修正 / `docs` 文書のみ / `refactor` 機能変更なし /
+  `test` テスト / `chore` 雑務 / `perf` 性能 / `style` 見た目のみ / `ci` CI 設定
+- **scope**: 影響範囲を kebab-case 1 単語 (例 `auth`, `network`)。不要なら省略可
+- **subject**: 50 文字以下、命令形、ピリオドなし。日本語可
 
 ## Do
 
@@ -65,72 +46,6 @@ audience: [claude]
 - 後続 PR の base を前の PR ブランチに設定しない（前 PR が delete-branch されると後続 PR が自動クローズされる）
 - 依存チェーンを 3 段以上にしない（最大 2 段、それ以上はフェーズ設計を見直す）
 
-## PR フロー: 設計先行 → draft PR パターン
-
-1. `docs/design/<feature>.md` または `docs/adr/NNNN-*.md` に設計提案を commit（実装なし）
-2. draft PR を作成し、設計レビューを受ける
-3. 設計承認後、同ブランチで実装をコミット
-4. 実装完了で PR を ready for review に切り替える
-5. コードレビュー → squash マージ → delete-branch
-
-## TDD サイクル
-
-1. テストを書く（**RED**: 失敗を確認）
-2. 最小実装で通す（**GREEN**: テスト通過を確認）
-3. ビルド確認（コンパイルエラー・lint エラーがないこと）
-4. コミット
-5. push → CI 通過を確認
-
-- RED を確認せずに実装しない（最初から通る = テストが機能していない）
-- GREEN にしてからリファクタリング。リファクタ後に再度 GREEN を確認してからコミット
-
-## Stacked PR の落とし穴と回避
-
-依存関係のある PR を積む場合（PR-A → PR-B → PR-C）:
-
-- 前 PR をマージ + branch 削除すると後続 PR が **自動クローズされる**（GitHub 仕様）
-- 対処: 自動クローズされた後続 PR は新規 PR で再作成する。元 PR はクローズのまま
-- ベストプラクティス: 各 PR は main から独立ブランチを切り、依存変更は `git rebase` で取り込む
-
-```bash
-# 後続ブランチを main ベースに切り直す
-git checkout main && git pull
-git checkout -b feat/next-feature
-git cherry-pick <commits-from-prev-feature>
-```
-
-## コミットメッセージ例
-
-```
-feat(auth): OAuth 2.0 PKCE フローを追加
-
-リフレッシュトークンを Android Keystore に保存し、長期セッションのセキュリティを向上。
-アクセストークンは EncryptedSharedPreferences に格納。
-
-Refs: a1b2c3d4
-```
-
-```
-fix(network): TLS handshake 失敗時の再試行回数を 1 回に制限
-
-無限再試行で発生していたバッテリードレインを回避。
-5xx 系のみ再試行し、4xx は即時失敗。
-
-Refs: e5f6g7h8
-```
-
-footer `Refs:` には **commit SHA (7-12 文字 short) / ADR-NNNN / tag (`vX.Y.Z`)** を使う。
-`#NN` は GitHub-native の counter でリポ再作成・org 移行で壊れるため、本体参照に使わない
-(GitHub の `Closes #N` auto-close keyword は例外として補助的に併用可。詳細は
-durable-references として別途整備予定: TBD)。
-
-## 根拠
-
-- Conventional Commits は changelog 自動生成と semantic versioning 判定の前提
-- squash + delete-branch は履歴を線形に保ち、`git bisect` を機械的に走らせやすくする
-- 設計先行 draft PR は実装後の手戻りを激減させ、レビュアーが文脈を持った状態でコードレビューできる
-- footer の `Refs:` を SHA / ADR / tag に揃えると、リポ削除・再作成・org 移行のいずれを経ても参照が壊れない（durable-references の方針、TBD: 別途 ADR で整備予定）
-
 ## 例外
 
 - ホットフィックスでは type を `fix` 固定、scope を `urgent` とし、ADR 不要
@@ -139,4 +54,5 @@ durable-references として別途整備予定: TBD)。
 
 ## 関連
 
-- durable-references — 参照スタイル詳細 (`Refs:` に何を入れるか、`#NN` の取扱)。engineer-claude-kit では未採番 (TBD, Phase 1 で整備予定)
+PR フロー / TDD サイクル / Stacked PR の回避 / コミットメッセージ例 / `Refs:` の
+書き方は `docs/setup/git-workflow.md` を必要時に読むこと。
