@@ -183,14 +183,15 @@ Describe "apply-claude-kit.ps1" {
     }
 
     It "auto-creates the scheduled-task parent dir when absent (G6i regression)" {
-        # apply-claude-kit.ps1 has no dot-source guard, so extract just the
-        # Copy-ScheduledTaskDir function text instead of running the whole apply.
+        # Copy-ScheduledTaskDir now lives in lib/scheduled-tasks-deploy.ps1, so it
+        # can be dot-sourced directly. It previously had to be regex-extracted
+        # from apply-claude-kit.ps1 and Invoke-Expression'd, because that script
+        # has no dot-source guard and running it would perform a real apply.
         # The function depends on Read/Write-Utf8NoBom from the encoding helper.
-        . (Join-Path (Join-Path (Join-Path $KitRoot "scripts") "lib") "encoding-helper.ps1")
-        $scriptText = Get-Content -LiteralPath $ScriptPath -Raw
-        $fnMatch = [regex]::Match($scriptText, '(?ms)^function Copy-ScheduledTaskDir.*?^\}')
-        $fnMatch.Success | Should Be $true
-        Invoke-Expression $fnMatch.Value
+        $libDir = Join-Path (Join-Path $KitRoot "scripts") "lib"
+        . (Join-Path $libDir "encoding-helper.ps1")
+        . (Join-Path $libDir "scheduled-tasks-deploy.ps1")
+        (Get-Command Copy-ScheduledTaskDir -ErrorAction SilentlyContinue) | Should Not BeNullOrEmpty
 
         # Source: a task subdir with one spec. Target: a brand-new root whose
         # scheduled-tasks/<name>/ subtree does NOT exist yet (the bug repro).

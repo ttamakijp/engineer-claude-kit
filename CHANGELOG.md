@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **branch-protection 機能** — GitHub リポジトリに kit 標準の branch protection
+  ruleset (`protect-main`: deletion / non_fast_forward / required_linear_history /
+  pull_request を既定ブランチに適用) が入っているかを確認し、未適用なら適用を提案する。
+  確認は read-only、適用は user の明示同意が前提。
+  - `templates/branch-protection/protect-main.json` — 期待値の正
+  - `scripts/check-branch-protection.ps1` / `.sh` — 確認のみ。
+    `match` / `drift` / `missing` の 3 状態を報告 (exit 0/1/2、エラーは 3)。
+    最終行は常に `STATUS: <state>` で parse 可能
+  - `scripts/apply-branch-protection.ps1` / `.sh` — `missing` は POST、
+    `drift` は diff 表示 → Y/N 確認 → PUT。`-DryRun` / `-Force` 対応、
+    非対話環境では hang せず中断
+  - `scripts/lib/branch-protection.ps1` / `.sh` — 判定ロジック (rule type は
+    厳密比較、rule parameters は subset 比較で GitHub 側の既定追加を drift 扱いしない)
+  - `templates/skills/branch-protection-check/` — 作業開始時の自然言語入口
+  - `templates/scheduled-tasks/check-branch-protection/` — 週次 (月曜 9:00) 確認。
+    `apply-claude-kit.ps1 -EnableBranchProtectionSchedule` で opt-in 配布
+  - `docs/branch-protection.md` — 目的 / ruleset 内容 / 実行方法 / 比較ポリシー /
+    トラブルシューティング
+  - `tests/branch-protection.tests.ps1` — Pester 32 件 (gh も network も叩かない)
 - **usage-insights 機能 (ADR-0014, G6f)** — Claude Code transcript
   (`~/.claude/projects/*.jsonl`) を解析し、model 効率 / cache 効率 (cold-read share) /
   token 浪費 score / stuck candidates / Haiku 委譲率 / cost trend を Markdown insights

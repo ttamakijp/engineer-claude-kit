@@ -36,6 +36,9 @@ param(
     # checkout regardless; this only gates the per-user Claude Code artifacts.
     [switch]$DisableInsights,
 
+    # Opt-in: read-only check-branch-protection task spec (docs/branch-protection.md).
+    [switch]$EnableBranchProtectionSchedule,
+
     # Kit self-update (ADR-0013). On startup the kit checks whether its own
     # checkout is behind origin and prints an opt-in hint. -Update performs a
     # fast-forward pull; -UpdateForce hard-resets to origin (escape hatch);
@@ -79,6 +82,10 @@ Assert-NonElevated -AllowElevated:$AllowElevated
 # Project-type detection + skill suggestion. Replaces the project-skill-recommend
 # rule, which re-derived this every session unverifiably. See ADR-0015 section C.
 . (Join-Path (Join-Path $PSScriptRoot "lib") "skill-recommend.ps1")
+
+# Scheduled-task spec deploy: Copy-ScheduledTaskDir. Depends on the encoding
+# helpers above. Extracted for the 500-line file-granularity cap.
+. (Join-Path (Join-Path $PSScriptRoot "lib") "scheduled-tasks-deploy.ps1")
 
 if (-not $KitRoot) {
     $KitRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
@@ -376,37 +383,6 @@ if ($mode -eq "Global") {
     }
 }
 
-# Scheduled-task deploy helper (Global mode). Copies every *.md under one task
-# subdir to ~/.claude/scheduled-tasks/<name>/<file>.md, preserving the parent dir
-# as the task name (mirrors the skills layout). Specs carry no role placeholders,
-# so they are copied verbatim. Returns the deployed dest paths.
-function Copy-ScheduledTaskDir {
-    param([string]$SourceTaskDir, [string]$TargetSchedTasksDir, [switch]$IsDryRun)
-    $deployed = @()
-    if (-not (Test-Path -LiteralPath $SourceTaskDir)) { return $deployed }
-    $taskName = Split-Path -Leaf $SourceTaskDir
-    $files = Get-ChildItem -LiteralPath $SourceTaskDir -Filter "*.md" -File
-    foreach ($file in $files) {
-        $dest = Join-Path (Join-Path $TargetSchedTasksDir $taskName) $file.Name
-        if ($IsDryRun) {
-            Write-Host "[dry-run] $($file.FullName) -> $dest"
-        } else {
-            $body = Read-Utf8NoBom -Path $file.FullName
-            # Ensure ~/.claude/scheduled-tasks/<name>/ exists before writing; the
-            # task subdir is absent on first deploy and Write-Utf8NoBom does not
-            # create parents (same ensure as Copy-Template above).
-            $destDir = Split-Path -Parent $dest
-            if (-not (Test-Path $destDir)) {
-                New-Item -ItemType Directory -Force -Path $destDir | Out-Null
-            }
-            Write-Utf8NoBom -Path $dest -Content $body
-            Write-Host "[apply] $($file.FullName) -> $dest"
-        }
-        $deployed += $dest
-    }
-    return $deployed
-}
-
 # Cleanup-orphan-processes scheduled task (Global mode, opt-in only -- ADR-0011)
 # The cleanup skill and /cleanup-processes command always ship (generic skill /
 # command loops above). The hourly scheduled-task spec is heavier-handed (auto
@@ -446,6 +422,11 @@ if ($mode -eq "Global" -and -not $DisableInsights) {
 } elseif ($mode -eq "Global") {
     Write-Host "[skip] usage-insights not deployed (-DisableInsights)."
 }
+
+# Branch-protection ruleset scheduled task (Global mode, opt-in; read-only check).
+. (Join-Path (Join-Path $PSScriptRoot "lib") "branch-protection.ps1")
+$appliedFiles += Copy-BranchProtectionTask -Mode $mode -TemplatesRoot $templatesRoot `
+    -TargetRoot $markerRoot -Enabled:$EnableBranchProtectionSchedule -IsDryRun:$DryRun
 
 # Write marker file
 if (-not $DryRun) {
