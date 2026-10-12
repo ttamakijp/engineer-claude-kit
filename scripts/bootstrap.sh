@@ -33,7 +33,30 @@ install_pwsh_macos() {
 }
 
 install_pwsh_linux() {
-    if command -v apt-get &>/dev/null; then
+    if command -v pacman &>/dev/null; then
+        # Arch / Manjaro. PowerShell is AUR-only; prefer an AUR helper when present,
+        # otherwise fall back to a rootless install of the official Microsoft tarball
+        # under ~/.local (no pacman, no root required).
+        echo "[info] Installing PowerShell on Arch..."
+        if command -v yay &>/dev/null; then
+            yay -S --needed --noconfirm powershell-bin
+        elif command -v paru &>/dev/null; then
+            paru -S --needed --noconfirm powershell-bin
+        else
+            echo "[info] No AUR helper found; installing official tarball under ~/.local..."
+            PWSH_VER="7.6.3"
+            PWSH_DIR="$HOME/.local/opt/powershell/$PWSH_VER"
+            PWSH_URL="https://github.com/PowerShell/PowerShell/releases/download/v${PWSH_VER}/powershell-${PWSH_VER}-linux-x64.tar.gz"
+            TMP_TGZ="$(mktemp /tmp/powershell.XXXXXX.tar.gz)"
+            curl -fsSL "$PWSH_URL" -o "$TMP_TGZ"
+            mkdir -p "$PWSH_DIR" "$HOME/.local/bin"
+            tar -xzf "$TMP_TGZ" -C "$PWSH_DIR"
+            rm -f "$TMP_TGZ"
+            chmod +x "$PWSH_DIR/pwsh"
+            ln -sf "$PWSH_DIR/pwsh" "$HOME/.local/bin/pwsh"
+            echo "[ok] pwsh installed to $HOME/.local/bin/pwsh (ensure ~/.local/bin is on PATH)"
+        fi
+    elif command -v apt-get &>/dev/null; then
         # Debian / Ubuntu
         echo "[info] Installing PowerShell via apt..."
         DISTRO_VERSION="$(lsb_release -rs 2>/dev/null || echo '22.04')"

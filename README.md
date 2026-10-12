@@ -142,8 +142,83 @@ bootstrap 実行後、以下の 2 層構造で配置される。
 |   |-- resume.md             # /resume state からの再開
 |   |-- install-skill.md      # /install-skill <name> (global skill を project へ)
 |   `-- cleanup-processes.md  # /cleanup-processes 孤立プロセス掃除 (ADR-0011)
+|-- rules/                    # user-level rules。全プロジェクトに適用 (ADR-0015)
+|   `-- <rule-id>.md          # source/rules/ から build。paths 付きは該当ファイル編集時のみロード
+|-- insights/                 # usage insights + rule 遵守率 baseline (ADR-0014 / ADR-0015)
+|-- backups/                  # apply が上書きしたファイルの退避 + restore-manifest.json
 `-- state/                    # checkpoint state (.gitignore)
 ```
+
+#### rules の配置先と二重ロード
+
+Claude Code は rules を 2 箇所から読みます。`~/.claude/rules/` は **machine 上の
+全プロジェクト**に、`<project>/.claude/rules/` は当該プロジェクトにのみ適用され、
+user-level が先にロードされます。**どちらも他方を上書きしません。**
+
+- `apply-claude-kit.ps1 -Global` → `~/.claude/rules/` に配置 (通常はこちら)
+- `apply-claude-kit.ps1 -Project <path>` → `<project>/.claude/rules/` に配置
+  (team に source control 経由で配る場合)
+
+同じ rule を両方に配置すると **同一内容が 2 回 context に載ります**。Project mode は
+`~/.claude/rules/` に同名 rule が既にある場合に警告を出すので、どちらか一方に
+統一してください (project 側を消すには `<project>/.claude/rules/` を削除)。
+
+frontmatter の `paths` を持つ rule は、Claude が該当パターンのファイルを
+Read / Write / Edit したときにのみロードされます。`paths` の無い rule は無条件に
+ロードされます (ADR-0015)。
+
+#### statusline の EOD 表示
+
+`templates/statusline.ps1` は context % の色分け (ADR-0012) に加えて、終業時刻が
+近いと `EOD <HH:MM>` を表示します (ADR-0015)。
+
+```
+[Opus 5] 42% context  engineer-claude-kit git:main  EOD 17:30
+```
+
+- 終業 `warning_window_minutes` 分前以内 → 黄、終業時刻を過ぎている → 赤
+- それ以外の時間帯は**何も表示しません**
+- 終業時刻は `~/.claude/.work-end-today` (当日分、`off` / `skip` / `yaml` も可) を
+  優先し、無ければ `~/.claude/work-schedule.yaml` の曜日別設定を使う。両方無ければ
+  非表示 (時刻を推測しない)
+- 時刻比較・marker 読込・window 判定は**すべてスクリプト**が行います。Claude 側の
+  rule は「`EOD` が出ていたら大きな作業の前に一言確認する」だけです
+
+#### /apply の skill ヒント
+
+`apply-claude-kit.ps1 -Project <path>` は最後に project type を検出し、関連 skill を
+1 回だけ表示します (ADR-0015)。該当なし・全 skill が無関係なら無表示です。
+
+```
+[hint] Detected project type(s): android, web-node
+       Relevant skills available here: android-build, web-test
+```
+
+検出ルールは `config/recommended-skills.yaml` で定義します (project root 直下の
+glob のみを見るため、`node_modules/package.json` は Node project と判定しません)。
+
+#### rule 本文と読み物の分離
+
+rule 本文は **要件 / Do / Don't / 例外** の 4 節に揃えてあります。手順・対応表・根拠は
+`docs/` 以下の読み物に分離し、rule からは**素のパスで言及**するだけにしています
+(ADR-0015 §B-2)。
+
+| rule | 分離先 |
+|---|---|
+| `commit-convention.md` | [docs/setup/git-workflow.md](docs/setup/git-workflow.md) |
+| `security-mobile.md` | [docs/rules/security-mobile-reference.md](docs/rules/security-mobile-reference.md) |
+
+`@import` では繋いでいません。import したファイルも launch 時にロードされるため、
+context 削減の効果がゼロになります (Claude Code 公式仕様)。Claude は必要なときに
+`Read` すれば足ります。
+
+#### 上書き時の backup
+
+apply は既存ファイルを上書きする前に、内容が異なる場合のみ
+`~/.claude/backups/<timestamp>/` へ退避し、`restore-manifest.json` に元のパスを
+記録します。`~/.claude/CLAUDE.md` が symlink だった場合は、**リンク先を書き換えず**
+にリンク自体を外して実ファイルに置き換え、リンク先パスを manifest に記録します
+(ADR-0015)。rollback は manifest を見て該当ファイルを戻してください。
 
 ### 1.2 プロジェクト (`<project>/`)
 
@@ -275,6 +350,10 @@ engineer-claude-kit/
 | `scripts/bootstrap.ps1` | ADO clone + `~/.claude` 配布 (entry point) | ✅ Phase 2 |
 | `scripts/apply-claude-kit.ps1` | 配布実装 | ✅ Phase 2 |
 | `scripts/build-rules.ps1` | `source/rules/` -> `.claude/rules/` build | ✅ Phase 2 |
+| `scripts/lib/rules-deploy.ps1` | rule の build + 配布 (Global / Project 両対応、二重ロード警告) | ✅ ADR-0015 |
+| `scripts/lib/link-safety.ps1` | symlink 貫通書込の防止 + 上書き前 backup | ✅ ADR-0015 |
+| `scripts/lib/rule-metrics.ps1` | rule 遵守率の実測と baseline | ✅ ADR-0015 |
+| `scripts/lib/skill-recommend.ps1` | project type 検出と関連 skill ヒント (rule から移管) | ✅ ADR-0015 |
 | `scripts/cost-observe-bedrock.ps1` | AWS Cost Explorer から Bedrock コストを取得し markdown report 生成 | ✅ Phase 3.2 |
 | `scripts/install-deps.ps1` | 必要ツール (gitleaks / gh / node) を winget で一括インストール + PSScriptAnalyzer を Install-Module (非対話) で導入 (既存は skip)。pwsh (PS 7+) は任意で `-InstallPwsh` opt-in (既定は hint のみ、PS 5.1 baseline) | ✅ Phase 4 / Phase 8 |
 | `config/cost-budget.yaml` | Bedrock コスト予算しきい値 | ✅ Phase 3.2 |
@@ -291,7 +370,9 @@ engineer-claude-kit/
 | `scripts/lint.ps1` | PSScriptAnalyzer runner (local + CI 共通、未導入時は非対話で自己 install) | ✅ Phase 4 |
 | `docs/manual-verification/` | kit 効果測定の手動検証手順 (scenario-comparison: 5 軸比較) | ✅ |
 | `docs/manual-verification/bootstrap-installation.md` | bootstrap chain 動作検証手順 (Windows / Claude MAX 環境対応) | ✅ |
-| `docs/adr/` | Architecture Decision Records (現状 0001-0012、§4 ADR Index 参照) | ✅ Phase 1 |
+| `docs/adr/` | Architecture Decision Records (§4 ADR Index 参照) | ✅ Phase 1 |
+| `docs/setup/git-workflow.md` | PR フロー / TDD / Stacked PR / コミット例 (rule から分離した読み物) | ✅ ADR-0015 |
+| `docs/rules/security-mobile-reference.md` | OWASP 対応表 / 根拠 / リポジトリ段階の PII 検出 (同上) | ✅ ADR-0015 |
 | `README.md` (本ファイル) | プロジェクト概要 + 配置構成 + Quick start | ✅ Phase 1 |
 | `LICENSE` / `.gitignore` | リポ初期セット | ✅ Phase 1 |
 

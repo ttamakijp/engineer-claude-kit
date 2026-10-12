@@ -1,12 +1,9 @@
 ---
 id: file-granularity
-title: File granularity rule
-description: Limit per-file line counts to keep AI context efficient and enforce single-responsibility
 audience: [claude]
-priority: high
-applyTo:
-  default: "**/*"
-tags: [code-style, refactor, ai-context]
+paths:
+  - "**/*.{kt,kts,java,swift,ts,tsx,js,jsx,py,go,rs}"
+  - "**/*.{ps1,psm1}"
 ---
 
 # File granularity
@@ -28,12 +25,6 @@ tags: [code-style, refactor, ai-context]
 - 単一ファイルに複数責務 (UI + state + API + permission) を詰め込まない
 - 500 行を超えた状態で PR を出さない
 - 「あとで分割」コメントを残してマージしない (技術的負債化する)
-
-## 根拠
-
-- Claude は grep + 部分 Read で必要部分だけ取得する
-- ファイルが大きいと毎回フル読込が必要になり context 累積が増えコストが線形に膨らむ
-- 1 ファイル 1 責務を維持すると、編集時のピンポイント読込みとテスト単位の明確化が両立する
 
 ## 例外
 

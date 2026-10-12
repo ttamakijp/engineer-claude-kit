@@ -36,4 +36,4 @@ engineer-claude-kit の最新内容を `~/.claude/` (グローバル) または�
 ## 注意
 
 - 既存の `~/.claude/` 内ファイルが上書きされる可能性あり。`--dry-run` で事前確認を推奨
-- Bedrock 環境想定 (Sonnet 4.5 main + Haiku 4.5 small fast の placeholder が substitution される)
+- 本環境は Anthropic 直。`config/models.yaml` のローカル override により main = Opus 5 / small fast = Haiku 4.5 の ID が substitution される

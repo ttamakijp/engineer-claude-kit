@@ -2,7 +2,7 @@
 name: propose-adr
 description: |
   Architecture Decision Record (ADR) draft を起票する skill。
-  architect sub-agent (Sonnet 4.5) で代替案 + 根拠を整理する。
+  architect sub-agent (Opus 5) で代替案 + 根拠を整理する。
 ---
 
 # propose-adr
@@ -23,7 +23,7 @@ description: |
    - **制約** (技術 / 期間 / 既存依存)
    - **関連 ADR / rule / コード** (もしあれば)
 2. `docs/adr/` 配下の既存 ADR 番号を確認し、次の連番を決定
-3. **Task tool** で `architect` sub-agent (Sonnet 4.5) を起動:
+3. **Task tool** で `architect` sub-agent (Opus 5) を起動:
    - 課題 + 制約を渡す
    - 代替案 **最低 2 案** (利点 / 欠点併記) を生成させる
    - 推奨案 + 根拠を生成させる
