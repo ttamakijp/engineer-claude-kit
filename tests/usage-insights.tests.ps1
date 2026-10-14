@@ -380,3 +380,83 @@ Describe "Get-PlainLanguageHint metrics placeholder" {
         (Get-PlainLanguageHint -Category 'KitBehind') | Should Match "\{Behind\}"
     }
 }
+
+Describe "Get-CostTrend history parsing" {
+    # Regression: the history file was read with
+    #   @((Read-Utf8NoBom $p) | ConvertFrom-Json)
+    # and PS 5.1 emits a JSON ARRAY as ONE object instead of enumerating it, so
+    # that expression produced a 1-element array holding the whole list. With 0
+    # entries there is no previous run and with exactly 1 entry ConvertFrom-Json
+    # returns a single object, so the defect only surfaced from the THIRD run on:
+    # $prev became the whole Object[], $prev.totalCost an Object[], and [double]
+    # on it threw "Cannot convert System.Object[] to System.Double", aborting the
+    # whole report over a cosmetic trend line. These cases pin each entry count.
+
+    function New-HistoryDir {
+        param([int]$Entries)
+        $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("ct-test-" + [System.Guid]::NewGuid().ToString("N"))
+        New-Item -ItemType Directory -Force -Path $dir | Out-Null
+        if ($Entries -gt 0) {
+            $rows = @()
+            for ($i = 1; $i -le $Entries; $i++) {
+                $rows += [PSCustomObject]@{ date = ("2026-10-{0:d2}" -f $i); kind = 'weekly'; totalCost = (100.0 * $i) }
+            }
+            Write-Utf8NoBom -Path (Join-Path $dir ".cost-history.json") -Content ($rows | ConvertTo-Json -Depth 4)
+        }
+        return $dir
+    }
+
+    It "reports n/a when no history exists" {
+        $dir = New-HistoryDir -Entries 0
+        $t = Get-CostTrend -OutputDir $dir -Kind 'weekly' -TotalCost 50 -DateStr '2026-10-15' -NoPersist
+        $t | Should Match 'no prior weekly run'
+        Remove-Item -Recurse -Force $dir
+    }
+    It "computes the delta against a single prior entry" {
+        $dir = New-HistoryDir -Entries 1
+        $t = Get-CostTrend -OutputDir $dir -Kind 'weekly' -TotalCost 150 -DateStr '2026-10-15' -NoPersist
+        $t | Should Match '^\+50'
+        Remove-Item -Recurse -Force $dir
+    }
+    It "computes the delta against the LAST of two prior entries (array regression)" {
+        $dir = New-HistoryDir -Entries 2
+        $t = Get-CostTrend -OutputDir $dir -Kind 'weekly' -TotalCost 250 -DateStr '2026-10-15' -NoPersist
+        # Last entry is 200.0, so the delta must be +50 -- not a cast failure and
+        # not a comparison against the first entry.
+        $t | Should Match '^\+50'
+        $t | Should Match '2026-10-02'
+        Remove-Item -Recurse -Force $dir
+    }
+    It "computes the delta against the last of many prior entries" {
+        $dir = New-HistoryDir -Entries 5
+        $t = Get-CostTrend -OutputDir $dir -Kind 'weekly' -TotalCost 400 -DateStr '2026-10-15' -NoPersist
+        $t | Should Match '^-100'
+        $t | Should Match '2026-10-05'
+        Remove-Item -Recurse -Force $dir
+    }
+    It "ignores entries of a different kind" {
+        $dir = New-HistoryDir -Entries 2
+        $t = Get-CostTrend -OutputDir $dir -Kind 'daily' -TotalCost 10 -DateStr '2026-10-15' -NoPersist
+        $t | Should Match 'no prior daily run'
+        Remove-Item -Recurse -Force $dir
+    }
+    It "degrades to n/a instead of throwing on a malformed entry" {
+        $dir = New-HistoryDir -Entries 0
+        Write-Utf8NoBom -Path (Join-Path $dir ".cost-history.json") `
+            -Content '[{"date":"2026-10-01","kind":"weekly","totalCost":"not-a-number"}]'
+        $t = Get-CostTrend -OutputDir $dir -Kind 'weekly' -TotalCost 10 -DateStr '2026-10-15' -NoPersist
+        $t | Should Match 'n/a'
+        Remove-Item -Recurse -Force $dir
+    }
+    It "appends to history and keeps all prior entries readable" {
+        $dir = New-HistoryDir -Entries 2
+        $null = Get-CostTrend -OutputDir $dir -Kind 'weekly' -TotalCost 300 -DateStr '2026-10-15'
+        $written = @()
+        ((Read-Utf8NoBom -Path (Join-Path $dir ".cost-history.json")) | ConvertFrom-Json) | ForEach-Object { $written += $_ }
+        $written.Count | Should Be 3
+        # The next run must see the appended entry, not choke on the longer array.
+        $t = Get-CostTrend -OutputDir $dir -Kind 'weekly' -TotalCost 350 -DateStr '2026-10-16' -NoPersist
+        $t | Should Match '^\+50'
+        Remove-Item -Recurse -Force $dir
+    }
+}

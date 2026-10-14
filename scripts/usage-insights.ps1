@@ -350,14 +350,36 @@ function Get-CostTrend {
     $historyPath = Join-Path $OutputDir ".cost-history.json"
     $history = @()
     if (Test-Path -LiteralPath $historyPath) {
-        try { $history = @((Read-Utf8NoBom -Path $historyPath) | ConvertFrom-Json) } catch { $history = @() }
+        # PS 5.1 gotcha: ConvertFrom-Json emits a JSON ARRAY as one object rather
+        # than enumerating it, so @(... | ConvertFrom-Json) yields a 1-element
+        # array holding the whole list. ForEach-Object forces real enumeration.
+        #
+        # Without this the bug stayed invisible for two runs and then broke the
+        # third: with 0 entries there is no previous run, with exactly 1 entry
+        # ConvertFrom-Json returns a single object (so the wrap happens to be
+        # correct), and from 2 entries on $prev became the whole Object[] --
+        # making $prev.totalCost an Object[] and [double] on it throw
+        # "Cannot convert System.Object[] to System.Double", which aborted the
+        # entire run over a cosmetic trend line.
+        try {
+            $parsed = (Read-Utf8NoBom -Path $historyPath) | ConvertFrom-Json
+            if ($null -ne $parsed) { $parsed | ForEach-Object { $history += $_ } }
+        } catch {
+            $history = @()
+        }
     }
     $prev = @($history | Where-Object { $_.kind -eq $Kind }) | Select-Object -Last 1
     $trend = "n/a (no prior $Kind run)"
     if ($prev) {
-        $delta = $TotalCost - [double]$prev.totalCost
-        $sign = if ($delta -ge 0) { "+" } else { "-" }
-        $trend = "$sign$([math]::Abs([math]::Round($delta, 4))) vs prev $Kind ($($prev.date))"
+        # The trend is decoration. A malformed history entry must never abort the
+        # report, so a failed cast degrades to "n/a" instead of throwing.
+        try {
+            $delta = $TotalCost - [double]$prev.totalCost
+            $sign = if ($delta -ge 0) { "+" } else { "-" }
+            $trend = "$sign$([math]::Abs([math]::Round($delta, 4))) vs prev $Kind ($($prev.date))"
+        } catch {
+            $trend = "n/a (prior $Kind entry unreadable)"
+        }
     }
     if (-not $NoPersist) {
         $history += [PSCustomObject]@{ date = $DateStr; kind = $Kind; totalCost = $TotalCost }
