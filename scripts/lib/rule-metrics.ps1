@@ -64,30 +64,57 @@ function Get-CommitSubject {
     param([string]$Command)
 
     if (-not $Command) { return $null }
-    if ($Command -notmatch $script:RuleMetricsGitCommitPattern) { return $null }
 
-    # -m "subject" / -m 'subject'. The character class excludes newlines on
-    # purpose: [^"] runs happily past the end of the line and swallows a whole
-    # heredoc body, which turned conforming commits into apparent violations on
-    # the 'git commit -m "$(cat <<TAG ... )"' form.
-    $inline = $null
-    if ($Command -match 'git\s+commit[^\r\n]*?-m\s+"([^"\r\n]+)"') { $inline = $Matches[1] }
-    elseif ($Command -match "git\s+commit[^\r\n]*?-m\s+'([^'\r\n]+)'") { $inline = $Matches[1] }
-
-    # A capture that only opens a command substitution is not the subject; the
-    # real subject is the first line of the heredoc it reads from, handled below.
-    if ($inline -and $inline -notmatch '^\s*\$\(') { return $inline }
-
-    # Multi-line forms where the message arrives on stdin or through a heredoc
-    # ('-F -', or -m "$(cat <<TAG ...)"): the subject is the first non-empty line
-    # after the line that launches git commit.
     $lines = $Command -split "`r?`n"
+
+    # Mark every line that sits inside a heredoc body. A report or an ADR written
+    # through a heredoc routinely contains the words "git commit", and treating
+    # such prose as an invocation produced subjects like
+    # "| | #25 rationale | conclusion |".
+    $inBody = @{}
+    $openTag = $null
     for ($i = 0; $i -lt $lines.Count; $i++) {
-        if ($lines[$i] -match $script:RuleMetricsGitCommitPattern) {
-            for ($j = $i + 1; $j -lt $lines.Count; $j++) {
-                if ($lines[$j].Trim()) { return $lines[$j].Trim() }
-            }
-            break
+        if ($openTag) {
+            if ($lines[$i].Trim() -eq $openTag) { $openTag = $null } else { $inBody[$i] = $true }
+            continue
+        }
+        if ($lines[$i] -match '<<-?\s*[''"]?([A-Za-z_][A-Za-z0-9_]*)[''"]?') { $openTag = $Matches[1] }
+    }
+
+    # Locate the first real invocation. Scoping everything below to THIS line
+    # matters: searching the whole command for -m picked up an unrelated later
+    # 'git commit -m "x"' and reported "x" as the subject of the first commit.
+    $cmdLine = -1
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($inBody.ContainsKey($i)) { continue }
+        if ($lines[$i] -match $script:RuleMetricsGitCommitPattern) { $cmdLine = $i; break }
+    }
+    if ($cmdLine -lt 0) { return $null }
+    $line = $lines[$cmdLine]
+
+    # -m "subject" / -m 'subject'. The message may be multi-line, in which case
+    # the closing quote is on a later line and the SUBJECT is the remainder of
+    # this one. The previous newline-anchored pattern required the closing quote
+    # on the same line, so every multi-line -m fell through to the heredoc branch
+    # and reported a body paragraph instead.
+    if ($line -match 'git\s+commit\b[^\r\n]*?\s-m\s+(["''])(.*)$') {
+        $quote = $Matches[1]
+        $rest = $Matches[2]
+        $end = $rest.IndexOf($quote)
+        $subject = if ($end -ge 0) { $rest.Substring(0, $end) } else { $rest }
+        $subject = $subject.Trim()
+        # '$(' only opens a command substitution; the real subject is the first
+        # line of the heredoc it reads from, handled next.
+        if ($subject -and $subject -notmatch '^\s*\$\(') { return $subject }
+    }
+
+    # Message fed through a heredoc on this line ('-F -' or -m "$(cat <<TAG").
+    # Requiring '<<' here is the point: 'git commit -F <path>' and a bare '-F -'
+    # fed by a pipe carry no subject in the command text, and guessing from the
+    # next line returned the next shell command ("git log --oneline -1").
+    if ($line -match '<<') {
+        for ($j = $cmdLine + 1; $j -lt $lines.Count; $j++) {
+            if ($lines[$j].Trim()) { return $lines[$j].Trim() }
         }
     }
     return $null
@@ -99,11 +126,20 @@ function Get-RuleMetrics {
     # Returns an ordered hashtable; Eligible counts of 0 yield a rate of 0.0 and
     # an Available flag of $false so the report can say "not exercised" rather
     # than implying 0% adherence.
+    # -ProjectFilter narrows the aggregation to sessions whose Cwd contains the
+    # given text, so one repository's adherence can be read on its own. The
+    # all-projects average hides composition shifts: in the 2026-10-16 window two
+    # unrelated repositories supplied 90% of the rows, and the resulting swing
+    # looked like a drop in adherence.
     param(
-        [Parameter(Mandatory)][AllowEmptyCollection()]$Entries
+        [Parameter(Mandatory)][AllowEmptyCollection()]$Entries,
+        [string]$ProjectFilter
     )
 
     $meta = @($Entries | Where-Object { $_.Role -eq 'meta' })
+    if ($ProjectFilter) {
+        $meta = @($meta | Where-Object { [string]$_.Cwd -and ([string]$_.Cwd).Contains($ProjectFilter) })
+    }
 
     # ---- M1: plan-first rate (CLAUDE.md section 2) ----
     # For each real user prompt, reconstruct the first logical turn that follows
@@ -445,6 +481,10 @@ function New-RuleMetricsRow {
         Kind         = $kind
         Timestamp    = $Timestamp
         SessionId    = [string]$Obj.sessionId
+        # Working directory of the session. Without it the metrics are a single
+        # all-projects average, and a window where one repository dominates
+        # cannot be told apart from a real change in adherence.
+        Cwd          = [string]$Obj.cwd
         RequestId    = [string]$Obj.requestId
         BlockIndex   = [int]($Obj.apiBlockIndex | ForEach-Object { if ($_) { $_ } else { 0 } })
         IsSidechain  = [bool]$Obj.isSidechain
