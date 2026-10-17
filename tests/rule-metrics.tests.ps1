@@ -240,28 +240,50 @@ Describe "Get-RuleMetrics M1 plan-first" {
 }
 
 Describe "Get-RuleMetrics M2 delegation" {
-    It "counts git commit calls and large outputs as eligible" {
+    # The denominator is large outputs ONLY. git commit calls counted while
+    # CLAUDE.md told the model to always delegate commit messages; that guidance
+    # was withdrawn once the cost was measured (delegating costs $0.082-0.120 per
+    # launch against $0.023-0.060 to write it in main), so scoring against it
+    # would reward a behaviour the kit no longer asks for.
+    It "counts only large outputs as eligible" {
         $rows = @(
             (New-MetaRow -BlockType 'tool_use' -ToolName 'Bash' -BashCommand 'git commit -m "chore: x"'),
             (New-MetaRow -Kind 'user' -RequestId '' -ResultChars 12000)
         )
         $m = Get-RuleMetrics -Entries $rows
-        $m.DelegationCommitEligible | Should Be 1
         $m.DelegationLogEligible | Should Be 1
-        $m.DelegationEligible | Should Be 2
+        $m.DelegationEligible | Should Be 1
         $m.DelegationHits | Should Be 0
         $m.DelegationRate | Should Be 0.0
     }
-    It "counts a sub-agent launch under either tool name" {
+    It "still reports the git-commit count so an older figure can be recomputed" {
+        $rows = @((New-MetaRow -BlockType 'tool_use' -ToolName 'Bash' -BashCommand 'git commit -m "chore: x"'))
+        $m = Get-RuleMetrics -Entries $rows
+        $m.DelegationCommitEligible | Should Be 1
+        $m.DelegationEligible | Should Be 0
+    }
+    It "counts a recommended sub-agent under either tool name" {
         $rows = @(
-            (New-MetaRow -BlockType 'tool_use' -ToolName 'Agent' -SubagentType 'commit-msg'),
+            (New-MetaRow -BlockType 'tool_use' -ToolName 'Agent' -SubagentType 'log-summary'),
+            (New-MetaRow -Kind 'user' -RequestId '' -ResultChars 12000),
             (New-MetaRow -BlockType 'tool_use' -ToolName 'Task'  -SubagentType 'log-summary'),
-            (New-MetaRow -BlockType 'tool_use' -ToolName 'Bash'  -BashCommand 'git commit -m "chore: x"')
+            (New-MetaRow -Kind 'user' -RequestId 'r9' -ResultChars 12000)
         )
         $m = Get-RuleMetrics -Entries $rows
         $m.DelegationHits | Should Be 2
-        $m.DelegationByAgent['commit-msg'] | Should Be 1
-        $m.DelegationByAgent['log-summary'] | Should Be 1
+        $m.DelegationByAgent['log-summary'] | Should Be 2
+    }
+    # commit-msg / lint-helper still ship for deliberate use, so their launches
+    # are tracked on their own rather than disappearing into "other".
+    It "tracks a no-longer-recommended sub-agent separately from the rate" {
+        $rows = @(
+            (New-MetaRow -BlockType 'tool_use' -ToolName 'Agent' -SubagentType 'commit-msg'),
+            (New-MetaRow -BlockType 'tool_use' -ToolName 'Agent' -SubagentType 'lint-helper')
+        )
+        $m = Get-RuleMetrics -Entries $rows
+        $m.DelegationLegacy | Should Be 2
+        $m.DelegationHits | Should Be 0
+        $m.DelegationOther | Should Be 0
     }
     It "records a non-Haiku sub-agent separately" {
         $rows = @((New-MetaRow -BlockType 'tool_use' -ToolName 'Agent' -SubagentType 'architect'))
