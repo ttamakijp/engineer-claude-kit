@@ -42,7 +42,6 @@ cache modifier: write 5m = 1.25x base, write 1h = 2.0x base, read = 0.1x base.
 |---|--:|--:|
 | (1) Bedrock デフォルト (Sonnet 4.6 + 5m TTL + Haiku) | $64.63 | 基準 |
 | (2) Sonnet 4.5 + 1h TTL + Haiku | $60.31 | −6.7% |
-| (3) (2) + engineer-claude-kit | $60.31 + α | −6.7% + α |
 
 cache の 94% が warm hit のため 1h TTL の追加価値は限定的。
 
@@ -52,7 +51,11 @@ cache の 94% が warm hit のため 1h TTL の追加価値は限定的。
 |---|--:|--:|
 | (1) Bedrock デフォルト (Sonnet 4.6 + 5m TTL + Haiku) | $310.02 | 基準 |
 | (2) Sonnet 4.5 + 1h TTL + Haiku | $60.31 | **−80.5%** |
-| (3) (2) + engineer-claude-kit | $60.31 + α | **−80.5% + α** |
+
+> kit を入れた構成 ((2) + engineer-claude-kit) は、以前この表に
+> 「$60.31 + α / −80.5% + α」として載せていた。α は定義も測定もされておらず、
+> cost の表に未測定の値を置くと数字が一人歩きするため削除した。kit の付加価値は
+> cost ではなく運用の自動化と構造的保護であり、README の対応表で説明している。
 
 (1) は cache_read 96.7M が全て miss 化 → 96.7M × $3/M = $290 が input cost として上乗せされる。
 (2) は 1h TTL により cache hit 継続、(1) との差が劇的に開く。

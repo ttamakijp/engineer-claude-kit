@@ -18,13 +18,25 @@ git clone <repository-url> "$env:USERPROFILE\.claude-kit"
 Bedrock のデフォルト設定は **会話 bot 向け**に最適化されており、
 engineering 用途 (turn 間隔 5-15min) では prompt cache が毎 turn 切れて高コストになります。
 
-実測 workload (1 日 432 turn / 44 session) を Bedrock 上の 3 構成で比較:
+**効果の中身**: turn 間隔が 5 分を超えると 5m TTL の cache は毎 turn 切れ、その都度
+input 全体を再課金します。**1h TTL はこの再課金を消します。**
 
-| 構成 | engineering 想定 cost | 削減率 |
-|---|--:|--:|
-| Bedrock デフォルト (Sonnet 4.6 / 5m TTL / Haiku) | $310 | 基準 |
-| Sonnet 4.5 + **1h TTL** + Haiku | $60 | **−80%** |
-| 上記 + **engineer-claude-kit** | $60 + 質的改善 | **−80% + α** |
+実測 workload (1 日 432 turn / 44 session) に pricing 概算を当てた試算:
+
+| 構成 | cache 再課金 | 概算 cost |
+|---|---|--:|
+| Bedrock デフォルト (Sonnet 4.6 / 5m TTL / Haiku) | 毎 turn 発生 | 約 $310 |
+| Sonnet 4.5 + **1h TTL** + Haiku | ほぼ発生しない | 約 $60 |
+
+数字の扱いについて:
+
+- **実測なのは workload (turn 数 / session 数) だけです。** 金額は
+  `scripts/pricing.psd1` の概算単価による試算で、billing 照合には使えません
+- 上表は **human-pace (思考しながらの単独セッション、turn 間隔 5-15 分) 前提**です。
+  **orchestration 中心 (子タスク並行) の workload では約 −7% に縮小します**
+  (同一実測データでの試算。cache の 94% が warm hit のため 1h TTL の追加価値が小さい)
+- kit 自体の付加価値は cost ではなく**運用の自動化と構造的保護**です (下表)。
+  測っていない「+α」は数字として書きません
 
 cost 削減の主因 (**1h TTL + Haiku 委譲**) は Anthropic / Bedrock の **設定機能**であり、
 kit はそれを「**1 コマンドで安全に・継続的に・複数 PJ に展開する自動化**」と
@@ -40,9 +52,8 @@ kit はそれを「**1 コマンドで安全に・継続的に・複数 PJ に�
 | stuck process 回収 | 手動監視 | `cleanup-orphan-processes` skill (ADR-0011) |
 | context 使用率可視化 | カスタム実装要 | statusLine 色分け 緑/黄/赤 (ADR-0012) |
 
-> 注: orchestration 中心 (子タスク並行) の workload では削減は **−7%** 程度に縮小。
-> kit の真価は **human-pace** (思考しながらの単独セッション) で発揮されます。
-> 実測詳細・計算根拠・pricing 概算は [docs/cost-analysis.md](docs/cost-analysis.md) を参照。
+> 実測 workload の内訳、2 つの pace での試算、計算根拠、pricing 概算の前提は
+> [docs/cost-analysis.md](docs/cost-analysis.md) を参照。
 
 ## 0. はじめに — Claude Code が初めての方へ
 
