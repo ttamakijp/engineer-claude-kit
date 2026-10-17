@@ -142,3 +142,76 @@ Describe "Remove-LinkOnly" {
         Remove-Item -Recurse -Force $dir
     }
 }
+
+Describe "Resolve-ReparsePath" {
+    # An elevated process cannot traverse a junction a non-administrator created
+    # ("untrusted mount point" / the redirection-trust mitigation). A user who
+    # shares ~/.claude/skills across machines through a OneDrive junction could
+    # therefore not run an elevated apply at all: the write failed on traversal,
+    # not on permissions. Writing to the resolved target reaches the same bytes.
+    #
+    # Creating a junction needs no elevation (mklink /J), so these tests build a
+    # real one when cmd.exe is available and assert the identity cases otherwise.
+    $script:CanJunction = $false
+    $script:JunctionRoot = $null
+    $cmdExe = Join-Path $env:SystemRoot 'System32\cmd.exe'
+    if (Test-Path -LiteralPath $cmdExe) {
+        $root = Join-Path ([System.IO.Path]::GetTempPath()) ("rp-" + [System.Guid]::NewGuid().ToString("N"))
+        New-Item -ItemType Directory -Force -Path (Join-Path $root "real") | Out-Null
+        $link = Join-Path $root "link"
+        & $cmdExe /c mklink /J "$link" "$(Join-Path $root 'real')" 2>&1 | Out-Null
+        if (Test-Path -LiteralPath $link) {
+            $script:CanJunction = $true
+            $script:JunctionRoot = $root
+        } else {
+            Remove-Item -Recurse -Force $root -ErrorAction SilentlyContinue
+        }
+    }
+
+    It "returns a plain path unchanged" {
+        $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("rp-plain-" + [System.Guid]::NewGuid().ToString("N"))
+        New-Item -ItemType Directory -Force -Path $dir | Out-Null
+        (Resolve-ReparsePath -Path $dir) | Should Be ([System.IO.Path]::GetFullPath($dir))
+        Remove-Item -Recurse -Force $dir
+    }
+    It "returns a non-existent path unchanged" {
+        $p = Join-Path ([System.IO.Path]::GetTempPath()) "rp-absent-xyz\deeper"
+        (Resolve-ReparsePath -Path $p) | Should Be ([System.IO.Path]::GetFullPath($p))
+    }
+    It "substitutes a directory junction with its target" {
+        if (-not $script:CanJunction) {
+            # mklink unavailable: nothing to assert beyond the identity cases.
+            $true | Should Be $true
+        } else {
+            $link = Join-Path $script:JunctionRoot "link"
+            $real = Join-Path $script:JunctionRoot "real"
+            (Resolve-ReparsePath -Path $link) | Should Be $real
+        }
+    }
+    It "keeps trailing segments after the substitution" {
+        if (-not $script:CanJunction) {
+            $true | Should Be $true
+        } else {
+            $link = Join-Path (Join-Path $script:JunctionRoot "link") "skill\SKILL.md"
+            $expected = Join-Path (Join-Path $script:JunctionRoot "real") "skill\SKILL.md"
+            (Resolve-ReparsePath -Path $link) | Should Be $expected
+        }
+    }
+    It "leaves a FILE reparse point alone (that is the CLAUDE.md symlink case)" {
+        # Only directories are resolved; a linked file is handled by unlinking
+        # instead (Get-LinkState / Remove-LinkOnly).
+        $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("rp-file-" + [System.Guid]::NewGuid().ToString("N"))
+        New-Item -ItemType Directory -Force -Path $dir | Out-Null
+        $f = Join-Path $dir "plain.md"
+        Write-Utf8NoBom -Path $f -Content "x"
+        (Resolve-ReparsePath -Path $f) | Should Be ([System.IO.Path]::GetFullPath($f))
+        Remove-Item -Recurse -Force $dir
+    }
+
+    if ($script:JunctionRoot -and (Test-Path $script:JunctionRoot)) {
+        # Remove the link first so the cleanup cannot recurse into the target.
+        $l = Join-Path $script:JunctionRoot "link"
+        if (Test-Path -LiteralPath $l) { [System.IO.Directory]::Delete($l, $false) }
+        Remove-Item -Recurse -Force $script:JunctionRoot -ErrorAction SilentlyContinue
+    }
+}
