@@ -210,6 +210,12 @@ $sourceAgentsDir = Join-Path $templatesRoot "agents"
 $sourceSkillsDir = Join-Path $templatesRoot "skills"
 $sourceCommandsDir = Join-Path $templatesRoot "commands"
 
+# Resolve directory junctions in the deploy targets: an elevated process cannot
+# traverse a junction a non-administrator created, which made an elevated apply
+# fail on a OneDrive-shared ~/.claude/skills. See lib/link-safety.ps1.
+Resolve-DeployTargets -VariableNames @('targetAgentsDir', 'targetSkillsDir',
+    'targetCommandsDir', 'targetRulesDir')
+
 $appliedFiles = @()
 
 # One backup directory per apply run, created lazily by New-KitBackup so a run

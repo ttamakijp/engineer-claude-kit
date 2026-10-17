@@ -60,6 +60,77 @@ function Get-LinkState {
     }
 }
 
+function Resolve-ReparsePath {
+    # Rewrite $Path so that any DIRECTORY reparse point along it is replaced by
+    # what it points at. Returns the path unchanged when nothing resolves, so
+    # callers can use it unconditionally.
+    #
+    # Why: an elevated process is blocked from traversing a junction that a
+    # non-administrator created ("untrusted mount point" / the redirection-trust
+    # mitigation). A user who shares ~/.claude/skills across machines through a
+    # OneDrive junction therefore cannot run an elevated apply at all -- the
+    # write fails on traversal, not on permissions. Writing to the resolved
+    # target reaches the same bytes without traversing the link.
+    #
+    # Only directories are resolved. A reparse point that is a FILE is left
+    # alone: that is the ~/.claude/CLAUDE.md symlink case, which Get-LinkState
+    # and Remove-LinkOnly handle by unlinking instead.
+    param([Parameter(Mandatory)][string]$Path)
+
+    if (-not $Path) { return $Path }
+    $full = $Path
+    try { $full = [System.IO.Path]::GetFullPath($Path) } catch { return $Path }
+
+    $root = [System.IO.Path]::GetPathRoot($full)
+    if (-not $root) { return $full }
+    $rest = $full.Substring($root.Length)
+    if (-not $rest) { return $full }
+
+    $current = $root.TrimEnd('\')
+    $segments = @($rest -split '[\\/]' | Where-Object { $_ })
+    $hops = 0
+    foreach ($segment in $segments) {
+        $current = Join-Path $current $segment
+        if (-not (Test-Path -LiteralPath $current)) { continue }
+        $item = Get-Item -LiteralPath $current -Force -ErrorAction SilentlyContinue
+        if (-not $item -or -not $item.PSIsContainer) { continue }
+        if (-not ([int]$item.Attributes -band [int][System.IO.FileAttributes]::ReparsePoint)) { continue }
+
+        $target = $null
+        # Older PS 5.1 builds do not populate Target for every link kind; leaving
+        # the path as-is is the safe outcome there.
+        try { if ($item.Target) { $target = @($item.Target)[0] } } catch { $target = $null }
+        if (-not $target) { continue }
+
+        # A junction pointing at a network location is left alone: resolving it
+        # buys nothing and following it can contact the host it names.
+        if ($target -like '\\\\*') { continue }
+
+        $hops++
+        if ($hops -gt 8) { break }   # cycle guard
+        $current = $target.TrimEnd('\')
+    }
+    return $current
+}
+
+function Resolve-DeployTargets {
+    # Resolve directory links in each named *Dir variable of the CALLER's scope,
+    # reporting every substitution. Kept here rather than inline in
+    # apply-claude-kit.ps1, which sits at the kit's 500-line file-granularity cap.
+    param(
+        [Parameter(Mandatory)][string[]]$VariableNames
+    )
+
+    foreach ($var in $VariableNames) {
+        $before = Get-Variable -Name $var -Scope 1 -ValueOnly -ErrorAction SilentlyContinue
+        if (-not $before) { continue }
+        $after = Resolve-ReparsePath -Path $before
+        if ($after -eq $before) { continue }
+        Write-Host "[link] $before -> $after (resolved; elevated runs cannot traverse the link)"
+        Set-Variable -Name $var -Value $after -Scope 1
+    }
+}
+
 function New-KitBackup {
     # Copy the CONTENT at $Path into <BackupRoot>/<stamp>/<name> and append a
     # restore manifest entry. Reading through a link on purpose: the point of the
