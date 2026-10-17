@@ -22,9 +22,25 @@ fi
 staged_added="$(git diff --cached --no-color --unified=0 | grep '^+' | grep -v '^+++' | sed 's/^+//' || true)"
 
 if [ -n "$staged_added" ]; then
-    # Email addresses
-    if printf '%s\n' "$staged_added" | grep -Eiq '[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}'; then
-        echo "[pre-commit] possible email address in staged changes." >&2
+    # Email addresses.
+    #
+    # Filter by VALUE, not by path. Excluding .mailmap / CODEOWNERS / *.md would
+    # also stop detecting a real address in those files, and docs are exactly
+    # where one tends to get pasted. What actually caused the false positives was
+    # placeholder addresses used as documentation examples, so the reserved
+    # domains of RFC 2606 / RFC 6761 and no-reply senders are dropped first and
+    # everything else still fails the commit.
+    #
+    # The surviving addresses are printed: the previous message named no address,
+    # leaving the author to hunt through the diff for it.
+    email_hits="$(printf '%s\n' "$staged_added" \
+        | grep -Eio '[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}' \
+        | grep -Eiv '@(example\.(com|org|net)|[a-z0-9.-]*\.(invalid|test|localhost)|localhost)$' \
+        | grep -Eiv '^(noreply|no-reply)@|@noreply\.' \
+        | sort -u || true)"
+    if [ -n "$email_hits" ]; then
+        echo "[pre-commit] possible email address in staged changes:" >&2
+        printf '%s\n' "$email_hits" | sed 's/^/           /' >&2
         fail=1
     fi
     # Phone numbers (international / hyphenated, 10+ digits grouped)
