@@ -53,7 +53,11 @@ function Format-InsightsReport {
     # Key findings (first 3-5 lines are what the session-start hint surfaces).
     [void]$sb.AppendLine("## Key findings")
     [void]$sb.AppendLine("")
-    $costLine = if ($Metrics.CostAvailable) { "Est. cost: USD $($Metrics.TotalCost) ($CostTrend)" } else { "Est. cost: unavailable (pricing.psd1 not loaded)" }
+    # The caveat rides on the cost line itself, not only in the Notes section at
+    # the bottom. Key findings is what the session-start hint surfaces (CLAUDE.md
+    # section 9), so a reader who never scrolls that far would otherwise take a
+    # four-figure concept-priced estimate for a real one.
+    $costLine = if ($Metrics.CostAvailable) { "Est. cost: USD $($Metrics.TotalCost) ($CostTrend) -- concept pricing, relative comparison only" } else { "Est. cost: unavailable (pricing.psd1 not loaded)" }
     [void]$sb.AppendLine("- $costLine")
     & $appendHint ($Metrics.CostAvailable -and $costRising) 'CostRising'
     if ($Metrics.CostAvailable) {

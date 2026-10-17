@@ -460,3 +460,65 @@ Describe "Get-CostTrend history parsing" {
         Remove-Item -Recurse -Force $dir
     }
 }
+
+Describe "Format-InsightsReport cost caveat" {
+    # Key findings is what the session-start hint surfaces (CLAUDE.md section 9),
+    # so the "concept pricing" caveat has to ride on the cost line itself. With it
+    # only in the Notes section, a reader who never scrolled saw a four-figure
+    # estimate presented as fact (observed: "Est. cost: USD 5401.6135 (+3462.1007)").
+    $metrics = [ordered]@{
+        WindowTurns = 10; UserPrompts = 5
+        PerModel = @{ Opus = [ordered]@{ Family = 'Opus'; Turns = 10; Input = 1; Output = 1; CacheCreate = 0; CacheRead = 0; Cost = 12.5 } }
+        TotalCost = 12.5; CostAvailable = $true
+        ColdReadPct = 1.0; TotalReadTokens = 10
+        StuckCandidates = @(); HaikuRatePct = 0.0; HaikuTurns = 0
+        WasteScore = 0.0; HeavyTurns = 0; Patterns = @()
+    }
+
+    It "marks the estimate as concept pricing on the cost line" {
+        $report = Format-InsightsReport -Metrics $metrics -Kind 'weekly' -DateStr '2026-10-17' -CostTrend '+1 vs prev weekly (2026-10-10)'
+        $costLine = @($report -split "`r?`n" | Where-Object { $_ -match '^- Est\. cost:' })[0]
+        $costLine | Should Not BeNullOrEmpty
+        $costLine | Should Match 'concept pricing'
+        $costLine | Should Match 'relative comparison only'
+    }
+    It "still reports the amount and the trend" {
+        $report = Format-InsightsReport -Metrics $metrics -Kind 'weekly' -DateStr '2026-10-17' -CostTrend '+1 vs prev weekly (2026-10-10)'
+        $report | Should Match 'USD 12\.5'
+        $report | Should Match 'vs prev weekly'
+    }
+    It "says pricing is unavailable rather than claiming a caveat-free zero" {
+        $noCost = [ordered]@{}
+        foreach ($k in $metrics.Keys) { $noCost[$k] = $metrics[$k] }
+        $noCost['CostAvailable'] = $false
+        $report = Format-InsightsReport -Metrics $noCost -Kind 'weekly' -DateStr '2026-10-17'
+        $report | Should Match 'Est\. cost: unavailable'
+    }
+}
+
+Describe "README cost headline" {
+    # The headline used to read "-80%" with an unmeasured "+ alpha" row, which
+    # presented a pricing projection as a measured result.
+    $readme = [System.IO.File]::ReadAllText((Join-Path (Split-Path -Parent $here) "README.md"))
+
+    It "does not advertise a bare reduction percentage as the headline" {
+        $readme | Should Not Match '\*\*-80%\*\*'
+        $readme | Should Not Match '80% \+ '
+    }
+    It "carries no unmeasured '+ alpha' figure in a cost table" {
+        $readme | Should Not Match '\$60 \+ '
+    }
+    # Assertions stay ASCII (ADR-0003 section C): PS 5.1 parses a BOM-less script
+    # with the host ANSI codepage, so a Japanese literal here breaks the file.
+    It "points at the concept pricing source next to the figures" {
+        $readme | Should Match 'pricing\.psd1'
+        $readme | Should Match 'billing'
+    }
+    It "names the measured quantity (workload) rather than the money" {
+        $readme | Should Match 'workload'
+    }
+    It "keeps the orchestration-pace caveat next to the table" {
+        $readme | Should Match 'orchestration'
+        $readme | Should Match '7%'
+    }
+}
