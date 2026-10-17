@@ -113,3 +113,101 @@ Describe "apply-claude-kit.ps1 Global-mode re-apply" {
 }
 
 if (Test-Path $MockHome) { Remove-Item -Recurse -Force $MockHome -ErrorAction SilentlyContinue }
+
+Describe "Install-KitRules orphan removal" {
+    # Deploy used to be additive only. ADR-0015 deleted
+    # project-skill-recommend.md, but the already-deployed copy (3,554 B, no
+    # paths, so loaded unconditionally) survived the apply and kept inflating the
+    # context the reduction was meant to shrink. Observed on the real machine
+    # after the 2026-10-17 apply: 6 rules / 16,961 B where 5 / 13,407 B was
+    # expected.
+    . (Join-Path $libDir "rules-deploy.ps1")
+
+    function New-RulesFixture {
+        $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("orphan-" + [System.Guid]::NewGuid().ToString("N"))
+        New-Item -ItemType Directory -Force -Path $dir | Out-Null
+        return $dir
+    }
+
+    It "removes a rule the kit shipped before but no longer builds" {
+        $dir = New-RulesFixture
+        $rules = Join-Path $dir "rules"
+        New-Item -ItemType Directory -Force -Path $rules | Out-Null
+        $orphan = Join-Path $rules "gone.md"
+        Write-Utf8NoBom -Path $orphan -Content "# stale"
+        $kept = Join-Path $rules "kept.md"
+        Write-Utf8NoBom -Path $kept -Content "# current"
+
+        Remove-OrphanedKitRules -TargetRulesDir $rules -CurrentApplied @($kept) `
+            -PreviousAppliedFiles @("C:\somewhere\.claude\rules\gone.md", "C:\somewhere\.claude\rules\kept.md") `
+            -BackupRoot (Join-Path $dir "backups") -BackupStamp "s1"
+
+        Test-Path $orphan | Should Be $false
+        Test-Path $kept | Should Be $true
+        Remove-Item -Recurse -Force $dir
+    }
+    It "backs the removed rule up before deleting it" {
+        $dir = New-RulesFixture
+        $rules = Join-Path $dir "rules"
+        New-Item -ItemType Directory -Force -Path $rules | Out-Null
+        Write-Utf8NoBom -Path (Join-Path $rules "gone.md") -Content "# stale content"
+
+        Remove-OrphanedKitRules -TargetRulesDir $rules -CurrentApplied @() `
+            -PreviousAppliedFiles @("C:\x\.claude\rules\gone.md") `
+            -BackupRoot (Join-Path $dir "backups") -BackupStamp "s1"
+
+        $saved = @(Get-ChildItem -LiteralPath (Join-Path $dir "backups") -Recurse -Filter "gone.md" -File)
+        $saved.Count | Should BeGreaterThan 0
+        (Get-Content -LiteralPath $saved[0].FullName -Raw) | Should Match 'stale content'
+        Remove-Item -Recurse -Force $dir
+    }
+    # A hand-written rule was never in applied_files, so it must survive.
+    It "never deletes a rule the kit did not deploy" {
+        $dir = New-RulesFixture
+        $rules = Join-Path $dir "rules"
+        New-Item -ItemType Directory -Force -Path $rules | Out-Null
+        $mine = Join-Path $rules "my-own-rule.md"
+        Write-Utf8NoBom -Path $mine -Content "# user authored"
+
+        Remove-OrphanedKitRules -TargetRulesDir $rules -CurrentApplied @() `
+            -PreviousAppliedFiles @() -BackupRoot (Join-Path $dir "backups") -BackupStamp "s1"
+
+        Test-Path $mine | Should Be $true
+        Remove-Item -Recurse -Force $dir
+    }
+    It "matches on leaf name so a marker from another path still attributes" {
+        $dir = New-RulesFixture
+        $rules = Join-Path $dir "rules"
+        New-Item -ItemType Directory -Force -Path $rules | Out-Null
+        $orphan = Join-Path $rules "gone.md"
+        Write-Utf8NoBom -Path $orphan -Content "# stale"
+
+        Remove-OrphanedKitRules -TargetRulesDir $rules -CurrentApplied @() `
+            -PreviousAppliedFiles @("D:\OTHER\.CLAUDE\RULES\GONE.MD") `
+            -BackupRoot (Join-Path $dir "backups") -BackupStamp "s1"
+
+        Test-Path $orphan | Should Be $false
+        Remove-Item -Recurse -Force $dir
+    }
+    It "removes nothing in dry-run mode" {
+        $dir = New-RulesFixture
+        $rules = Join-Path $dir "rules"
+        New-Item -ItemType Directory -Force -Path $rules | Out-Null
+        $orphan = Join-Path $rules "gone.md"
+        Write-Utf8NoBom -Path $orphan -Content "# stale"
+
+        Remove-OrphanedKitRules -TargetRulesDir $rules -CurrentApplied @() `
+            -PreviousAppliedFiles @("C:\x\.claude\rules\gone.md") `
+            -BackupRoot (Join-Path $dir "backups") -BackupStamp "s1" -IsDryRun
+
+        Test-Path $orphan | Should Be $true
+        Remove-Item -Recurse -Force $dir
+    }
+    It "tolerates a missing rules directory" {
+        $dir = New-RulesFixture
+        Remove-OrphanedKitRules -TargetRulesDir (Join-Path $dir "absent") -CurrentApplied @() `
+            -PreviousAppliedFiles @("C:\x\.claude\rules\gone.md")
+        $true | Should Be $true
+        Remove-Item -Recurse -Force $dir
+    }
+}
