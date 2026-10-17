@@ -20,6 +20,7 @@ function Format-InsightsReport {
         [string]$CostTrend = 'n/a',
         [int]$KitBehind = -1,  # commits behind origin; >0 prepends a banner, <=0 omits it
         $RuleMetrics,          # Get-RuleMetrics output; $null omits the section entirely
+        $ProjectMix,           # Get-ProjectMix output; $null omits the section entirely
         $RuleBaseline          # stored baseline for delta columns; $null omits deltas
     )
     if (-not $DateStr) { $DateStr = (Get-Date).ToString('yyyy-MM-dd') }
@@ -113,6 +114,12 @@ function Format-InsightsReport {
     # so an older caller sees byte-identical output.
     if ($RuleMetrics) {
         [void]$sb.Append((Format-RuleMetricsSection -RuleMetrics $RuleMetrics -Baseline $RuleBaseline))
+    }
+
+    # Immediately after the rates, so the reader sees whose work they describe
+    # before drawing a conclusion from them.
+    if ($null -ne $ProjectMix) {
+        [void]$sb.Append((Format-ProjectMixSection -Mix $ProjectMix))
     }
 
     [void]$sb.AppendLine("## Notes")
