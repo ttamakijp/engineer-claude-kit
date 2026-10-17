@@ -89,6 +89,53 @@ powershell -NoProfile -File scripts/usage-insights.ps1 -Window Weekly -OutputDir
 rule 指標 (`rule-metrics.ps1`)、描画 (`insights-report.ps1`) で責務が分かれています。
 分割の理由は kit 自身の file-granularity 500 行上限です (ADR-0015)。
 
+## apply 後の確認 (ADR-0015 Step 4 の配布確認)
+
+削減版 rule を配布したら、期待どおり減ったかを次の 1 コマンドで確認できます。
+
+```powershell
+powershell -NoProfile -File scripts/apply-claude-kit.ps1 -Global
+```
+
+```powershell
+$c = Join-Path $env:USERPROFILE '.claude'
+"CLAUDE.md : {0} B" -f (Get-Item (Join-Path $c 'CLAUDE.md')).Length
+Get-ChildItem (Join-Path $c 'rules\*.md') | ForEach-Object { "  {0,6} B  {1}" -f $_.Length, $_.Name }
+"rules 合計: {0} B" -f (Get-ChildItem (Join-Path $c 'rules\*.md') | Measure-Object -Sum Length).Sum
+```
+
+### 期待値 (2026-10-17 時点の main)
+
+| | apply 前 (実測) | apply 後 (期待) |
+|---|--:|--:|
+| `CLAUDE.md` | 8,291 B | **3,763 B** |
+| `bilingual-notation.md` | 2,890 B | 1,547 B |
+| `commit-convention.md` | 6,518 B | 3,036 B |
+| `file-granularity.md` | 1,561 B | 1,226 B |
+| `security-mobile.md` | 9,073 B | 6,596 B |
+| `work-end-reminder.md` | 7,784 B | 1,002 B |
+| `project-skill-recommend.md` | 3,554 B | **削除** |
+| **rules 合計** | **31,380 B** | **13,407 B** |
+
+### あわせて確認すること
+
+| 確認項目 | 期待 |
+|---|---|
+| `project-skill-recommend.md` | `~/.claude/rules/` から**消えている** (機能は `/apply` のヒントへ移管) |
+| `paths` を持つ rule | `security-mobile.md` と `file-granularity.md` の 2 件のみ |
+| 常時ロード面 | CLAUDE.md 3,763 + `paths` なし 3 rule (1,547+3,036+1,002) = **9,348 B** |
+| 条件付きロード | `security-mobile` 6,596 + `file-granularity` 1,226 = 7,822 B |
+| backup | `~/.claude/backups/<stamp>/` に旧 CLAUDE.md と差分のある rule が退避され、`restore-manifest.json` に元パスが記録される |
+| statusline | 終業時刻の window 内なら `EOD <HH:MM>` が出る (window 外は無表示が正常) |
+
+Step 1 前の常時ロード面は 40,142 B (当時は `applyTo` が解釈されず全 rule が
+無条件ロード扱いだった) なので、**9,348 B は -77%** に相当します。
+
+### rollback
+
+`~/.claude/backups/<stamp>/restore-manifest.json` が元のパスを保持しています。
+戻すときはそれを見て該当ファイルをコピーし直してください。
+
 ## 取得後にやること
 
 1. `~/.claude/insights/rule-metrics-baseline-<date>.json` が生成されたことを確認
