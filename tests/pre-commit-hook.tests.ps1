@@ -16,18 +16,76 @@ $HookPath = Join-Path (Join-Path (Join-Path $repoRoot "templates") "git-hooks") 
 $MailmapPath = Join-Path (Join-Path $repoRoot "templates") ".mailmap"
 
 $script:BashExe = (Get-Command bash -ErrorAction SilentlyContinue)
+$script:BashAvailable = [bool]$script:BashExe
+
+function Invoke-Native {
+    # Run a native command and return @{ Code; StdOut; StdErr } WITHOUT letting
+    # its stderr reach the PowerShell error stream.
+    #
+    # This matters more than it looks. PowerShell turns every stderr line of a
+    # native command into an ErrorRecord, and GitHub Actions prepends
+    # $ErrorActionPreference = 'stop' to both its powershell and pwsh shells. So
+    # on CI any stderr line became a TERMINATING error inside the It block,
+    # surfacing as "System.Management.Automation.RemoteException". Two entirely
+    # normal lines did it: the hook's own "gitleaks not found, skipping leak
+    # scan" (gitleaks is not installed on the runner) and git's "LF will be
+    # replaced by CRLF" warning. The suite passed locally only because gitleaks
+    # IS installed here and the local runner leaves the preference at Continue.
+    #
+    # Redirecting both streams to files keeps them out of the pipeline entirely,
+    # and the local Continue makes the function safe no matter what the caller's
+    # preference is.
+    param(
+        [Parameter(Mandatory)][string]$FilePath,
+        [string[]]$Arguments = @(),
+        [string]$WorkingDirectory
+    )
+
+    $outFile = [System.IO.Path]::GetTempFileName()
+    $errFile = [System.IO.Path]::GetTempFileName()
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $startArgs = @{
+            FilePath               = $FilePath
+            NoNewWindow            = $true
+            Wait                   = $true
+            PassThru               = $true
+            RedirectStandardOutput = $outFile
+            RedirectStandardError  = $errFile
+        }
+        if ($Arguments.Count -gt 0) { $startArgs['ArgumentList'] = $Arguments }
+        if ($WorkingDirectory) { $startArgs['WorkingDirectory'] = $WorkingDirectory }
+        $proc = Start-Process @startArgs
+        $stdout = ''
+        $stderr = ''
+        if (Test-Path -LiteralPath $outFile) { $stdout = [System.IO.File]::ReadAllText($outFile) }
+        if (Test-Path -LiteralPath $errFile) { $stderr = [System.IO.File]::ReadAllText($errFile) }
+        return @{ Code = $proc.ExitCode; StdOut = $stdout; StdErr = $stderr }
+    } finally {
+        $ErrorActionPreference = $prevEap
+        Remove-Item -Force -LiteralPath $outFile, $errFile -ErrorAction SilentlyContinue
+    }
+}
 
 function Invoke-PreCommitOn {
     # Stage $Content as a file in a fresh repo, run the hook, return
-    # @{ Code = <exit code>; Output = <combined output> }.
+    # @{ Code = <exit code>; Output = <stdout + stderr> }.
+    #
+    # git runs with autocrlf/safecrlf off: the hook inspects the staged diff, not
+    # the checkout, so line-ending translation is irrelevant here and its warning
+    # is pure noise.
     param([string]$Content, [string]$FileName = 'staged.md', [string]$CopyFrom)
 
     $repo = Join-Path ([System.IO.Path]::GetTempPath()) ("pc-test-" + [System.Guid]::NewGuid().ToString("N"))
     New-Item -ItemType Directory -Force -Path $repo | Out-Null
     try {
-        & git init -q $repo 2>&1 | Out-Null
+        $gitConfig = @('-c', 'core.autocrlf=false', '-c', 'core.safecrlf=false')
+        $null = Invoke-Native -FilePath 'git' -Arguments ($gitConfig + @('init', '-q', $repo))
+
         $hooksDir = Join-Path (Join-Path $repo ".git") "hooks"
-        Copy-Item -LiteralPath $HookPath -Destination (Join-Path $hooksDir "pre-commit") -Force
+        $hookDest = Join-Path $hooksDir "pre-commit"
+        Copy-Item -LiteralPath $HookPath -Destination $hookDest -Force
 
         $target = Join-Path $repo $FileName
         if ($CopyFrom) {
@@ -35,26 +93,25 @@ function Invoke-PreCommitOn {
         } else {
             [System.IO.File]::WriteAllText($target, $Content)
         }
-        & git -C $repo add -A 2>&1 | Out-Null
+        $null = Invoke-Native -FilePath 'git' -Arguments ($gitConfig + @('-C', $repo, 'add', '-A'))
 
-        Push-Location $repo
-        try {
-            $out = & bash (Join-Path $hooksDir "pre-commit") 2>&1
-            $code = $LASTEXITCODE
-        } finally {
-            Pop-Location
-        }
-        $text = (@($out) -join "`n")
-        return @{ Code = $code; Output = $text }
+        # The hook reads the staged diff of the repo it runs in, so it must be
+        # launched with the repo as its working directory.
+        $run = Invoke-Native -FilePath $script:BashExe.Source -Arguments @($hookDest) -WorkingDirectory $repo
+        return @{ Code = $run.Code; Output = ($run.StdOut + "`n" + $run.StdErr) }
     } finally {
         if (Test-Path $repo) { Remove-Item -Recurse -Force $repo -ErrorAction SilentlyContinue }
     }
 }
 
 Describe "pre-commit hook: email detection" {
-    if (-not $script:BashExe) {
-        It "requires bash on PATH" { $script:BashExe | Should Not BeNullOrEmpty }
-        return
+    # bash ships with Git for Windows, so it is present both locally and on the
+    # GitHub windows-latest runner. Asserting it rather than returning early from
+    # the Describe block keeps a missing bash a visible failure instead of a
+    # silently empty suite (an early `return` inside Describe is also unreliable
+    # in Pester 3).
+    It "has bash available to run the hook" {
+        $script:BashAvailable | Should Be $true
     }
 
     It "exists" {
