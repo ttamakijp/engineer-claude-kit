@@ -57,6 +57,10 @@ if (-not $env:USERPROFILE) { $env:USERPROFILE = $env:HOME }
 # Loaded after the encoding helper because Write-RuleMetricsBaseline writes via
 # Write-Utf8NoBom. See ADR-0015 section E.
 . (Join-Path (Join-Path $PSScriptRoot "lib") "rule-metrics.ps1")
+# Activity-by-project breakdown (Get-ProjectMix / Format-ProjectMixSection).
+# Publishes which repositories supplied the window so a shift in composition is
+# not mistaken for a change in adherence. See ADR-0015 section E.
+. (Join-Path (Join-Path $PSScriptRoot "lib") "project-mix.ps1")
 # Optional: kit-updater.ps1 (G6b); absent on legacy installs -> banner skipped (ADR-0014 G6h).
 $kitUpdaterPath = Join-Path (Join-Path $PSScriptRoot "lib") "kit-updater.ps1"
 if (Test-Path -LiteralPath $kitUpdaterPath) { try { . $kitUpdaterPath } catch { } }
@@ -438,6 +442,7 @@ function Invoke-UsageInsights {
     $entries = Get-InsightsScope -WindowDays $windowDays -IncludeRuleMetrics
     $metrics = Get-UsageMetrics -Entries $entries -Pricing $pricing
     $ruleMetrics = Get-RuleMetrics -Entries $entries
+    $projectMix = Get-ProjectMix -Entries $entries
 
     if (-not (Test-Path -LiteralPath $OutputDir)) {
         New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
@@ -457,7 +462,7 @@ function Invoke-UsageInsights {
 
     $report = Format-InsightsReport -Metrics $metrics -Kind $kind -DateStr $dateStr `
         -WindowDays $windowDays -CostTrend $trend -KitBehind $kitBehind `
-        -RuleMetrics $ruleMetrics -RuleBaseline $ruleBaseline
+        -RuleMetrics $ruleMetrics -RuleBaseline $ruleBaseline -ProjectMix $projectMix
     $path = Write-InsightsReport -Report $report -Kind $kind -OutputDir $OutputDir -DateStr $dateStr
 
     if ($WriteBaseline) {
