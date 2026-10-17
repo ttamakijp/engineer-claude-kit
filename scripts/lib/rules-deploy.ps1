@@ -67,12 +67,22 @@ function Update-KitRulesBuild {
 function Install-KitRules {
     # Deploy every built rule into $TargetRulesDir. Returns the deployed paths so
     # the caller can record them in the applied-files marker.
+    # -PreviousAppliedFiles is the applied_files list from the marker of the LAST
+    # run. Deploy used to be additive only, so a rule the kit stopped shipping was
+    # left behind and kept loading forever. ADR-0015 deleted
+    # project-skill-recommend.md, yet the deployed copy (3,554 B, no paths, so
+    # unconditional) survived the apply and silently inflated the context the
+    # reduction was supposed to shrink.
+    #
+    # Only files the kit itself deployed last time are removed. A rule the user
+    # wrote by hand was never in applied_files and is reported, never deleted.
     param(
         [Parameter(Mandatory)][string]$KitRoot,
         [Parameter(Mandatory)][string]$TargetRulesDir,
         [Parameter(Mandatory)][string]$Mode,
         [string]$BackupRoot,
         [string]$BackupStamp,
+        [string[]]$PreviousAppliedFiles = @(),
         [switch]$IsDryRun
     )
 
@@ -126,5 +136,60 @@ function Install-KitRules {
         Write-Warning "Keep one copy: delete the project copies, or deploy globally only."
     }
 
+    Remove-OrphanedKitRules -TargetRulesDir $TargetRulesDir -CurrentApplied $applied `
+        -PreviousAppliedFiles $PreviousAppliedFiles -BackupRoot $BackupRoot `
+        -BackupStamp $BackupStamp -IsDryRun:$IsDryRun
+
     return $applied
+}
+
+function Remove-OrphanedKitRules {
+    # Delete rules the kit deployed on a previous run but no longer ships.
+    # Anything else that happens to sit in the directory is reported, not touched.
+    param(
+        [Parameter(Mandatory)][string]$TargetRulesDir,
+        [Parameter(Mandatory)][AllowEmptyCollection()][string[]]$CurrentApplied,
+        [AllowEmptyCollection()][string[]]$PreviousAppliedFiles = @(),
+        [string]$BackupRoot,
+        [string]$BackupStamp,
+        [switch]$IsDryRun
+    )
+
+    if (-not (Test-Path -LiteralPath $TargetRulesDir)) { return }
+
+    # Compare on leaf names: the marker stores absolute paths from the machine it
+    # ran on, which may differ in casing or drive mapping.
+    $currentNames = @{}
+    foreach ($p in $CurrentApplied) { $currentNames[(Split-Path -Leaf $p).ToLowerInvariant()] = $true }
+    $previousNames = @{}
+    foreach ($p in $PreviousAppliedFiles) {
+        if ($p -match '[\\/]rules[\\/]') { $previousNames[(Split-Path -Leaf $p).ToLowerInvariant()] = $true }
+    }
+
+    $unmanaged = @()
+    foreach ($file in (Get-ChildItem -LiteralPath $TargetRulesDir -Filter "*.md" -File)) {
+        $leaf = $file.Name.ToLowerInvariant()
+        if ($currentNames.ContainsKey($leaf)) { continue }
+
+        if ($previousNames.ContainsKey($leaf)) {
+            if ($IsDryRun) {
+                Write-Host "[dry-run] would remove $($file.FullName) (no longer shipped by the kit)"
+            } else {
+                if ($BackupRoot) {
+                    $null = New-KitBackup -Path $file.FullName -BackupRoot $BackupRoot -Stamp $BackupStamp `
+                        -Note "rule removed: the kit no longer ships it"
+                }
+                Remove-Item -LiteralPath $file.FullName -Force
+                Write-Host "[remove] $($file.FullName) (no longer shipped by the kit)"
+            }
+        } else {
+            $unmanaged += $file.Name
+        }
+    }
+
+    if ($unmanaged.Count -gt 0) {
+        Write-Host ("[note] not shipped by this kit and left untouched: " + ($unmanaged -join ", "))
+        Write-Host "       If one of these is a kit rule from an older version, delete it by hand:"
+        Write-Host "       it is loaded into every session as long as it sits there."
+    }
 }

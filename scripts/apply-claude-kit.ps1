@@ -305,8 +305,22 @@ if (Test-Path $sourceCommandsDir) {
 # Claude rules (both modes). Global deploys ~/.claude/rules/, Project deploys
 # <project>/.claude/rules/; see lib/rules-deploy.ps1 for the double-load caveat.
 if ($targetRulesDir) {
+    # Read the previous run's marker BEFORE Write-AppliedMarker overwrites it, so
+    # a rule the kit has stopped shipping can be attributed and removed. Without
+    # this, deploy is additive only and a deleted rule keeps loading forever.
+    $previousApplied = @()
+    $prevMarker = Join-Path $markerRoot ".engineer-claude-kit-applied"
+    if (Test-Path -LiteralPath $prevMarker) {
+        try {
+            $prevJson = (Read-Utf8NoBom -Path $prevMarker) | ConvertFrom-Json
+            if ($prevJson.applied_files) { $prevJson.applied_files | ForEach-Object { $previousApplied += [string]$_ } }
+        } catch {
+            $previousApplied = @()
+        }
+    }
     $appliedFiles += Install-KitRules -KitRoot $KitRoot -TargetRulesDir $targetRulesDir `
-        -Mode $mode -BackupRoot $backupRoot -BackupStamp $backupStamp -IsDryRun:$DryRun
+        -Mode $mode -BackupRoot $backupRoot -BackupStamp $backupStamp `
+        -PreviousAppliedFiles $previousApplied -IsDryRun:$DryRun
 }
 
 # Leak-protection artifacts (Project mode only)
