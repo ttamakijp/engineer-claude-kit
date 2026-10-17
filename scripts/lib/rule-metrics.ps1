@@ -33,8 +33,22 @@
 # read zero on one of them.
 $script:RuleMetricsAgentTools = @('Agent', 'Task')
 
-# Sub-agents that CLAUDE.md section 3.1 designates for mandatory delegation.
-$script:RuleMetricsHaikuAgents = @('commit-msg', 'lint-helper', 'log-summary')
+# Sub-agents whose use CLAUDE.md section 3 actually recommends, i.e. the ones
+# that keep a large input OUT of the main context.
+#
+# commit-msg and lint-helper were here until the delegation cost was measured.
+# They are gone because delegating them is more expensive than doing the work in
+# main: the diff is already in the main context, so the sub-agent shuts nothing
+# out while paying cacheCreate on a cold self-contained prompt (76% of its cost;
+# $0.082-0.120 per launch against $0.023-0.060 to write it directly). Counting
+# them would reward a behaviour the kit no longer asks for.
+# See docs/step-6-items/item-4-subagent-cost-measurement.md.
+$script:RuleMetricsHaikuAgents = @('log-summary')
+
+# Sub-agents the kit ships but no longer recommends by default. Tracked
+# separately so an explicit, deliberate use stays visible instead of being
+# lumped into "other".
+$script:RuleMetricsLegacyHaikuAgents = @('commit-msg', 'lint-helper')
 
 # Shell tools whose command text is inspected for 'git commit'.
 $script:RuleMetricsShellTools = @('Bash', 'PowerShell')
@@ -183,6 +197,7 @@ function Get-RuleMetrics {
     $m2Delegations = @{}
     foreach ($agent in $script:RuleMetricsHaikuAgents) { $m2Delegations[$agent] = 0 }
     $m2Other = 0
+    $m2Legacy = 0
 
     # ---- M3: Conventional Commits adherence (commit-convention rule) ----
     $m3Total = 0; $m3Extracted = 0; $m3Conforming = 0
@@ -195,6 +210,8 @@ function Get-RuleMetrics {
             $sub = [string]$row.SubagentType
             if ($script:RuleMetricsHaikuAgents -contains $sub) {
                 $m2Delegations[$sub] = $m2Delegations[$sub] + 1
+            } elseif ($script:RuleMetricsLegacyHaikuAgents -contains $sub) {
+                $m2Legacy++
             } elseif ($sub) {
                 $m2Other++
             }
@@ -226,7 +243,17 @@ function Get-RuleMetrics {
 
     $m2Hit = 0
     foreach ($agent in $script:RuleMetricsHaikuAgents) { $m2Hit += $m2Delegations[$agent] }
-    $m2Eligible = $m2CommitEligible + $m2LogEligible
+
+    # Denominator is large outputs ONLY. git commit calls used to be included,
+    # from when CLAUDE.md told the model to always delegate commit messages.
+    # Leaving them in after that guidance was withdrawn would score the model
+    # against an instruction it is no longer given, and the rate would appear to
+    # collapse purely because the numerator lost two sub-agents.
+    #
+    # NOTE: this breaks comparability with the snapshots taken before the change.
+    # The commit-eligible count is still reported so an older figure can be
+    # recomputed by hand.
+    $m2Eligible = $m2LogEligible
 
     return [ordered]@{
         Available          = ($meta.Count -gt 0)
@@ -243,6 +270,7 @@ function Get-RuleMetrics {
         DelegationLogEligible    = $m2LogEligible
         DelegationHits     = $m2Hit
         DelegationByAgent  = $m2Delegations
+        DelegationLegacy   = $m2Legacy
         DelegationOther    = $m2Other
         DelegationRate     = (Get-RuleRate -Hits $m2Hit -Eligible $m2Eligible)
 
@@ -325,7 +353,8 @@ function Format-RuleMetricsSection {
         $byAgent += ("$agent=" + $RuleMetrics.DelegationByAgent[$agent])
     }
     [void]$sb.AppendLine("- delegation by sub-agent: $($byAgent -join ', ') (other sub-agents: $($RuleMetrics.DelegationOther))")
-    [void]$sb.AppendLine("- delegation eligibility split: git-commit=$($RuleMetrics.DelegationCommitEligible), large-output=$($RuleMetrics.DelegationLogEligible)")
+    [void]$sb.AppendLine("- no-longer-recommended sub-agents used anyway (commit-msg / lint-helper): $($RuleMetrics.DelegationLegacy)")
+    [void]$sb.AppendLine("- denominator: large outputs only ($($RuleMetrics.DelegationLogEligible)). git-commit calls ($($RuleMetrics.DelegationCommitEligible)) are no longer counted")
     $unextractable = $RuleMetrics.CommitTotal - $RuleMetrics.CommitExtracted
     [void]$sb.AppendLine("- commit subjects: $($RuleMetrics.CommitExtracted) extracted of $($RuleMetrics.CommitTotal) git-commit calls ($unextractable without an inline subject)")
     if ($RuleMetrics.CommitOffenders.Count -gt 0) {
