@@ -100,10 +100,60 @@ DRY RUN: no files written. 23 would be placed, 1 would be skipped.
 | 症状 | 原因 | 対処 |
 |---|---|---|
 | `apply-claude-kit.ps1 not found` | kit が clone されていない / 配置先が標準と異なる | `bootstrap.ps1` で初回 install を実施 ([README §3.1](../../README.md)) |
-| `Refusing to run as Administrator` | 管理者権限で起動した | 通常ユーザ権限で再実行。どうしても必要なら `-AllowElevated` (非推奨、ADR-0008) |
+| `Running as Administrator` | 本当に elevated なセッションで起動した | 通常ユーザ権限で再実行。どうしても必要なら `-AllowElevated` (非推奨、ADR-0008)。詳細は下記 |
 | `... cannot be loaded because running scripts is disabled` | Execution Policy が `Restricted` | `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force` 後に再実行 ([README §3.3](../../README.md)) |
 | Project mode で `<path> is not a git repository` | 指定パスが git repo でない | git repo のルートを指定するか、`git init` 後に再実行 |
 | 文字化け (mojibake) した出力 | 端末 / 読込側の encoding 不一致 | kit は UTF-8 (no BOM) で出力する。PowerShell 5.1 で読む場合の対処は encoding-helper rule / ADR-0007 を参照 |
+
+## 3.1 管理者権限の判定について
+
+### Administrators グループに所属しているだけでは止まりません
+
+よくある誤解ですが、**アカウントが Administrators グループに所属していること自体は
+この検出の条件ではありません。**
+
+UAC が有効な環境では、Administrators グループのユーザがログオンすると Windows は
+**分割トークン**を作ります。通常セッションの limited token には Administrators の
+SID が入っていますが **「拒否のみに使用されるグループ」** としてマークされるため、
+`IsInRole(Administrator)` は `$false` を返します。
+
+実測例 (Administrators 所属アカウント、通常の PowerShell):
+
+```
+integrity level          : Medium (S-1-16-8192)
+BUILTIN\Administrators   : トークンに存在するが「拒否のみに使用されるグループ」
+IsInRole(Administrator)  : False   <- 検出は発火しない
+```
+
+したがって `Running as Administrator` が出た場合、そのセッションは**実際に
+elevated**です (「管理者として実行」で起動した、あるいは親プロセスが elevated)。
+
+メッセージには検出値が出るので、確認に使えます。
+
+```
+Detected: integrity=S-1-16-8192, UAC=enabled
+```
+
+`integrity` が `S-1-16-12288` (High) なら elevated、`S-1-16-8192` (Medium) なら
+通常セッションです。
+
+### UAC を無効化している環境
+
+`EnableLUA = 0` の環境には分割トークンが存在せず、**すべてのセッションが full
+administrator token で動きます**。この場合 `IsInRole` は常に `$true` になり、
+「通常ユーザ権限で再実行してください」は**従うことが不可能な指示**になります。
+
+そのため UAC 無効を検出した場合は **拒否せず警告のみで続行**します
+(`-AllowElevated` と同じ扱い)。`~/.claude/` の owner は Administrators になるため、
+後から UAC を有効化して通常ユーザで実行する場合は、先にそのディレクトリの
+owner を直してください。
+
+### `-AllowElevated` は正式な回避手段です
+
+以下は想定された使い方で、非推奨ではありますが正当です。
+
+- CI / 自動化環境 (GitHub Actions の windows-latest runner は elevated で動作)
+- elevated なセッションしか使えない運用上の制約がある場合
 
 ## 4. 関連
 

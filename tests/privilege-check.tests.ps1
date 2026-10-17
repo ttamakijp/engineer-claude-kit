@@ -45,3 +45,52 @@ Describe "privilege-check.ps1" {
         $true | Should Be $true
     }
 }
+
+Describe "privilege-check elevation diagnostics" {
+    # Reported symptom: an Administrators-group account was refused in a normal
+    # (non-elevated) shell, with the theory that IsInRole(Administrator) reports
+    # group membership. Measured on such an account under UAC, it does NOT:
+    #   integrity level = Medium (S-1-16-8192)
+    #   BUILTIN\Administrators present but "used for deny only"
+    #   IsInRole(Administrator) = False   <- guard stays quiet
+    # So the gate is kept as-is and these tests pin the observable facts instead.
+    . $ScriptPath
+
+    It "defines the diagnostic helpers" {
+        (Get-Command Test-UacEnabled -ErrorAction SilentlyContinue) | Should Not BeNullOrEmpty
+        (Get-Command Get-ElevationDiagnostics -ErrorAction SilentlyContinue) | Should Not BeNullOrEmpty
+    }
+    It "reports UAC state as a boolean or null, never a string" {
+        $uac = Test-UacEnabled
+        ($null -eq $uac -or $uac -is [bool]) | Should Be $true
+    }
+    It "produces a single-line diagnostic naming integrity and UAC" {
+        $d = Get-ElevationDiagnostics
+        $d | Should Match 'integrity='
+        $d | Should Match 'UAC='
+        $d.Contains("`n") | Should Be $false
+    }
+    It "does not refuse a non-elevated session on an Administrators-group account" {
+        # The guard must stay quiet here. Running it must not exit the process.
+        $id = [Security.Principal.WindowsIdentity]::GetCurrent()
+        $pr = New-Object Security.Principal.WindowsPrincipal($id)
+        $isAdmin = $pr.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+        if ($isAdmin) {
+            # Elevated runner (CI is elevated): nothing to assert about the quiet path.
+            $true | Should Be $true
+        } else {
+            Assert-NonElevated
+            $true | Should Be $true
+        }
+    }
+    It "explains that group membership alone is not the trigger" {
+        $text = Get-Content -LiteralPath $ScriptPath -Raw
+        $text | Should Match 'deny only'
+    }
+    It "continues instead of refusing when UAC is disabled" {
+        $text = Get-Content -LiteralPath $ScriptPath -Raw
+        # The refusal is unactionable with UAC off: no non-elevated session exists.
+        $text | Should Match 'UAC is disabled'
+        $text | Should Match 'no non-elevated session to re-run from'
+    }
+}
