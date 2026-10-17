@@ -127,6 +127,50 @@ Describe "Get-CommitSubject" {
         $cmd = $parts -join $script:LF
         (Get-CommitSubject -Command $cmd) | Should Be 'fix(metrics): stop swallowing the heredoc'
     }
+    # The four forms below were all mis-extracted in the 2026-10-16 window and
+    # together accounted for 13 of the 14 apparent commit-convention violations.
+    # See docs/step-6-items/snapshot-2prime-analysis.md.
+    It "reads the heredoc subject when the commit line opens one after git add" {
+        $parts = @(
+            'git add cpp/src/ov_core.h cpp/CMakeLists.txt',
+            "git commit -q -F - <<'EOF'",
+            'perf(cpp): cache the compiled model',
+            '',
+            'body',
+            'EOF'
+        )
+        (Get-CommitSubject -Command ($parts -join $script:LF)) | Should Be 'perf(cpp): cache the compiled model'
+    }
+    It "returns null when the message comes from a file, not a heredoc" {
+        # Guessing the next line here returned the next shell command.
+        $parts = @(
+            'git status --short',
+            'git commit -q -F "C:/tmp/msg.txt"',
+            'git log --oneline -1',
+            'git push -u origin feat/x'
+        )
+        (Get-CommitSubject -Command ($parts -join $script:LF)) | Should BeNullOrEmpty
+    }
+    It "takes the first line of a multi-line -m message" {
+        # The closing quote sits on a later line, so a newline-anchored pattern
+        # found no match and the heredoc branch reported a body paragraph.
+        $parts = @(
+            'cd /c/proj && git add -A && git commit -q -m "test: add a failing case',
+            '',
+            'The second paragraph explains why.',
+            '"'
+        )
+        (Get-CommitSubject -Command ($parts -join $script:LF)) | Should Be 'test: add a failing case'
+    }
+    It "does not borrow -m from a later unrelated git commit" {
+        $parts = @(
+            "git commit -q -F - <<'EOF'",
+            'docs: the real subject',
+            'EOF',
+            'git commit -m "x"'
+        )
+        (Get-CommitSubject -Command ($parts -join $script:LF)) | Should Be 'docs: the real subject'
+    }
     It "never returns a multi-line subject" {
         $parts = @('git commit -F - <<EOF', 'docs: one line only', 'second line', 'EOF')
         $subject = Get-CommitSubject -Command ($parts -join $script:LF)
@@ -253,6 +297,51 @@ Describe "Get-RuleMetrics M3 commit convention" {
         $m.CommitTotal | Should Be 1
         $m.CommitExtracted | Should Be 0
         $m.CommitRate | Should Be 0.0
+    }
+}
+
+Describe "Get-RuleMetrics -ProjectFilter" {
+    # The all-projects average hid a composition shift: in the 2026-10-16 window
+    # two unrelated repositories supplied 90% of the rows while this kit supplied
+    # 3.3%, and the resulting swing was first read as a drop in adherence.
+    function New-CwdRow {
+        param([string]$Cwd, [string]$Sid, [string]$RequestId, [string]$BlockType, [switch]$IsUserPrompt, [int]$OffsetSeconds)
+        $r = New-MetaRow -Kind $(if ($IsUserPrompt) { 'user' } else { 'assistant' }) -Sid $Sid `
+            -RequestId $RequestId -BlockType $BlockType -IsUserPrompt:$IsUserPrompt -OffsetSeconds $OffsetSeconds
+        $r | Add-Member -NotePropertyName Cwd -NotePropertyValue $Cwd -Force
+        return $r
+    }
+
+    $rows = @(
+        # project A: prompt answered with text first (a hit)
+        (New-CwdRow -Cwd 'C:\projA' -Sid 'a1' -RequestId '' -IsUserPrompt -OffsetSeconds 0),
+        (New-CwdRow -Cwd 'C:\projA' -Sid 'a1' -RequestId 'ra' -BlockType 'text' -OffsetSeconds 1),
+        # project B: prompt answered with a tool first (a miss)
+        (New-CwdRow -Cwd 'C:\projB' -Sid 'b1' -RequestId '' -IsUserPrompt -OffsetSeconds 0),
+        (New-CwdRow -Cwd 'C:\projB' -Sid 'b1' -RequestId 'rb' -BlockType 'tool_use' -OffsetSeconds 1)
+    )
+
+    It "aggregates every project by default" {
+        $m = Get-RuleMetrics -Entries $rows
+        $m.PlanFirstEligible | Should Be 2
+        $m.PlanFirstHits | Should Be 1
+        $m.PlanFirstRate | Should Be 50
+    }
+    It "narrows to one project when filtered" {
+        $m = Get-RuleMetrics -Entries $rows -ProjectFilter 'projA'
+        $m.PlanFirstEligible | Should Be 1
+        $m.PlanFirstHits | Should Be 1
+        $m.PlanFirstRate | Should Be 100
+    }
+    It "reports the other project separately" {
+        $m = Get-RuleMetrics -Entries $rows -ProjectFilter 'projB'
+        $m.PlanFirstEligible | Should Be 1
+        $m.PlanFirstHits | Should Be 0
+    }
+    It "flags itself unavailable when the filter matches nothing" {
+        $m = Get-RuleMetrics -Entries $rows -ProjectFilter 'no-such-project'
+        $m.Available | Should Be $false
+        $m.PlanFirstEligible | Should Be 0
     }
 }
 
