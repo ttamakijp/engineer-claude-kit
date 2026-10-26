@@ -56,6 +56,16 @@ function Write-RuleMetricsBaseline {
         CommitRate          = $RuleMetrics.CommitRate
         CommitExtracted     = $RuleMetrics.CommitExtracted
     }
+    # ADR-0016 decision C, appended after the existing keys so an older reader
+    # that indexes by name is unaffected and compare-snapshots.ps1 can treat a
+    # missing key as "this snapshot predates local-llm" rather than as zero.
+    # Written only when the counters are present, so a caller that did not run
+    # Add-RuleMetricsMcpStats produces a byte-identical baseline.
+    if ($null -ne $RuleMetrics.DelegationLocalLlm) {
+        $payload['DelegationLocalLlm'] = [int]$RuleMetrics.DelegationLocalLlm
+        $payload['DelegationLocalLlmProbes'] = [int]$RuleMetrics.DelegationLocalLlmProbes
+        $payload['DelegationLocalLlmByTool'] = $RuleMetrics.DelegationLocalLlmByTool
+    }
     $dir = Split-Path -Parent $Path
     if ($dir -and -not (Test-Path -LiteralPath $dir)) {
         New-Item -ItemType Directory -Force -Path $dir | Out-Null

@@ -6,12 +6,14 @@
 #
 # Functions:
 #   Get-RuleMetrics            - aggregate M1 / M2 / M3 from 'meta' rows
+#   Add-RuleMetricsMcpStats    - fold in lib/mcp-metrics.ps1's local-llm counters
 #   Format-RuleMetricsSection  - render the metrics as a Markdown section
 #   New-RuleMetricsRow         - project one transcript row into the flat shape
 #
 # Split out of this file as it approached the 500-line cap:
 #   lib/commit-subject.ps1  - Get-CommitSubject (commit-convention parser)
 #   lib/baseline-io.ps1     - Read- / Write-RuleMetricsBaseline
+#   lib/mcp-metrics.ps1     - Get-McpDelegationStats (ADR-0016)
 #
 # Why a separate file: usage-insights.ps1 sits at the 500-line hard cap of the
 # kit's own file-granularity rule, so this logic is dot-sourced instead of
@@ -222,6 +224,26 @@ function Get-RuleMetrics {
     }
 }
 
+function Add-RuleMetricsMcpStats {
+    # Fold lib/mcp-metrics.ps1's counters into a Get-RuleMetrics result.
+    # Separate from Get-RuleMetrics so the existing tests can dot-source this
+    # file alone, and so rule-metrics.ps1 stays under the 500-line cap.
+    #
+    # DelegationHits / DelegationRate are deliberately NOT changed: folding
+    # local-llm into the existing numerator would redefine delegation for the
+    # third time and break comparison with snapshot 3. The local-llm counts are
+    # appended as their own fields instead (ADR-0016 decision C).
+    param(
+        [Parameter(Mandatory)]$Metrics,
+        [Parameter(Mandatory)][AllowEmptyCollection()]$Entries,
+        [string]$ProjectFilter
+    )
+    if (-not (Get-Command -Name Get-McpDelegationStats -ErrorAction SilentlyContinue)) { return $Metrics }
+    $mcp = Get-McpDelegationStats -Entries $Entries -ProjectFilter $ProjectFilter
+    foreach ($key in $mcp.Keys) { $Metrics[$key] = $mcp[$key] }
+    return $Metrics
+}
+
 function Get-RuleRate {
     # Percentage with one decimal; 0.0 when the denominator is 0 (never divide).
     param([int]$Hits, [int]$Eligible)
@@ -302,7 +324,11 @@ function Format-RuleMetricsSection {
         foreach ($o in $RuleMetrics.CommitOffenders) { $samples += ($o -replace '\|', '\|') }
         [void]$sb.AppendLine("- non-conforming subjects (sample): $($samples -join ' / ')")
     }
-    [void]$sb.AppendLine("")
+    # local-llm delegation (ADR-0016). Emits nothing when the server was unused,
+    # so a user without local-llm sees byte-identical output.
+    if (Get-Command -Name Format-McpDelegationLines -ErrorAction SilentlyContinue) {
+        foreach ($line in @(Format-McpDelegationLines -McpStats $RuleMetrics)) { [void]$sb.AppendLine($line) }
+    }    [void]$sb.AppendLine("")
     [void]$sb.AppendLine("These are proxies, not ground truth: the transcript records no trace of which")
     [void]$sb.AppendLine("instruction files were loaded. Read the delta against the baseline, not the")
     [void]$sb.AppendLine("absolute value. 'not exercised' means no eligible event occurred and is never")
@@ -391,7 +417,9 @@ function New-RuleMetricsRow {
         # cannot be told apart from a real change in adherence.
         Cwd          = [string]$Obj.cwd
         RequestId    = [string]$Obj.requestId
-
+        # Raw model id of the turn. Only assistant rows carry one; lib/mcp-metrics.ps1
+        # carries the last seen value forward to attribute a tool result to a family.
+        Model        = [string]$Obj.message.model
         BlockIndex   = [int]($Obj.apiBlockIndex | ForEach-Object { if ($_) { $_ } else { 0 } })
         IsSidechain  = [bool]$Obj.isSidechain
         BlockType    = $blockType
