@@ -75,12 +75,17 @@ function Get-ReportCost {
 }
 
 function Format-Delta {
-    param([double]$From, [double]$To, [string]$Unit = 'pt')
-    $d = [math]::Round($To - $From, 1)
+    # -Digits exists because a per-turn cost delta is in the 4th decimal place.
+    # Rounding it to 1 printed "0 USD" directly above a verdict that read
+    # "per-turn saving USD 0.0053", so the row contradicted the conclusion drawn
+    # from it.
+    param([double]$From, [double]$To, [string]$Unit = 'pt', [int]$Digits = 1)
+    $d = [math]::Round($To - $From, $Digits)
     $sign = if ($d -gt 0) { '+' } else { '' }
     $note = ''
     if ($Unit -eq 'pt' -and [math]::Abs($d) -lt $NoiseFloorPt) { $note = '  (within noise)' }
-    return "$sign$d $Unit$note"
+    $text = if ($Digits -gt 1) { $d.ToString("N$Digits") } else { [string]$d }
+    return "$sign$text $Unit$note"
 }
 
 # --- resolve the two archives ---
@@ -190,7 +195,7 @@ if ($null -eq $costA -or $null -eq $costB) {
         [math]::Round($costA.Cost, 2), [math]::Round($costB.Cost, 2), (Format-Delta -From $costA.Cost -To $costB.Cost -Unit 'USD'))
     Write-Host ("  turns      {0,14} -> {1,10}" -f $costA.Turns, $costB.Turns)
     Write-Host ("  per turn   USD {0,10} -> {1,10}   {2}" -f `
-        [math]::Round($perA, 4), [math]::Round($perB, 4), (Format-Delta -From $perA -To $perB -Unit 'USD'))
+        $perA.ToString('N4'), $perB.ToString('N4'), (Format-Delta -From $perA -To $perB -Unit 'USD' -Digits 4))
     Write-Host ""
     Write-Host "  The total tracks how much work was done. Read per-turn for efficiency:"
     Write-Host "  in ADR-0015 a -85% total was -33% once normalised by turn count."
