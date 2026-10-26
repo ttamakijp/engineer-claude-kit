@@ -65,6 +65,7 @@ function Write-RuleMetricsBaseline {
         $payload['DelegationLocalLlm'] = [int]$RuleMetrics.DelegationLocalLlm
         $payload['DelegationLocalLlmProbes'] = [int]$RuleMetrics.DelegationLocalLlmProbes
         $payload['DelegationLocalLlmByTool'] = $RuleMetrics.DelegationLocalLlmByTool
+        $payload['DelegationDisplaced'] = $RuleMetrics.DelegationDisplaced
     }
     $dir = Split-Path -Parent $Path
     if ($dir -and -not (Test-Path -LiteralPath $dir)) {

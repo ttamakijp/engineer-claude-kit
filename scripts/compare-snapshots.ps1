@@ -134,6 +134,46 @@ foreach ($row in $rows) {
 }
 Write-Host ""
 
+# --- local-llm delegation (ADR-0016) ---
+
+# A baseline written before ADR-0016 has no local-llm keys at all. That is not
+# the same as zero: the old aggregation could not see mcp__* calls, so a missing
+# key means "unmeasured" and must not be rendered as a drop to 0.
+$hasA = ($null -ne $a.PSObject.Properties['DelegationLocalLlm'])
+$hasB = ($null -ne $b.PSObject.Properties['DelegationLocalLlm'])
+if ($hasA -or $hasB) {
+    Write-Host "local-llm delegation"
+    if (-not $hasA) {
+        Write-Host "  from: unmeasured (snapshot predates ADR-0016; mcp__* calls were not counted)"
+        Write-Host ("  to  : {0} work call(s), {1} health probe(s)" -f [int]$b.DelegationLocalLlm, [int]$b.DelegationLocalLlmProbes)
+        Write-Host "  No delta can be computed. This pair establishes the first measured point."
+    } elseif (-not $hasB) {
+        Write-Host "  to: unmeasured. Re-take the newer snapshot with a current usage-insights.ps1."
+    } else {
+        $callsA = [int]$a.DelegationLocalLlm
+        $callsB = [int]$b.DelegationLocalLlm
+        Write-Host ("  work calls   {0,6} -> {1,6}   {2}" -f $callsA, $callsB, (Format-Delta -From $callsA -To $callsB -Unit 'calls'))
+        Write-Host ("  health probes{0,6} -> {1,6}" -f [int]$a.DelegationLocalLlmProbes, [int]$b.DelegationLocalLlmProbes)
+        # The handler mix is the only honest way to read displacement: a rise in
+        # Local that is not matched by a fall in Opus / Haiku is extra work, not
+        # moved work. ADR-0016 unresolved question 3.
+        $keys = @('Local', 'Haiku', 'Opus', 'Sonnet', 'Unknown')
+        $anyMix = $false
+        foreach ($k in $keys) {
+            $va = if ($a.DelegationDisplaced) { [int]$a.DelegationDisplaced.$k } else { 0 }
+            $vb = if ($b.DelegationDisplaced) { [int]$b.DelegationDisplaced.$k } else { 0 }
+            if ($va -eq 0 -and $vb -eq 0) { continue }
+            if (-not $anyMix) { Write-Host "  light-work handler mix"; $anyMix = $true }
+            Write-Host ("    {0,-8} {1,6} -> {2,6}   {3}" -f $k, $va, $vb, (Format-Delta -From $va -To $vb -Unit 'events'))
+        }
+        if ($anyMix) {
+            Write-Host "  Work moved only if Local rose AND Opus / Haiku fell by a similar amount."
+            Write-Host "  Local rising on its own is additional delegation, not displaced cost."
+        }
+    }
+    Write-Host ""
+}
+
 # --- cost ---
 
 $costA = Get-ReportCost -Dir $InsightsDir -DateStr $a.RecordedOn
