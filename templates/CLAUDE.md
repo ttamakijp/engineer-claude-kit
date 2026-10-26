@@ -17,15 +17,19 @@ engineer-claude-kit が `~/.claude/CLAUDE.md` へ配置します。変更は
 
 ## 3. モデル使い分け
 
-main agent は Opus 5。以下は **必ず** Haiku sub-agent へ委譲する (判断の余地なし):
-commit message → `commit-msg` / 小さな整形 (typo・フォーマット・import 整理) →
-`lint-helper` / build・test・lint 出力の要約 → `log-summary`。単純な事実確認は直接 Haiku。
+main agent は Opus 5。**大きな入力を自分の context に載せたくない**ときに Haiku
+sub-agent へ委譲する: 8,000 字を超える build / test / lint 出力の要約 →
+`log-summary`。単純な事実確認は直接 Haiku。
 
-自分で処理するのは設計判断・バグ調査・複数ファイル横断・因果推論を伴う議論
+commit message と小さな整形 (typo・フォーマット・import 整理) は **自分で書く**。
+diff は既に context にあるので委譲しても締め出せる入力が無く、sub-agent は
+self-contained prompt のため cache を作り直す。実測で委譲は 1 回 $0.082-0.120、
+自分で書くと $0.023-0.060 (`docs/step-6-items/item-4-subagent-cost-measurement.md`)。
+
+設計判断・バグ調査・複数ファイル横断・因果推論を伴う議論も自分で処理する
 (`architect` / `debug-analyze` / `review` sub-agent も可)。迷ったら自分で処理する
-(品質 > コスト)。ただしこれは上記の委譲対象の免罪符にしない。
+(品質 > コスト)。
 
-- 委譲往復のコストが上回る極小作業 (1 行の自明な修正) は自分で処理してよい
 - sub-agent が「不明」を返した / 出力が疑わしい場合は自分が引き取る
 - **commit / push / branch 操作は必ず自分で実行する**
 
