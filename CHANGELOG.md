@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **local-llm 委譲の計測 (ADR-0016 decision C)** — rule 指標が `Agent` / `Task` の
+  `subagent_type` しか見ておらず、`mcp__*` の呼出が完全に不可視だった。snapshot 3 の
+  7 日窓には local-llm への 9 件 (`generate_commit_message` 5 / `chat` 2 /
+  `health` 2) があったが、指標は「delegation 0%」と報告していた。この 0% は
+  「委譲が無かった」ではなく「知っている 2 つの tool 名への委譲が無かった」を
+  測っていた。
+  - `scripts/lib/mcp-metrics.ps1` — `Get-McpDelegationStats` が work 呼出を数え、
+    `health` は可用性 probe として work から除外する。tool 名の server 部分
+    (`mcp__<server>__`) は user 設定なので、tool 側の `local_llm__` 接頭辞で照合
+  - `DelegationDisplaced` — 軽作業を**どの model が処理したか**の内訳
+    (`Local` / `Haiku` / `Opus` / `Sonnet`)。ADR-0016 未解決の問い 3 のとおり
+    「local-llm が処理したので Opus が処理しなかった」は transcript から事後に
+    判定できないため、単一 snapshot の `Local` は上限値 (下限 0) として扱い、
+    点推定として報告しない。snapshot 間の差分として読む
+  - `DelegationHits` / `DelegationRate` は**意図的に変更しない**。local-llm を
+    既存の分子に合算すると delegation の定義が 3 度目の変更となり snapshot 3 と
+    比較できなくなるため、新しいフィールドとして追加する
+  - baseline schema は既存キーの**後ろに追記**。キーが無い snapshot は 0 ではなく
+    「未計測」として扱い、`compare-snapshots.ps1` は差分を出さず最初の計測点と
+    して報告する (0 -> 7 と描くと、指標が見始めただけの変化を増加と誤認させる)
+  - `scripts/lib/commit-subject.ps1` / `scripts/lib/baseline-io.ps1` — 500 行上限
+    対策の抽出。`rule-metrics.ps1` は PR #95 の時点で既に 528 行で上限を超えていた
+    (計画時の 499 行という計測が誤っていた) -> 433 行に低下
+  - `tests/mcp-metrics.tests.ps1` (23 件) / `tests/compare-snapshots.tests.ps1` (+5 件)
 - **local-llm 不達時の escalate rule (ADR-0016 決定 B)** —
   `source/rules/common/local-llm-fallback.md`。**Phase 1 では配布しない**
   (`audience` に `claude` を含めず build 出力から外す。ADR-0016 決定 C の注記 3)。

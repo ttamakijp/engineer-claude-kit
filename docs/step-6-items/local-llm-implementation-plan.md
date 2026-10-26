@@ -59,9 +59,12 @@ $script:RuleMetricsLocalLlmExclude = @('local_llm__health')
 
 ### 想定工数
 
-**2-3 時間**。`rule-metrics.ps1` は現在 **499 行**で 500 行上限に張り付いている
-ため、**集計の追加だけで上限を超える**。`lib/delegation-metrics.ps1` への抽出が
-事実上必須で、その分の時間を含む。
+**2-3 時間**。`rule-metrics.ps1` は 500 行上限に張り付いているため、**集計の追加
+だけで上限を超える**。lib 抽出が事実上必須で、その分の時間を含む。
+
+> 実装時の実測 (2026-10-27): 計画時に 499 行と書いたが実際は **528 行**で、
+> PR #95 の時点で既に上限を超えていた。計画時の計測が誤っていた。実装 PR では
+> `lib/baseline-io.ps1` と `lib/commit-subject.ps1` を抽出して 433 行に下げた。
 
 ## (c) local-llm 不達時の fallback rule
 
@@ -175,7 +178,7 @@ system prompt** なので、`templates/agents/` に置くと Claude Code が sub
 
 | PR | 工数 | 500 行上限に抵触するファイル |
 |---|--:|---|
-| (d) | 2-3 h | `rule-metrics.ps1` 499 行 → **抽出必須** |
+| (d) | 2-3 h | `rule-metrics.ps1` 528 行 (上限超過済) → **抽出必須** |
 | (c) | 1-2 h | なし |
 | (a) | 3-4 h | なし (A-2 採用時は `models-config.ps1` に追加) |
 | (b) | 2-3 h | `apply-claude-kit.ps1` 500 行 → **抽出必須** |
