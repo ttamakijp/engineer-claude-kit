@@ -62,8 +62,9 @@ function Invoke-RulesetWrite {
 
     $endpoint = "repos/$Repo/rulesets"
     if ($RulesetId) { $endpoint = "$endpoint/$RulesetId" }
-    # Not $args: that is a PowerShell automatic variable.
-    $apiArgs = @('api', '-X', $Method, $endpoint, '--input', '-')
+    # Not $args: that is a PowerShell automatic variable. Invoke-GhApi appends
+    # `--input <file>` for -Body.
+    $apiArgs = @('api', '-X', $Method, $endpoint)
 
     if ($PSBoundParameters.ContainsKey('Invoker')) {
         $res = Invoke-GhApi -Arguments $apiArgs -Body $Body -Invoker $Invoker

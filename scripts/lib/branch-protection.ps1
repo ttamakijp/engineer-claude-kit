@@ -12,6 +12,7 @@
 #   Get-RepoFromGitRemote     -- OWNER/REPO from a git remote URL
 #   Read-RulesetTemplate      -- load + parse the canonical ruleset JSON
 #   New-RulesetRequestBody    -- template -> POST/PUT body (drops response-only keys)
+#   New-GhInputFile           -- write a request body to a BOM-less UTF-8 temp file
 #   Invoke-GhApi              -- run `gh api ...` (injectable for tests)
 #   Get-RepoRuleset           -- fetch one named ruleset with full detail, or $null
 #   Compare-RulesetState      -- expected vs actual -> match / drift / missing
@@ -97,9 +98,28 @@ function New-RulesetRequestBody {
     return ($body | ConvertTo-Json -Depth 10 -Compress)
 }
 
+function New-GhInputFile {
+    # Write -Body to a new temp file as UTF-8 WITHOUT a BOM and return its path.
+    # The caller deletes it.
+    #
+    # Why not pipe the body to `gh --input -`: Windows PowerShell 5.1 prefixed
+    # the piped bytes with EF BB BF on a machine whose $OutputEncoding was
+    # us-ascii, and GitHub rejected the body as "Problems parsing JSON (HTTP 400)".
+    # A file written with UTF8Encoding($false) has no such dependency on the
+    # console / pipeline encoding settings.
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Body)
+
+    $path = [System.IO.Path]::GetTempFileName()
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($path, $Body, $utf8NoBom)
+    return $path
+}
+
 function Invoke-GhApi {
     # Run `gh` with the given argument list and return @{ ExitCode; Output }.
-    # -Body is piped to gh's stdin (used with `--input -`).
+    # -Body is passed as `--input <temp file>` (see New-GhInputFile); callers
+    # must not add --input themselves.
     # -Invoker is a test injection point: { param($Arguments, $Body) ... }.
     [CmdletBinding()]
     param(
@@ -117,7 +137,12 @@ function Invoke-GhApi {
     }
 
     if ($Body) {
-        $out = ($Body | & gh @Arguments 2>&1 | Out-String)
+        $inputFile = New-GhInputFile -Body $Body
+        try {
+            $out = (& gh @Arguments --input $inputFile 2>&1 | Out-String)
+        } finally {
+            Remove-Item -LiteralPath $inputFile -Force -ErrorAction SilentlyContinue
+        }
     } else {
         $out = (& gh @Arguments 2>&1 | Out-String)
     }
@@ -382,7 +407,7 @@ function Copy-BranchProtectionTask {
 if ($ExecutionContext.SessionState.Module) {
     Export-ModuleMember -Function `
         Get-RepoFromGitRemote, Read-RulesetTemplate, New-RulesetRequestBody, `
-        Invoke-GhApi, Get-RepoRuleset, ConvertTo-FactValue, Get-RuleParameterMap, `
+        New-GhInputFile, Invoke-GhApi, Get-RepoRuleset, ConvertTo-FactValue, Get-RuleParameterMap, `
         Compare-RulesetState, Format-RulesetReport, Get-BranchProtectionExitCode, `
         Copy-BranchProtectionTask
 }

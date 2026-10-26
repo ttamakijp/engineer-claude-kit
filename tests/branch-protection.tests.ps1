@@ -111,6 +111,23 @@ Describe "New-RulesetRequestBody" {
     }
 }
 
+Describe "New-GhInputFile" {
+
+    It "writes the body byte-for-byte as UTF-8 without a BOM" {
+        $body = New-RulesetRequestBody -Template (Read-RulesetTemplate -Path $TemplatePath)
+        $path = New-GhInputFile -Body $body
+        try {
+            $bytes = [System.IO.File]::ReadAllBytes($path)
+            $bytes[0] | Should Be ([byte][char]'{')
+            $expected = (New-Object System.Text.UTF8Encoding($false)).GetBytes($body)
+            $bytes.Length | Should Be $expected.Length
+            ([System.Text.Encoding]::UTF8.GetString($bytes)) | Should Be $body
+        } finally {
+            Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 Describe "Get-RepoFromGitRemote" {
 
     It "parses the HTTPS form" {
