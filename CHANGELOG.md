@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **local-llm 不達時の escalate rule (ADR-0016 決定 B)** —
+  `source/rules/common/local-llm-fallback.md` (1,568 B、無条件ロード)。
+  不達なら Haiku へ振り直さず自分で処理する、という分岐を表で固定した。
+  `health` は委譲が必要になった時に 1 回だけ叩き、session 冒頭の先回り確認は
+  しない (往復が増え、委譲で浮いた分を食い潰す)。一度不達ならその session 中は
+  再確認しない。ADR-0016 未解決の問い 2 を本 PR で close。
+- **`templates/local-llm/`** — prompt template の置き場所 (placeholder)。中身は
+  PR (b) で作る。`apply-claude-kit.ps1` は `templates/` の各 subdir を明示列挙して
+  配布するため、本 dir は**配布されない** (意図どおり)。
 - **branch-protection 機能** — GitHub リポジトリに kit 標準の branch protection
   ruleset (`protect-main`: deletion / non_fast_forward / required_linear_history /
   pull_request を既定ブランチに適用) が入っているかを確認し、未適用なら適用を提案する。
@@ -57,6 +66,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`scripts/lib/plain-language-hints.json`** — `HaikuZero` hint を**削除**し、
+  `OpusHeavy` を local-llm へ向け直した。`HaikuZero` は Haiku turn が 0 件のときに
+  「commit message やログ要約を別の AI に振れ」と助言していたが、CLAUDE.md §3 は
+  PR #95 以降「commit message は自分で書く」(委譲のほうが高い) としており、
+  **指標の助言が指示と正反対**になっていた。Haiku 0 件は現在は意図された状態なので
+  助言ごと削除し、`insights-report.ps1` の発火行も落とした。
+  test は hint の一覧を JSON から導出する形に変え (hard-code した一覧が drift の
+  原因だった)、`HaikuZero` が復活しないことを回帰として固定した。
 - **`apply-claude-kit.ps1`** — settings wizard で ANTHROPIC_SMALL_FAST_MODEL の backend 選択 default を `1` (Bedrock) から `s` (Skip) に変更 (G6j)。明示 opt-in 原則に整合。
 - **`scripts/usage-insights.ps1` (G6g)** — `Format-InsightsReport` に人間語併記を追加。
   技術メトリクスはそのまま残し、各 finding 直後に blockquote で対人類比を提示
@@ -145,6 +162,14 @@ ADR-0001~0012 による設計決定、自己ガバナンス (CI / lint / leak do
 
 ### Changed
 
+- **`scripts/lib/plain-language-hints.json`** — `HaikuZero` hint を**削除**し、
+  `OpusHeavy` を local-llm へ向け直した。`HaikuZero` は Haiku turn が 0 件のときに
+  「commit message やログ要約を別の AI に振れ」と助言していたが、CLAUDE.md §3 は
+  PR #95 以降「commit message は自分で書く」(委譲のほうが高い) としており、
+  **指標の助言が指示と正反対**になっていた。Haiku 0 件は現在は意図された状態なので
+  助言ごと削除し、`insights-report.ps1` の発火行も落とした。
+  test は hint の一覧を JSON から導出する形に変え (hard-code した一覧が drift の
+  原因だった)、`HaikuZero` が復活しないことを回帰として固定した。
 - `/apply` 中心の Quick Start 再構成 + skill / command の責務分離明記 (#45)。
 - pwsh 専用前提を解消し PS 5.1 互換を hard rule 化 (install-deps は opt-in, #46)。
 - config / model 解決を `lib/models-config.ps1` に抽出し apply を 508 -> 393 行に

@@ -85,13 +85,38 @@ fallback の判断を Claude の毎ターンの推論に委ねない。rule と�
 
 | フィールド | 意味 |
 |---|---|
-| `DelegationHits` | 推奨された宛先への委譲 (今後は local-llm) |
+| `DelegationHits` | 推奨された宛先への委譲 (snapshot 3 時点の定義で凍結。下記注記 1) |
 | `DelegationLocalLlm` | local-llm MCP tool の呼出数 (宛先別) |
 | `DelegationLegacy` | 非推奨の Haiku sub-agent が使われた数 (既存) |
 | `DelegationDisplaced` | **local-llm が肩代わりし、Opus / Haiku のどちらでも処理されなかった件数** |
 
 `DelegationDisplaced` は `item-4-subagent-cost-measurement.md` §2 で使った
 「締め出せた入力量」の考え方を件数に流用したもので、削減額の推定に使う。
+
+#### 注記 1: `DelegationHits` / `DelegationRate` の定義は凍結し、local-llm は別 bucket
+
+`DelegationHits` および `DelegationRate` の定義は **snapshot 3 時点で凍結**する。
+local-llm は separate bucket (`Local`) として集計する。
+
+上の表の初稿は「`DelegationHits` に local-llm を合算する」と読める書き方だったが、
+**採用しない**。合算すると delegation の定義が 3 度目の変更となり、snapshot 1 ->
+2' -> 3 の `delegation` trend の連続性が失われる。既存の分子・分母はそのまま残し、
+local-llm は新しいフィールドとして**追加**する。
+
+実装は PR #98 (`scripts/lib/mcp-metrics.ps1`)。
+
+#### 注記 2: `displaced` は per-event で移管を証明する指標ではない
+
+`DelegationDisplaced` は**軽作業をどの model が処理したか**の内訳
+(`Local` / `Haiku` / `Opus` / `Sonnet`) であり、個々の呼出について「Opus の作業が
+local-llm に移った」ことを証明する指標ではない。
+
+- `Local` は**上限値**として扱う (下限は 0)
+- 2 つの snapshot 間の delta で **`Local` 増 + `Opus` / `Haiku` 減が揃った時のみ**
+  有意な移動として読む。`Local` の単独増加は委譲の純増であり、削減ではない
+- 単一 snapshot の `Local` を点推定として報告してはならない
+
+この注記により**未解決の問い 3 を close** する (下記)。
 
 ## 検討した代替案
 
@@ -119,11 +144,12 @@ fallback の判断を Claude の毎ターンの推論に委ねない。rule と�
 1. **local-llm の出力品質が Haiku と比べてどうか未検証。** commit message は
    Conventional Commits 形式の充足で機械判定できる (`CommitRate` が既にある) が、
    log 要約の品質は機械判定できない
-2. **不達の検出コスト。** 毎回 `health` を叩くと往復が増える。session 開始時 1 回に
-   するか、失敗時のみ確認するかは実装 PR (c) で決める
-3. **`DelegationDisplaced` の定義。** 「local-llm が処理したので Opus が処理しな
-   かった」を transcript から事後に判定する方法が自明でない。local-llm tool の
-   呼出数を上限値として扱い、下限は 0 とする区間推定になる可能性がある
+2. ~~**不達の検出コスト。**~~ **決定済 (PR (c))。** `health` は委譲が実際に必要に
+   なった時に 1 回だけ叩く。session 冒頭の先回り確認はしない。一度不達なら その
+   session 中は再確認せず自分で処理し続ける (`local-llm-fallback.md`)
+3. ~~**`DelegationDisplaced` の定義。**~~ **決定済 (決定 C の注記 2)。** 事後の
+   per-event 判定はできないため、handler mix の内訳とし、`Local` を上限値
+   (下限 0) として snapshot 間の delta で読む。
 4. **snapshot の比較可能性。** ADR-0015 §A に記録したとおり delegation は既に
    snapshot 3 で定義が変わっている。本 ADR の実装で**再度変わる**ため、
    snapshot 5 以降としか比較できなくなる
