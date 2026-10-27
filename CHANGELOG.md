@@ -10,7 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **local-llm 不達時の escalate rule (ADR-0016 決定 B)** —
-  `source/rules/common/local-llm-fallback.md` (1,568 B、無条件ロード)。
+  `source/rules/common/local-llm-fallback.md`。**Phase 1 では配布しない**
+  (`audience` に `claude` を含めず build 出力から外す。ADR-0016 決定 C の注記 3)。
+  local-llm の不達は実測で 0 件のため、未観測の障害に常時ロードの指示を先回りで
+  足すのは ADR-0015 の「足す前に測る」に反し、snapshot 4 で測る常時ロード面
+  そのものを汚す。内容は先に固めて repo に残し、配布だけ保留する。常時ロード面は
+  **9,505 B で据え置き**。失敗が 1 件でも観測されたら配布へ切り替える
+  (ADR-0016 未解決の問い 6)。
   不達なら Haiku へ振り直さず自分で処理する、という分岐を表で固定した。
   `health` は委譲が必要になった時に 1 回だけ叩き、session 冒頭の先回り確認は
   しない (往復が増え、委譲で浮いた分を食い潰す)。一度不達ならその session 中は

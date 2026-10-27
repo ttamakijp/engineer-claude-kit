@@ -1,7 +1,17 @@
 ---
 id: local-llm-fallback
-audience: [claude]
-# paths なし = 無条件ロード。委譲の判断はファイル種別に依存しない。
+# audience に 'claude' を含めないので build-rules.ps1 はこの rule を dist へ出さず、
+# apply も配布しない。**意図的な保留**であり壊れた設定ではない。
+#
+# 理由: local-llm の不達はまだ 1 件も観測されていない (実測は work 呼出 7 件 +
+# health probe 2 件、失敗 0 件)。未観測の障害に常時ロードの指示を先回りで足すのは
+# ADR-0015 の「足す前に測る」に反し、snapshot 4 の常時ロード面の測定も汚す。
+# 内容は先に固めて repo に残し、配布だけ保留する (ADR-0016 決定 C の注記 3)。
+#
+# 配布へ切り替える条件: local-llm の失敗が 1 件でも観測されたら audience を
+# [claude] に戻す (ADR-0016 未解決の問い 6)。そのとき paths は付けない
+# (委譲の判断はファイル種別に依存しないため無条件ロードになる)。
+audience: [kit]
 ---
 
 # local-llm 不達時の escalate
