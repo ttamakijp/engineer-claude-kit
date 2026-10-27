@@ -246,8 +246,25 @@ Describe "Format-InsightsReport" {
 # Assertions stay ASCII: they check the blockquote marker (^>) and gating, never
 # the translated copy itself.
 Describe "Get-PlainLanguageHint" {
-    $categories = @('OpusHeavy','HaikuZero','ColdHeavy','WasteHigh','StuckSession','RepeatedPattern','CostRising')
+    # Derived from the data file rather than hard-coded: a hard-coded list is how
+    # this test broke when HaikuZero was removed, and it would not have caught a
+    # newly added category with no text at all.
+    $hintsPath = Join-Path (Join-Path (Join-Path (Join-Path $here "..") "scripts") "lib") "plain-language-hints.json"
+    $categories = @((Read-Utf8NoBom -Path $hintsPath | ConvertFrom-Json).PSObject.Properties |
+        ForEach-Object { $_.Name } | Where-Object { $_ -ne 'KitBehind' })
 
+    It "covers more than one category" {
+        # Guards against the list silently collapsing to empty, which would make
+        # the next assertion pass without testing anything.
+        $categories.Count | Should BeGreaterThan 1
+    }
+    # HaikuZero told the user to delegate commit messages to Haiku, which
+    # CLAUDE.md section 3 now forbids as more expensive than writing them
+    # directly. It must not come back (ADR-0016).
+    It "no longer ships a hint that contradicts the delegation guidance" {
+        $categories -contains 'HaikuZero' | Should Be $false
+        (Get-PlainLanguageHint -Category 'HaikuZero') | Should Be ''
+    }
     It "returns a non-empty blockquote for every known category" {
         foreach ($c in $categories) {
             $hint = Get-PlainLanguageHint -Category $c
