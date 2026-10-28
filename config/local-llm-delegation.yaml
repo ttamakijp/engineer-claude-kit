@@ -37,6 +37,9 @@ delegation:
     # diff が既に自分の context にある場合は委譲しない。締め出せる入力が無く、
     # 往復だけが増える。
     skip_when: diff_already_in_context
+    # 実機で deploy 済なのは generate_commit_message (server 内蔵 prompt) で、
+    # 下記 prompt は path 版 draft_commit_message が deploy された時点で効く。
+    system_prompt_ref: templates/local-llm/commit-message.md
 
   log_summary:
     # 8,000 字を超える build / test / lint 出力の要約。
@@ -58,7 +61,7 @@ delegation:
     input: path
     status: not_deployed
     fallback: self
-    system_prompt_ref: templates/local-llm/lint-fix.md
+    system_prompt_ref: templates/local-llm/review-file.md
     blocked_by: local-llm 側に review_file が未 deploy
     # 指摘を受けても **編集は自分で行う**。local 側に repo 全体の文脈が無く、
     # 無条件に適用すると file-granularity / commit-convention に反する変更が入る。

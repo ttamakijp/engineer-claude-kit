@@ -60,6 +60,39 @@ Describe "config/local-llm-delegation.yaml" {
             $line | Should Match 'fallback\s*:\s*self\s*$'
         }
     }
+    It "keeps every system_prompt_ref kit-relative" {
+        $text = Read-Utf8NoBom -Path $ConfigPath
+        $refs = @()
+        foreach ($line in ($text -split "`r?`n")) {
+            if ($line -match '^\s*system_prompt_ref\s*:\s*(\S+)\s*$') { $refs += $Matches[1] }
+        }
+        @($refs).Count | Should Be 3
+        foreach ($r in $refs) {
+            # An absolute path would not survive a clone to another machine.
+            $r | Should Not Match '^([A-Za-z]:|/|~)'
+            $r | Should Match '^templates/local-llm/[a-z-]+\.md$'
+        }
+    }
+    # Every ref must name a file that actually ships. The config and the templates
+    # land in separate PRs ((a) and (b)), which is exactly how a reference goes
+    # stale -- the config said lint-fix.md while (b) shipped review-file.md. The
+    # check therefore runs only once the templates are present in the tree, and
+    # becomes effective on the branch where both have merged.
+    It "points every system_prompt_ref at a template that exists" {
+        $templateDir = Join-Path (Join-Path $repoRoot "templates") "local-llm"
+        $missing = @()
+        # templates/local-llm/ arrives with PR (b); until it is in the tree there
+        # is nothing to resolve against and the list stays empty.
+        if (Test-Path $templateDir) {
+            $text = Read-Utf8NoBom -Path $ConfigPath
+            foreach ($line in ($text -split "`r?`n")) {
+                if ($line -match '^\s*system_prompt_ref\s*:\s*(\S+)\s*$') {
+                    if (-not (Test-Path (Join-Path $repoRoot $Matches[1]))) { $missing += $Matches[1] }
+                }
+            }
+        }
+        ($missing -join ', ') | Should Be ''
+    }
     It "marks every target with a known status" {
         $text = Read-Utf8NoBom -Path $ConfigPath
         $statuses = @($text -split "`r?`n" | Where-Object { $_ -match '^\s*status\s*:' })
