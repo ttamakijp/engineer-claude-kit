@@ -85,13 +85,55 @@ fallback の判断を Claude の毎ターンの推論に委ねない。rule と�
 
 | フィールド | 意味 |
 |---|---|
-| `DelegationHits` | 推奨された宛先への委譲 (今後は local-llm) |
+| `DelegationHits` | 推奨された宛先への委譲 (snapshot 3 時点の定義で凍結。下記注記 1) |
 | `DelegationLocalLlm` | local-llm MCP tool の呼出数 (宛先別) |
 | `DelegationLegacy` | 非推奨の Haiku sub-agent が使われた数 (既存) |
 | `DelegationDisplaced` | **local-llm が肩代わりし、Opus / Haiku のどちらでも処理されなかった件数** |
 
 `DelegationDisplaced` は `item-4-subagent-cost-measurement.md` §2 で使った
 「締め出せた入力量」の考え方を件数に流用したもので、削減額の推定に使う。
+
+#### 注記 1: `DelegationHits` / `DelegationRate` の定義は凍結し、local-llm は別 bucket
+
+`DelegationHits` および `DelegationRate` の定義は **snapshot 3 時点で凍結**する。
+local-llm は separate bucket (`Local`) として集計する。
+
+上の表の初稿は「`DelegationHits` に local-llm を合算する」と読める書き方だったが、
+**採用しない**。合算すると delegation の定義が 3 度目の変更となり、snapshot 1 ->
+2' -> 3 の `delegation` trend の連続性が失われる。既存の分子・分母はそのまま残し、
+local-llm は新しいフィールドとして**追加**する。
+
+実装は PR #98 (`scripts/lib/mcp-metrics.ps1`)。
+
+#### 注記 2: `displaced` は per-event で移管を証明する指標ではない
+
+`DelegationDisplaced` は**軽作業をどの model が処理したか**の内訳
+(`Local` / `Haiku` / `Opus` / `Sonnet`) であり、個々の呼出について「Opus の作業が
+local-llm に移った」ことを証明する指標ではない。
+
+- `Local` は**上限値**として扱う (下限は 0)
+- 2 つの snapshot 間の delta で **`Local` 増 + `Opus` / `Haiku` 減が揃った時のみ**
+  有意な移動として読む。`Local` の単独増加は委譲の純増であり、削減ではない
+- 単一 snapshot の `Local` を点推定として報告してはならない
+
+この注記により**未解決の問い 3 を close** する (下記)。
+
+#### 注記 3: fallback rule は Phase 1 では repo 保全のみ、配布しない
+
+`local-llm-fallback.md` (決定 B の rule) は repo に置くが、**Phase 1 の時点では
+配布しない** (`audience` に `claude` を含めず、build-rules.ps1 の出力から外す)。
+
+理由:
+
+- **local-llm の不達はまだ 1 件も観測されていない。** 実測は work 呼出 7 件 +
+  health probe 2 件で、失敗 0 件 (PR #98 の計測)
+- 未観測 (0 件) の障害に対して常時ロードの指示を先回りで足すのは、ADR-0015 の
+  「足す前に測る」に反する。ADR-0015 で指示面を 77% 削った方向とも逆向き
+- 常時ロード面が 9,505 -> 11,073 B (+16.5%) になり、**snapshot 4 で測ろうとしている
+  常時ロード面そのものを汚す**。測定前に測定対象を動かすことになる
+
+rule の内容は先に固めてある (不達時の分岐を毎ターンの推論に委ねない形)。足りないのは
+「足す根拠」だけなので、配布だけを保留する。切替条件は未解決の問い 6。
 
 ## 検討した代替案
 
@@ -119,11 +161,12 @@ fallback の判断を Claude の毎ターンの推論に委ねない。rule と�
 1. **local-llm の出力品質が Haiku と比べてどうか未検証。** commit message は
    Conventional Commits 形式の充足で機械判定できる (`CommitRate` が既にある) が、
    log 要約の品質は機械判定できない
-2. **不達の検出コスト。** 毎回 `health` を叩くと往復が増える。session 開始時 1 回に
-   するか、失敗時のみ確認するかは実装 PR (c) で決める
-3. **`DelegationDisplaced` の定義。** 「local-llm が処理したので Opus が処理しな
-   かった」を transcript から事後に判定する方法が自明でない。local-llm tool の
-   呼出数を上限値として扱い、下限は 0 とする区間推定になる可能性がある
+2. ~~**不達の検出コスト。**~~ **決定済 (PR (c))。** `health` は委譲が実際に必要に
+   なった時に 1 回だけ叩く。session 冒頭の先回り確認はしない。一度不達なら その
+   session 中は再確認せず自分で処理し続ける (`local-llm-fallback.md`)
+3. ~~**`DelegationDisplaced` の定義。**~~ **決定済 (決定 C の注記 2)。** 事後の
+   per-event 判定はできないため、handler mix の内訳とし、`Local` を上限値
+   (下限 0) として snapshot 間の delta で読む。
 4. **snapshot の比較可能性。** ADR-0015 §A に記録したとおり delegation は既に
    snapshot 3 で定義が変わっている。本 ADR の実装で**再度変わる**ため、
    snapshot 5 以降としか比較できなくなる
@@ -131,6 +174,13 @@ fallback の判断を Claude の毎ターンの推論に委ねない。rule と�
    している (ADR-0003)。MCP tool 名をハードコードすると、local-llm を持たない
    利用者には無効な指示が常時ロードされる。`config/` で宛先を切り替えられる形に
    するかは実装 PR (a) で決める
+6. **fallback rule を配布へ切り替える trigger。** 注記 3 のとおり Phase 1 では
+   repo 保全のみ。**local-llm の失敗が 1 件でも観測された時点で (B) -> (A) に
+   切り替える** (`audience` を `[claude]` に戻して配布する)。観測の手段は
+   `DelegationLocalLlm` の呼出数に対して成果物が得られなかった turn の有無で、
+   現状これを機械判定する経路は無い (失敗した MCP 呼出の結果が transcript 上で
+   どう見えるかは未調査)。snapshot 4 の時点で手で確認し、1 件でもあれば切り替える。
+   **0 件なら保留を続ける** — 「使われていないから配る」は根拠にならない
 
 ## 結果
 

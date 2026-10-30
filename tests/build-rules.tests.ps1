@@ -70,10 +70,26 @@ Describe "build-rules.ps1" {
         ($offenders -join ",") | Should Be ""
     }
 
-    It "builds every source rule (audience filter still matches)" {
-        $srcCount = (Get-ChildItem -Path $SourceDir -Recurse -Filter "*.md" -File).Count
+    # Counts the sources that opt in rather than every file on disk: a rule can be
+    # held back deliberately by leaving 'claude' out of its audience, and the old
+    # all-files assertion read that as a build failure.
+    It "builds every source rule whose audience includes claude" {
+        $optIn = 0
+        foreach ($f in (Get-ChildItem -Path $SourceDir -Recurse -Filter "*.md" -File)) {
+            $text = [System.IO.File]::ReadAllText($f.FullName)
+            if ($text -match "(?m)^audience:.*\bclaude\b") { $optIn++ }
+        }
+        $optIn | Should BeGreaterThan 0
         $builtCount = (Get-ChildItem -Path $TempDist -Filter "*.md" -File).Count
-        $builtCount | Should Be $srcCount
+        $builtCount | Should Be $optIn
+    }
+
+    # ADR-0016 note 3: the fallback rule is kept in the repo but not distributed,
+    # because local-llm has not failed once yet and an always-loaded instruction
+    # for an unobserved fault would both contradict ADR-0015 and move the
+    # instruction-surface figure that snapshot 4 is meant to measure.
+    It "holds the local-llm fallback rule back from the distribution" {
+        Test-Path (Join-Path $TempDist "local-llm-fallback.md") | Should Be $false
     }
 }
 
