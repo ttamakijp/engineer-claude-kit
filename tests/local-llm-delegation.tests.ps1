@@ -76,14 +76,21 @@ Describe "config/local-llm-delegation.yaml" {
     # Every ref must name a file that actually ships. The config and the templates
     # land in separate PRs ((a) and (b)), which is exactly how a reference goes
     # stale -- the config said lint-fix.md while (b) shipped review-file.md. The
-    # check therefore runs only once the templates are present in the tree, and
-    # becomes effective on the branch where both have merged.
+    # check therefore runs only once the templates are present, and becomes
+    # effective on the branch where both have merged.
     It "points every system_prompt_ref at a template that exists" {
         $templateDir = Join-Path (Join-Path $repoRoot "templates") "local-llm"
         $missing = @()
-        # templates/local-llm/ arrives with PR (b); until it is in the tree there
-        # is nothing to resolve against and the list stays empty.
+        # Gate on a prompt template actually being present, NOT on the directory:
+        # PR (c) created templates/local-llm/ holding only a placeholder README,
+        # so a directory check passes while every referenced prompt is still
+        # absent, and this assertion failed on a branch that was correct.
+        $prompts = @()
         if (Test-Path $templateDir) {
+            $prompts = @(Get-ChildItem -LiteralPath $templateDir -Filter "*.md" -File |
+                Where-Object { $_.Name -ne 'README.md' })
+        }
+        if (@($prompts).Count -gt 0) {
             $text = Read-Utf8NoBom -Path $ConfigPath
             foreach ($line in ($text -split "`r?`n")) {
                 if ($line -match '^\s*system_prompt_ref\s*:\s*(\S+)\s*$') {
