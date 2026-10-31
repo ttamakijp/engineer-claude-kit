@@ -65,7 +65,6 @@ function Format-InsightsReport {
         & $appendHint ($opusPct -ge 60) 'OpusHeavy'
     }
     [void]$sb.AppendLine("- Haiku delegation: $($Metrics.HaikuRatePct)% ($($Metrics.HaikuTurns)/$($Metrics.WindowTurns) turns)")
-    & $appendHint ($Metrics.WindowTurns -gt 0 -and $Metrics.HaikuTurns -eq 0) 'HaikuZero'
     [void]$sb.AppendLine("- Cache cold-read share: $($Metrics.ColdReadPct)% (higher = more cache misses)")
     & $appendHint ($Metrics.ColdReadPct -ge 50) 'ColdHeavy'
     [void]$sb.AppendLine("- Token-waste score: $($Metrics.WasteScore)/100 ($($Metrics.HeavyTurns) heavy-output turns)")

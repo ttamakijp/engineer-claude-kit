@@ -55,8 +55,11 @@ CLAUDE.md / rule が要求する行動が実際に起きたかの近似指標。
 
 - **plan-first**: ユーザ prompt 直後の論理ターンで、最初の tool 呼出より前に
   text block があるか (CLAUDE.md §2「実装前に 1 行の修正方針」)
-- **haiku-delegation**: `git commit` 呼出と大きな tool 出力に対し
-  `commit-msg` / `lint-helper` / `log-summary` へ委譲したか (CLAUDE.md §3.1)
+- **haiku-delegation**: 大きな tool 出力に対し Haiku sub-agent へ委譲したか。
+  **定義は snapshot 3 時点で凍結**してあり、現在の CLAUDE.md §3 は Haiku を
+  委譲先にしていないため構造的に 0% に近づく。これは遵守率の低下ではなく
+  **指示の変更**で、snapshot を跨いだ比較可能性のために分子を据え置いている
+  (ADR-0016 決定 C の注記 1)。local-llm への委譲は別 bucket で数える
 - **commit-convention**: commit subject が Conventional Commits 形式か
 - `-WriteBaseline` で `~/.claude/insights/rule-metrics-baseline.json` に保存。
   以降のレポートは各値に baseline からの差分 (pt) を併記する
