@@ -91,6 +91,51 @@ Describe "build-rules.ps1" {
     It "holds the local-llm fallback rule back from the distribution" {
         Test-Path (Join-Path $TempDist "local-llm-fallback.md") | Should Be $false
     }
+
+    # Regression (2026-10-31): the dist dir is a build output, not an
+    # accumulator. apply deploys every *.md it finds there, so a rule the build
+    # stopped emitting kept being installed: local-llm-fallback.md reached
+    # ~/.claude/rules/ despite 'audience: [kit]' because an earlier build, from
+    # before the audience change, had already written it to dist. Suppressing it
+    # at the source filter is not enough -- the previous output has to go.
+    It "removes a dist rule that this build no longer produces" {
+        $optedOut = Join-Path $TempDist "local-llm-fallback.md"
+        $deletedSource = Join-Path $TempDist "project-skill-recommend.md"
+        Set-Content -LiteralPath $optedOut -Value "stale: audience dropped claude" -Encoding ASCII
+        Set-Content -LiteralPath $deletedSource -Value "stale: source file deleted" -Encoding ASCII
+
+        $output = & powershell -NoProfile -File $ScriptPath `
+            -SourceDir $SourceDir `
+            -DistDir $TempDist 2>&1
+
+        Test-Path $optedOut | Should Be $false
+        Test-Path $deletedSource | Should Be $false
+        Test-Path (Join-Path $TempDist "commit-convention.md") | Should Be $true
+        ($output -join "`n") | Should Match "\[clean\] removed stale"
+
+        # The count is what apply actually deploys, and it is what went wrong on
+        # the real machine: 6 rules installed where 5 were built.
+        $optIn = 0
+        foreach ($f in (Get-ChildItem -Path $SourceDir -Recurse -Filter "*.md" -File)) {
+            $text = [System.IO.File]::ReadAllText($f.FullName)
+            if ($text -match "(?m)^audience:.*\bclaude\b") { $optIn++ }
+        }
+        (Get-ChildItem -Path $TempDist -Filter "*.md" -File).Count | Should Be $optIn
+    }
+
+    It "reports a stale dist rule in dry-run mode without deleting it" {
+        $optedOut = Join-Path $TempDist "local-llm-fallback.md"
+        Set-Content -LiteralPath $optedOut -Value "stale" -Encoding ASCII
+
+        $output = & powershell -NoProfile -File $ScriptPath `
+            -SourceDir $SourceDir `
+            -DistDir $TempDist `
+            -DryRun 2>&1
+
+        Test-Path $optedOut | Should Be $true
+        ($output -join "`n") | Should Match "\[dry-run\] remove stale"
+        Remove-Item -LiteralPath $optedOut -Force
+    }
 }
 
 if (Test-Path $TempDist) {

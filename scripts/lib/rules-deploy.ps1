@@ -18,47 +18,47 @@
 #   New-KitBackup                    (link-safety.ps1)
 
 function Update-KitRulesBuild {
-    # Rebuild dist/.claude/rules/ when it is absent, empty, or older than source.
+    # Rebuild dist/.claude/rules/ from source/rules/ before deploying.
     # build-rules.ps1 compiles source/rules/*.md into dist/.claude/rules/<id>.md
-    # with audience filtering.
+    # with audience filtering, and prunes dist outputs it did not produce.
+    #
+    # The build used to be skipped when no source file was newer than the newest
+    # dist file. An mtime comparison cannot see a rule that STOPPED being built:
+    # deleting source/rules/common/<x>.md, or dropping 'claude' from its audience
+    # in a commit older than the dist copy, leaves every surviving source file
+    # untouched, so the newest source stayed older than dist, the build was
+    # skipped, and the orphaned dist copy was deployed again. ADR-0015 hit that
+    # with project-skill-recommend.md. Six small reads and writes do not justify
+    # a staleness heuristic that is blind in exactly the case that matters.
     param(
         [Parameter(Mandatory)][string]$KitRoot,
-        [Parameter(Mandatory)][string]$DistRulesDir,
         [switch]$IsDryRun
     )
 
-    $sourceRulesDir = Join-Path (Join-Path $KitRoot "source") "rules"
     $buildScript = Join-Path (Join-Path $KitRoot "scripts") "build-rules.ps1"
 
-    $needBuild = $false
-    if (-not (Test-Path $DistRulesDir)) {
-        $needBuild = $true
-    } elseif (Test-Path $sourceRulesDir) {
-        $newestSource = Get-ChildItem -LiteralPath $sourceRulesDir -Recurse -Filter "*.md" -File |
-            Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
-        $newestDist = Get-ChildItem -LiteralPath $DistRulesDir -Filter "*.md" -File |
-            Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
-        if ($null -eq $newestDist) {
-            $needBuild = $true
-        } elseif ($null -ne $newestSource -and $newestSource.LastWriteTimeUtc -gt $newestDist.LastWriteTimeUtc) {
-            $needBuild = $true
-        }
-    }
-    if (-not $needBuild) { return }
-
     if ($IsDryRun) {
-        Write-Host "[dry-run] would build rules from source/rules/ (dist missing or stale)"
+        Write-Host "[dry-run] would build rules from source/rules/"
         return
     }
     if (-not (Test-Path $buildScript)) {
         Write-Warning "build-rules.ps1 not found at: $buildScript"
         return
     }
-    Write-Host "[rules] dist is missing or stale; building from source/rules/"
+    Write-Host "[rules] building from source/rules/"
     # Switch cwd to the kit root while invoking build-rules.ps1, then restore.
     Push-Location $KitRoot
     try {
-        & $buildScript | Out-Null
+        # Per-rule [build] lines would drown out apply's own output, but a stale
+        # removal must stay visible: it is the one thing here that deletes a file
+        # the previous apply deployed.
+        # 6>&1 is required: build-rules.ps1 reports through Write-Host, which goes
+        # to the information stream, and "2>&1" alone leaves it to pass straight
+        # through to the host -- capturing nothing and filtering nothing.
+        $buildOutput = & $buildScript 6>&1 2>&1
+        foreach ($line in $buildOutput) {
+            if ("$line" -match '^\[clean\]') { Write-Host "$line" }
+        }
     } finally {
         Pop-Location
     }
@@ -87,7 +87,7 @@ function Install-KitRules {
     )
 
     $distRulesDir = Join-Path (Join-Path (Join-Path $KitRoot "dist") ".claude") "rules"
-    Update-KitRulesBuild -KitRoot $KitRoot -DistRulesDir $distRulesDir -IsDryRun:$IsDryRun
+    Update-KitRulesBuild -KitRoot $KitRoot -IsDryRun:$IsDryRun
 
     $applied = @()
     if (-not (Test-Path $distRulesDir)) { return $applied }
