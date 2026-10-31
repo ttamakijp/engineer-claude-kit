@@ -6,9 +6,14 @@
 #
 # Functions:
 #   Get-RuleMetrics            - aggregate M1 / M2 / M3 from 'meta' rows
+#   Add-RuleMetricsMcpStats    - fold in lib/mcp-metrics.ps1's local-llm counters
 #   Format-RuleMetricsSection  - render the metrics as a Markdown section
-#   Read-RuleMetricsBaseline   - load a stored baseline (or $null)
-#   Write-RuleMetricsBaseline  - store the current metrics as the baseline
+#   New-RuleMetricsRow         - project one transcript row into the flat shape
+#
+# Split out of this file as it approached the 500-line cap:
+#   lib/commit-subject.ps1  - Get-CommitSubject (commit-convention parser)
+#   lib/baseline-io.ps1     - Read- / Write-RuleMetricsBaseline
+#   lib/mcp-metrics.ps1     - Get-McpDelegationStats (ADR-0016)
 #
 # Why a separate file: usage-insights.ps1 sits at the 500-line hard cap of the
 # kit's own file-granularity rule, so this logic is dot-sourced instead of
@@ -70,69 +75,6 @@ $script:RuleMetricsCCPattern = '^(feat|fix|docs|style|refactor|perf|test|build|c
 # patch script whose replacement text contained the words, for instance), which
 # then scored a line of code as a non-conforming commit subject.
 $script:RuleMetricsGitCommitPattern = '(?m)(^|[;&|(]\s*)\s*git\s+commit\b'
-
-function Get-CommitSubject {
-    # Extract the subject line from a shell command that runs git commit.
-    # Returns $null when no subject is present in the command text (for example
-    # 'git commit --amend --no-edit', or a message piped in from a file).
-    param([string]$Command)
-
-    if (-not $Command) { return $null }
-
-    $lines = $Command -split "`r?`n"
-
-    # Mark every line that sits inside a heredoc body. A report or an ADR written
-    # through a heredoc routinely contains the words "git commit", and treating
-    # such prose as an invocation produced subjects like
-    # "| | #25 rationale | conclusion |".
-    $inBody = @{}
-    $openTag = $null
-    for ($i = 0; $i -lt $lines.Count; $i++) {
-        if ($openTag) {
-            if ($lines[$i].Trim() -eq $openTag) { $openTag = $null } else { $inBody[$i] = $true }
-            continue
-        }
-        if ($lines[$i] -match '<<-?\s*[''"]?([A-Za-z_][A-Za-z0-9_]*)[''"]?') { $openTag = $Matches[1] }
-    }
-
-    # Locate the first real invocation. Scoping everything below to THIS line
-    # matters: searching the whole command for -m picked up an unrelated later
-    # 'git commit -m "x"' and reported "x" as the subject of the first commit.
-    $cmdLine = -1
-    for ($i = 0; $i -lt $lines.Count; $i++) {
-        if ($inBody.ContainsKey($i)) { continue }
-        if ($lines[$i] -match $script:RuleMetricsGitCommitPattern) { $cmdLine = $i; break }
-    }
-    if ($cmdLine -lt 0) { return $null }
-    $line = $lines[$cmdLine]
-
-    # -m "subject" / -m 'subject'. The message may be multi-line, in which case
-    # the closing quote is on a later line and the SUBJECT is the remainder of
-    # this one. The previous newline-anchored pattern required the closing quote
-    # on the same line, so every multi-line -m fell through to the heredoc branch
-    # and reported a body paragraph instead.
-    if ($line -match 'git\s+commit\b[^\r\n]*?\s-m\s+(["''])(.*)$') {
-        $quote = $Matches[1]
-        $rest = $Matches[2]
-        $end = $rest.IndexOf($quote)
-        $subject = if ($end -ge 0) { $rest.Substring(0, $end) } else { $rest }
-        $subject = $subject.Trim()
-        # '$(' only opens a command substitution; the real subject is the first
-        # line of the heredoc it reads from, handled next.
-        if ($subject -and $subject -notmatch '^\s*\$\(') { return $subject }
-    }
-
-    # Message fed through a heredoc on this line ('-F -' or -m "$(cat <<TAG").
-    # Requiring '<<' here is the point: 'git commit -F <path>' and a bare '-F -'
-    # fed by a pipe carry no subject in the command text, and guessing from the
-    # next line returned the next shell command ("git log --oneline -1").
-    if ($line -match '<<') {
-        for ($j = $cmdLine + 1; $j -lt $lines.Count; $j++) {
-            if ($lines[$j].Trim()) { return $lines[$j].Trim() }
-        }
-    }
-    return $null
-}
 
 function Get-RuleMetrics {
     # Aggregate rule-firing metrics from the 'meta' rows of Get-InsightsScope.
@@ -282,6 +224,26 @@ function Get-RuleMetrics {
     }
 }
 
+function Add-RuleMetricsMcpStats {
+    # Fold lib/mcp-metrics.ps1's counters into a Get-RuleMetrics result.
+    # Separate from Get-RuleMetrics so the existing tests can dot-source this
+    # file alone, and so rule-metrics.ps1 stays under the 500-line cap.
+    #
+    # DelegationHits / DelegationRate are deliberately NOT changed: folding
+    # local-llm into the existing numerator would redefine delegation for the
+    # third time and break comparison with snapshot 3. The local-llm counts are
+    # appended as their own fields instead (ADR-0016 decision C).
+    param(
+        [Parameter(Mandatory)]$Metrics,
+        [Parameter(Mandatory)][AllowEmptyCollection()]$Entries,
+        [string]$ProjectFilter
+    )
+    if (-not (Get-Command -Name Get-McpDelegationStats -ErrorAction SilentlyContinue)) { return $Metrics }
+    $mcp = Get-McpDelegationStats -Entries $Entries -ProjectFilter $ProjectFilter
+    foreach ($key in $mcp.Keys) { $Metrics[$key] = $mcp[$key] }
+    return $Metrics
+}
+
 function Get-RuleRate {
     # Percentage with one decimal; 0.0 when the denominator is 0 (never divide).
     param([int]$Hits, [int]$Eligible)
@@ -362,77 +324,17 @@ function Format-RuleMetricsSection {
         foreach ($o in $RuleMetrics.CommitOffenders) { $samples += ($o -replace '\|', '\|') }
         [void]$sb.AppendLine("- non-conforming subjects (sample): $($samples -join ' / ')")
     }
-    [void]$sb.AppendLine("")
+    # local-llm delegation (ADR-0016). Emits nothing when the server was unused,
+    # so a user without local-llm sees byte-identical output.
+    if (Get-Command -Name Format-McpDelegationLines -ErrorAction SilentlyContinue) {
+        foreach ($line in @(Format-McpDelegationLines -McpStats $RuleMetrics)) { [void]$sb.AppendLine($line) }
+    }    [void]$sb.AppendLine("")
     [void]$sb.AppendLine("These are proxies, not ground truth: the transcript records no trace of which")
     [void]$sb.AppendLine("instruction files were loaded. Read the delta against the baseline, not the")
     [void]$sb.AppendLine("absolute value. 'not exercised' means no eligible event occurred and is never")
     [void]$sb.AppendLine("evidence that a rule can be deleted. See ADR-0015 section E.")
     [void]$sb.AppendLine("")
     return $sb.ToString()
-}
-
-function Read-RuleMetricsBaseline {
-    # Load the stored baseline. Returns $null when absent or unreadable so the
-    # report simply omits deltas instead of failing the run.
-    param([string]$Path)
-    if (-not $Path) { return $null }
-    if (-not (Test-Path -LiteralPath $Path)) { return $null }
-    try {
-        $raw = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
-        if ([string]::IsNullOrWhiteSpace($raw)) { return $null }
-        return ($raw | ConvertFrom-Json)
-    } catch {
-        return $null
-    }
-}
-
-function Write-RuleMetricsBaseline {
-    # Persist the current rates as the baseline for later comparison. Only the
-    # three rates plus provenance are stored; the full metric object is not, so a
-    # later schema change cannot make an old baseline unreadable.
-    #
-    # Two files are written: $Path is the active comparison target (overwritten
-    # each time), and a dated sibling is kept as an archive. ADR-0015 compares
-    # three snapshots -- before distribution, after distribution, after reduction
-    # -- to separate the effect of deploying rules from the effect of trimming
-    # them, which a single overwritten file cannot support.
-    param(
-        [Parameter(Mandatory)][string]$Path,
-        [Parameter(Mandatory)]$RuleMetrics,
-        [string]$DateStr,
-        [int]$WindowDays = 7,
-        [switch]$NoArchive
-    )
-    if (-not $DateStr) { $DateStr = (Get-Date).ToString('yyyy-MM-dd') }
-    $payload = [ordered]@{
-        RecordedOn          = $DateStr
-        WindowDays          = $WindowDays
-        PlanFirstRate       = $RuleMetrics.PlanFirstRate
-        PlanFirstStrictRate = $RuleMetrics.PlanFirstStrictRate
-        PlanFirstEligible   = $RuleMetrics.PlanFirstEligible
-        DelegationRate      = $RuleMetrics.DelegationRate
-        DelegationEligible  = $RuleMetrics.DelegationEligible
-        CommitRate          = $RuleMetrics.CommitRate
-        CommitExtracted     = $RuleMetrics.CommitExtracted
-    }
-    $dir = Split-Path -Parent $Path
-    if ($dir -and -not (Test-Path -LiteralPath $dir)) {
-        New-Item -ItemType Directory -Force -Path $dir | Out-Null
-    }
-    $json = $payload | ConvertTo-Json -Depth 3
-    Write-Utf8NoBom -Path $Path -Content $json
-
-    if (-not $NoArchive) {
-        # <name>-<date>.json beside the active baseline. Re-running on the same
-        # day replaces that day's archive, which keeps one entry per day rather
-        # than one per invocation.
-        $leaf = [System.IO.Path]::GetFileNameWithoutExtension($Path)
-        $ext = [System.IO.Path]::GetExtension($Path)
-        $archiveName = "$leaf-$DateStr$ext"
-        $archive = if ($dir) { Join-Path $dir $archiveName } else { $archiveName }
-        if ($archive -ne $Path) { Write-Utf8NoBom -Path $archive -Content $json }
-    }
-    return $Path
 }
 
 function New-RuleMetricsRow {
@@ -515,6 +417,9 @@ function New-RuleMetricsRow {
         # cannot be told apart from a real change in adherence.
         Cwd          = [string]$Obj.cwd
         RequestId    = [string]$Obj.requestId
+        # Raw model id of the turn. Only assistant rows carry one; lib/mcp-metrics.ps1
+        # carries the last seen value forward to attribute a tool result to a family.
+        Model        = [string]$Obj.message.model
         BlockIndex   = [int]($Obj.apiBlockIndex | ForEach-Object { if ($_) { $_ } else { 0 } })
         IsSidechain  = [bool]$Obj.isSidechain
         BlockType    = $blockType
