@@ -198,6 +198,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   regression test: `tests/project-mode.tests.ps1`「CLAUDE.md preservation」。
 - **`apply-claude-kit.ps1`** — scheduled-task deploy が親ディレクトリ不在で失敗していた問題を修正 (G6i)。Write-Utf8NoBom 直前で New-Item で ensure。
 - **`apply-claude-kit.ps1`** — non-interactive context (background process / slash command 経由) を auto-detect し settings wizard を自動 skip (G6k)。`/apply` で wizard が hang する問題を解消。
+- **`scripts/build-rules.ps1`** — dist に残った前回 build の出力を剪定するよう修正。
+  dist は累積場所ではなく build 出力なので、**今回 build しなかった `*.md` は削除する**。
+  apply は `dist/.claude/rules/` の `*.md` を全部配布するため、剪定が無いと
+  「source 側で配布を止めた rule」が配布され続ける。実害: `local-llm-fallback.md` が
+  `audience: [kit]` (PR #100 で配布保留) にもかかわらず `~/.claude/rules/` へ配布され、
+  常時ロード面が 9,505 -> 11,073 B (+16.5%) に膨らんでいた。source filter で出力を
+  止めるだけでは不十分で、**前回の出力を消す**必要がある。
+  - 削除は `*.md` 限定・非再帰。`-DistDir` は呼出側が渡せる引数 (test は temp dir を
+    指す) なので、`Remove-Item -Recurse -Force $DistDir` だと引数の打ち間違いが
+    そのままデータ消失になる。この script が所有するのは自分が書いた `<id>.md` だけ
+  - dry-run では削除せず `[dry-run] remove stale ...` を表示するだけ
+  - `$PSScriptRoot` は `powershell -File <script>` の param default 評価時には空で、
+    `-SourceDir` / `-DistDir` を明示しないと Join-Path で落ちていた。default の解決を
+    本文へ移し、手で build を回せるようにした (本 bug の手動復旧で最初に叩く経路)
+- **`scripts/lib/rules-deploy.ps1`** — `Update-KitRulesBuild` の staleness 判定を撤去し
+  毎回 build するよう変更。「source のどれも dist より新しくなければ skip」という
+  mtime 比較は、**build されなくなった rule を検出できない**。source を 1 本削除しても
+  (あるいは dist より古い commit で `audience` から `claude` を外しても) 残りの source
+  file の mtime は動かないため、dist は「新しい」ままで build が skip され、dist に
+  残った孤児がまた配布される。ADR-0015 の `project-skill-recommend.md` がこの経路。
+  build は 6 ファイルの読み書きで、肝心の場合に外れる heuristic を正当化しない。
+  - build 出力のうち `[clean]` 行だけ apply の出力へ転送する (`[build]` 行は抑制)。
+    前回 apply が配布したファイルを消す唯一の処理なので、見えないままにしない
+  - `Write-Host` は information stream へ出るため capture は `6>&1` が必須
+    (`2>&1` だけでは素通りして、抑制も転送も成立しない)
+- regression test: `tests/build-rules.tests.ps1` (剪定 / dry-run 非削除 / 配布数が
+  opt-in 数と一致)、`tests/global-mode.tests.ps1`「Update-KitRulesBuild」(dist が
+  source より新しくても build する / `[clean]` 転送と `[build]` 抑制 / dry-run skip)。
+  修正前の build-rules.ps1 で新規 2 件が fail することを確認済み。
 
 ## [0.1.0] - 2026-06-10
 

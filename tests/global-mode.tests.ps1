@@ -211,3 +211,62 @@ Describe "Install-KitRules orphan removal" {
         Remove-Item -Recurse -Force $dir
     }
 }
+
+Describe "Update-KitRulesBuild" {
+    # The build used to run only when a source file was newer than the newest
+    # dist file. That heuristic is blind to a rule that STOPPED being built: no
+    # surviving source file is touched when one is deleted, or when 'claude' is
+    # dropped from its audience in a commit older than the dist copy. dist
+    # therefore looked fresh, the build was skipped, and the orphan it still
+    # held was deployed again. Observed 2026-10-31: local-llm-fallback.md
+    # reached ~/.claude/rules/ despite 'audience: [kit]' (always-loaded surface
+    # 9,505 -> 11,073 B). The build is cheap; the heuristic was not sound.
+    . (Join-Path $libDir "rules-deploy.ps1")
+
+    function New-KitBuildFixture {
+        $root = Join-Path ([System.IO.Path]::GetTempPath()) ("kitbuild-" + [System.Guid]::NewGuid().ToString("N"))
+        $scripts = Join-Path $root "scripts"
+        New-Item -ItemType Directory -Force -Path $scripts | Out-Null
+        New-Item -ItemType Directory -Force -Path (Join-Path (Join-Path $root "source") "rules") | Out-Null
+        New-Item -ItemType Directory -Force -Path (Join-Path (Join-Path (Join-Path $root "dist") ".claude") "rules") | Out-Null
+
+        # Stand-in for build-rules.ps1: records that it ran and emits one line of
+        # each kind the caller filters on.
+        $stub = @'
+Set-Content -LiteralPath (Join-Path $PSScriptRoot "..\build-ran.txt") -Value "ran" -Encoding ASCII
+Write-Host "[build] source/rules/a.md -> dist/.claude/rules/a.md"
+Write-Host "[clean] removed stale dist/.claude/rules/gone.md"
+'@
+        Set-Content -LiteralPath (Join-Path $scripts "build-rules.ps1") -Value $stub -Encoding ASCII
+        Write-Utf8NoBom -Path (Join-Path (Join-Path (Join-Path $root "source") "rules") "a.md") -Content "# src"
+        return $root
+    }
+
+    It "builds even when every dist file is newer than every source file" {
+        $root = New-KitBuildFixture
+        $orphan = Join-Path (Join-Path (Join-Path (Join-Path $root "dist") ".claude") "rules") "gone.md"
+        Write-Utf8NoBom -Path $orphan -Content "# orphan"
+        (Get-Item -LiteralPath $orphan).LastWriteTimeUtc = (Get-Date).ToUniversalTime().AddDays(1)
+
+        Update-KitRulesBuild -KitRoot $root
+
+        Test-Path (Join-Path $root "build-ran.txt") | Should Be $true
+        Remove-Item -Recurse -Force $root
+    }
+
+    It "reports the build's stale removal and hides its per-rule build lines" {
+        $root = New-KitBuildFixture
+        $out = (Update-KitRulesBuild -KitRoot $root 6>&1) -join "`n"
+
+        $out | Should Match "\[clean\] removed stale"
+        ($out -match "\[build\]") | Should Be $false
+        Remove-Item -Recurse -Force $root
+    }
+
+    It "skips the build in dry-run mode" {
+        $root = New-KitBuildFixture
+        Update-KitRulesBuild -KitRoot $root -IsDryRun
+        Test-Path (Join-Path $root "build-ran.txt") | Should Be $false
+        Remove-Item -Recurse -Force $root
+    }
+}
