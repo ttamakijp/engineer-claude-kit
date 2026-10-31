@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`templates/local-llm/` prompt template (ADR-0016、計画 (b))** — path を受ける
+  3 tool 向けの prompt 本体。`config/local-llm-delegation.yaml` の
+  `system_prompt_ref` が kit 相対パスでここを指す。**apply は配布しない**
+  (`templates/` の subdir 明示列挙に入れない。委譲時に kit 側から読めばよく、
+  配布対象を増やさない。PR #100 の `audience: [kit]` と同じ思想)。
+  - `log-summary.md` -> `local_llm__summarize_log` (4 節固定の構造化要約)
+  - `commit-message.md` -> `local_llm__draft_commit_message` (Conventional Commits)
+  - `review-file.md` -> `local_llm__review_file` (security / quality / style、focus 対応)
+  - 想定 model は **`qwen2.5-coder:7b`** (Phase 1、`hx99g-local-llm/config/ollama-models.yaml`
+    の `7b-instruct-q4_K_M` alias)。7B 前提で指示を短くし、出力骨格を固定で与え、
+    **推測で理由を書かせない**ことを各 template で明示した。diff や log に無い why を
+    もっともらしく捏造するのが 7B で最も害のある失敗
+  - `commit-message.md` はモデルに **what (事実) のみ**書かせる。commit body の
+    **why は diff から読み取れない**ため、why は main agent が追記する
+    (commit-convention rule の「body に why」は main agent 側の責務として残る)
+  - `review-file.md` は編集させない (`apply_edits: self`)。7B に repo 全体の文脈が
+    無く、無条件適用は file-granularity / commit-convention に反する変更を入れる
+  - frontmatter に `target_tool` / `audience` / `description` / `model` / `delivery` /
+    `output_contract` / `output_sections` / `contract_markers` を宣言。
+    **prompt 本文は日本語だが、PS 5.1 で日本語リテラルが parse を壊すため**
+    test は本文を引用せず、ASCII の frontmatter marker だけを検証する
+- `tests/local-llm-templates.tests.ps1` (15 件) — frontmatter の必須キー、tool 名の
+  重複なし、`no-invention` / `no-rewrite` / `no-edit` / `no-footer` marker、
+  UTF-8 no BOM、`output_sections` と骨格の節数の一致を固定。
 - **`config/local-llm-delegation.yaml` (ADR-0016 決定 A)** — 委譲先の定義。MCP tool
   名を CLAUDE.md に直書きすると local-llm を持たない利用者に無効な指示が常時
   ロードされるため (ADR-0016 未解決の問い 5)、tool 名は config に置き §3 は
