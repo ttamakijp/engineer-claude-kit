@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`config/local-llm-delegation.yaml` (ADR-0016 決定 A)** — 委譲先の定義。MCP tool
+  名を CLAUDE.md に直書きすると local-llm を持たない利用者に無効な指示が常時
+  ロードされるため (ADR-0016 未解決の問い 5)、tool 名は config に置き §3 は
+  参照だけにした。`enabled` 既定 false で upstream は inert。
+  - **判定基準は 1 つ: 大きな入力を自分の context に載せずに済むか。** したがって
+    **path を受ける tool だけが委譲先**。本文を inline で受ける tool (`chat` 等) は
+    渡すために先に自分が読む必要があり、締め出しが成立しない。Haiku 委譲が損だった
+    構造と同じ。local-llm 側 repo の設計方針と一致する
+    (「path を渡して server 側で読ませる。context に載せてから渡すのでは目的が
+    達成できない」)
+  - `commit_msg` は `generate_commit_message` + **`diff_path`** で `status: available`
+    (実測で呼出 5 件中 4 件が `diff_path` 17-30 字)。diff が既に context にある場合は
+    委譲しない (`skip_when`)
+  - `log_summary` / `lint_fix` は path を受ける `summarize_log` / `review_file` を
+    指すが **`status: not_deployed`**。実機の deploy は `health` / `chat` /
+    `generate_commit_message` の 3 tool のみで、path を受ける 2 つは local-llm 側で
+    設計済・未 deploy。`chat` で代替はしない (締め出しが成立しないため)
+- `tests/local-llm-delegation.tests.ps1` (10 件) — 「inline 入力の tool を委譲先に
+  しない」「§3 に MCP tool 名を直書きしない」を回帰として固定。
 - **local-llm 委譲の計測 (ADR-0016 decision C)** — rule 指標が `Agent` / `Task` の
   `subagent_type` しか見ておらず、`mcp__*` の呼出が完全に不可視だった。snapshot 3 の
   7 日窓には local-llm への 9 件 (`generate_commit_message` 5 / `chat` 2 /
@@ -96,6 +115,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`templates/CLAUDE.md` §3** — Haiku sub-agent (`commit-msg` / `lint-helper` /
+  `log-summary`) への委譲指示を削除し、委譲先を
+  `~/.claude-kit/config/local-llm-delegation.yaml` 参照に変更した。3,920 -> 4,191 B。
+- **`templates/skills/commit-helper/SKILL.md`** — `commit-msg` sub-agent (Haiku) を
+  Task tool で起動する手順を削除した。PR #95 で §3 から Haiku 委譲を外した時点で
+  **skill が指示と正反対のことを能動的に指示していた** ((c) の `HaikuZero` hint と
+  同種の drift)。config の `commit_msg` に従い、diff を一時ファイルへ書き出して
+  path を渡す経路と、自分で書く経路に分けた。
+- **`templates/skills/usage-insights/SKILL.md`** — `haiku-delegation` 指標の説明を
+  更新。定義は snapshot 3 時点で凍結しており、現 §3 が Haiku を委譲先にしないため
+  構造的に 0% に近づくが、これは遵守率の低下ではなく指示の変更である点を明記した
+  (ADR-0016 決定 C の注記 1)。存在しない `§3.1` 参照も修正。
 - **`scripts/lib/plain-language-hints.json`** — `HaikuZero` hint を**削除**し、
   `OpusHeavy` を local-llm へ向け直した。`HaikuZero` は Haiku turn が 0 件のときに
   「commit message やログ要約を別の AI に振れ」と助言していたが、CLAUDE.md §3 は
@@ -192,6 +223,18 @@ ADR-0001~0012 による設計決定、自己ガバナンス (CI / lint / leak do
 
 ### Changed
 
+- **`templates/CLAUDE.md` §3** — Haiku sub-agent (`commit-msg` / `lint-helper` /
+  `log-summary`) への委譲指示を削除し、委譲先を
+  `~/.claude-kit/config/local-llm-delegation.yaml` 参照に変更した。3,920 -> 4,191 B。
+- **`templates/skills/commit-helper/SKILL.md`** — `commit-msg` sub-agent (Haiku) を
+  Task tool で起動する手順を削除した。PR #95 で §3 から Haiku 委譲を外した時点で
+  **skill が指示と正反対のことを能動的に指示していた** ((c) の `HaikuZero` hint と
+  同種の drift)。config の `commit_msg` に従い、diff を一時ファイルへ書き出して
+  path を渡す経路と、自分で書く経路に分けた。
+- **`templates/skills/usage-insights/SKILL.md`** — `haiku-delegation` 指標の説明を
+  更新。定義は snapshot 3 時点で凍結しており、現 §3 が Haiku を委譲先にしないため
+  構造的に 0% に近づくが、これは遵守率の低下ではなく指示の変更である点を明記した
+  (ADR-0016 決定 C の注記 1)。存在しない `§3.1` 参照も修正。
 - **`scripts/lib/plain-language-hints.json`** — `HaikuZero` hint を**削除**し、
   `OpusHeavy` を local-llm へ向け直した。`HaikuZero` は Haiku turn が 0 件のときに
   「commit message やログ要約を別の AI に振れ」と助言していたが、CLAUDE.md §3 は
