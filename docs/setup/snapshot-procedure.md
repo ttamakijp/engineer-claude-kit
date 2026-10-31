@@ -82,10 +82,13 @@ powershell -NoProfile -File scripts/usage-insights.ps1 -Window Weekly -OutputDir
 | ファイル | 公開関数 |
 |---|---|
 | `scripts/usage-insights.ps1` | `Get-ModelFamily` / `Import-Pricing` / `Get-InsightsScope` / `Get-UsageMetrics` / `Get-Median` / `Get-CostTrend` / `Write-InsightsReport` / `Invoke-UsageInsights` |
-| `scripts/lib/rule-metrics.ps1` | `Get-CommitSubject` / `Get-RuleMetrics` / `Get-RuleRate` / `Get-RuleVerdict` / `Format-RuleMetricsSection` / `Read-RuleMetricsBaseline` / `Write-RuleMetricsBaseline` / `New-RuleMetricsRow` |
+| `scripts/lib/rule-metrics.ps1` | `Get-RuleMetrics` / `Add-RuleMetricsMcpStats` / `Get-RuleRate` / `Get-RuleVerdict` / `Format-RuleMetricsSection` / `New-RuleMetricsRow` |
+| `scripts/lib/commit-subject.ps1` | `Get-CommitSubject` |
+| `scripts/lib/baseline-io.ps1` | `Read-RuleMetricsBaseline` / `Write-RuleMetricsBaseline` |
+| `scripts/lib/mcp-metrics.ps1` | `Get-McpModelFamily` / `Get-McpShortToolName` / `Get-McpDelegationStats` / `Format-McpDelegationLines` |
 | `scripts/lib/insights-report.ps1` | `Format-InsightsReport` |
 
-**17 関数すべて名前が一意で、機能の重複はありません。** 収集 (`usage-insights.ps1`)、
+**関数名はすべて一意で、機能の重複はありません。** 収集 (`usage-insights.ps1`)、
 rule 指標 (`rule-metrics.ps1`)、描画 (`insights-report.ps1`) で責務が分かれています。
 分割の理由は kit 自身の file-granularity 500 行上限です (ADR-0015)。
 

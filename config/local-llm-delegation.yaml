@@ -1,0 +1,72 @@
+# local-llm 委譲先の定義 (ADR-0016)。CLAUDE.md §3 がこのファイルを参照する。
+#
+# なぜ config か: MCP tool 名を CLAUDE.md に直書きすると、local-llm を持たない
+# 利用者に無効な指示が常時ロードされる (ADR-0016 未解決の問い 5)。tool 名はここに
+# 置き、§3 は「このファイルに定義された宛先を使う」とだけ書く。local-llm が無い
+# 環境では enabled: false のままで、§3 の指示は「自分で処理する」に帰着する。
+#
+# enabled の既定は false。upstream kit は inert な状態で配布し、local-llm を
+# 動かしている checkout だけが true にする (config/models.yaml と同じ運用)。
+enabled: true
+
+# 委譲の判定基準は 1 つだけ: **大きな入力を自分の context に載せずに済むか**。
+#
+# これは local-llm 側 repo の設計方針と同じ (docs/claude-code-integration.md §2.3):
+#   「設計の要点は path を渡して server 側で読ませること。log ファイルの中身を
+#     Claude の context に載せてから local に渡すのでは、コスト削減の目的が
+#     達成できない」
+#
+# したがって **path を受ける tool だけが委譲先になる**。本文を inline で受ける
+# tool (chat 等) は、渡すために先に自分が読む必要があり、締め出しが成立しない。
+# Haiku 委譲が損だった理由と同じ構造 (実測 1 回 $0.082-0.120 vs 自分で $0.023-0.060、
+# docs/step-6-items/item-4-subagent-cost-measurement.md)。
+#
+# status:
+#   available     - 実機で確認済。使ってよい
+#   not_deployed  - local-llm 側で設計済だが未 deploy。fallback に従う
+# fallback: self = 自分で処理する。Haiku へは振り直さない (ADR-0016 決定 B)
+
+delegation:
+  commit_msg:
+    mcp_tool: local_llm__generate_commit_message
+    # diff_path を渡す。inline の diff は使わない (載せてしまうと締め出せない)。
+    # 実測: 呼出 5 件中 4 件が diff_path (17-30 字)、1 件が inline diff (448 字)。
+    input: diff_path
+    status: available
+    fallback: self
+    # diff が既に自分の context にある場合は委譲しない。締め出せる入力が無く、
+    # 往復だけが増える。
+    skip_when: diff_already_in_context
+    # 実機で deploy 済なのは generate_commit_message (server 内蔵 prompt) で、
+    # 下記 prompt は path 版 draft_commit_message が deploy された時点で効く。
+    system_prompt_ref: templates/local-llm/commit-message.md
+
+  log_summary:
+    # 8,000 字を超える build / test / lint 出力の要約。
+    # path を受ける tool なので締め出しが成立する。
+    mcp_tool: local_llm__summarize_log
+    input: path
+    status: not_deployed
+    fallback: self
+    system_prompt_ref: templates/local-llm/log-summary.md
+    # 実機の deploy は health / chat / generate_commit_message の 3 tool のみ
+    # (local-llm 側 docs/deployment-guide.md、および transcript の実測と一致)。
+    # chat で代替しないこと: 本文を prompt に inline するため締め出しが成立せず、
+    # 委譲の根拠が消える。
+    blocked_by: local-llm 側に summarize_log が未 deploy
+
+  lint_fix:
+    # 単一ファイルの typo / フォーマット / import 整理の一次指摘。
+    mcp_tool: local_llm__review_file
+    input: path
+    status: not_deployed
+    fallback: self
+    system_prompt_ref: templates/local-llm/review-file.md
+    blocked_by: local-llm 側に review_file が未 deploy
+    # 指摘を受けても **編集は自分で行う**。local 側に repo 全体の文脈が無く、
+    # 無条件に適用すると file-granularity / commit-convention に反する変更が入る。
+    apply_edits: self
+
+# 不達 (失敗 / timeout / 空出力) 時の挙動は
+# source/rules/common/local-llm-fallback.md (ADR-0016 決定 B)。
+# Phase 1 では配布保留中 (決定 C の注記 3)。

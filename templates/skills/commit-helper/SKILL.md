@@ -2,7 +2,8 @@
 name: commit-helper
 description: |
   Conventional Commits 形式でコミットメッセージを生成する補助 skill。
-  軽作業のため commit-msg sub-agent (Haiku 4.5) を Task tool で起動して委譲する。
+  委譲先は config/local-llm-delegation.yaml の commit_msg に従う。
+  定義が無い / 利用不可なら自分で書く (CLAUDE.md §3)。
 ---
 
 # commit-helper
@@ -18,16 +19,27 @@ Conventional Commits 形式 (`<type>(<scope>): <subject>`) のコミットメッ
 
 ## 実行手順
 
-1. `git diff --cached` (staged) または `git diff HEAD` (未 stage) で対象 diff を取得
-2. ユーザに修正意図 (1-2 行) を確認 (省略可、diff から推定可能なら skip)
-3. **Task tool** で `commit-msg` sub-agent (Haiku 4.5) を起動し、以下を渡す:
-   - `git diff` 結果 (全文または要約)
-   - 修正意図 (取得できた場合)
-4. sub-agent の返した message を提示し、ユーザの承認後に `git commit -m "<message>"` を実行する
+1. `~/.claude-kit/config/local-llm-delegation.yaml` の `delegation.commit_msg` を見る
+2. `enabled: true` かつ `status: available` で、**diff をまだ自分の context に
+   読み込んでいない** 場合のみ委譲する:
+   - diff を一時ファイルへ書き出し、その **path** を `input` の指定どおり渡す
+     (`diff_path`)。diff 本文を inline で渡さない
+   - 返った message を提示する
+3. それ以外は **自分で書く**:
+   - `git diff --cached` (staged) または `git diff HEAD` (未 stage) で diff を読む
+   - 修正意図を 1-2 行でユーザに確認する (diff から推定できるなら省略可)
+   - Conventional Commits 形式で subject と body を書く
+4. ユーザの承認後に `git commit` を実行する
 
 ## 制約
 
-- `commit-msg` sub-agent が「不明」と返した場合、main agent (Opus 5) が引き取り、ユーザに追加情報を求める
-- `git commit` の実行は **明示承認後** のみ。skill が自動で commit しない
+- **diff が既に context にある場合は委譲しない。** 締め出せる入力が無く、往復だけが
+  増える (CLAUDE.md §3 / config の `skip_when: diff_already_in_context`)
+- **Haiku sub-agent へは委譲しない。** 実測で委譲は 1 回 $0.082-0.120、自分で書くと
+  $0.023-0.060 (`docs/step-6-items/item-4-subagent-cost-measurement.md`)
+- 委譲先が「不明」を返した / 出力が疑わしい場合は自分が引き取る。不達時は
+  Haiku へ振り直さず自分で処理する (ADR-0016 決定 B)
+- `git commit` の実行は **明示承認後** のみ。skill が自動で commit しない。
+  `git commit` を打つのは常に main agent 自身 (CLAUDE.md §3)
 - main 直 push は禁止 (commit までで止める)
 - 既存 commit-convention rule (`~/.claude/rules/commit-convention.md`) を必ず参照

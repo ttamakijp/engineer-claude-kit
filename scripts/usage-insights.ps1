@@ -13,6 +13,8 @@
 # Dot-sourced from lib/ (split out to stay inside the kit's own 500-line
 # file-granularity cap once rule-firing metrics landed; see ADR-0015):
 #   lib/insights-report.ps1 - Format-InsightsReport (Markdown rendering)
+#   lib/mcp-metrics.ps1     - Get-McpDelegationStats + lib/baseline-io.ps1
+
 #   lib/rule-metrics.ps1    - Get-RuleMetrics / New-RuleMetricsRow /
 #                             Format-RuleMetricsSection / baseline read+write,
 #                             driven by Get-InsightsScope -IncludeRuleMetrics
@@ -57,6 +59,12 @@ if (-not $env:USERPROFILE) { $env:USERPROFILE = $env:HOME }
 # Loaded after the encoding helper because Write-RuleMetricsBaseline writes via
 # Write-Utf8NoBom. See ADR-0015 section E.
 . (Join-Path (Join-Path $PSScriptRoot "lib") "rule-metrics.ps1")
+# Commit-subject parser, baseline archive I/O, and local-llm MCP counters. All
+# split out of rule-metrics.ps1 to keep it under the 500-line cap; these load
+# after it because they read the $script:RuleMetrics* constants (ADR-0016).
+. (Join-Path (Join-Path $PSScriptRoot "lib") "commit-subject.ps1")
+. (Join-Path (Join-Path $PSScriptRoot "lib") "baseline-io.ps1")
+. (Join-Path (Join-Path $PSScriptRoot "lib") "mcp-metrics.ps1")
 # Activity-by-project breakdown (Get-ProjectMix / Format-ProjectMixSection).
 # Publishes which repositories supplied the window so a shift in composition is
 # not mistaken for a change in adherence. See ADR-0015 section E.
@@ -442,6 +450,7 @@ function Invoke-UsageInsights {
     $entries = Get-InsightsScope -WindowDays $windowDays -IncludeRuleMetrics
     $metrics = Get-UsageMetrics -Entries $entries -Pricing $pricing
     $ruleMetrics = Get-RuleMetrics -Entries $entries
+    $ruleMetrics = Add-RuleMetricsMcpStats -Metrics $ruleMetrics -Entries $entries
     $projectMix = Get-ProjectMix -Entries $entries
 
     if (-not (Test-Path -LiteralPath $OutputDir)) {

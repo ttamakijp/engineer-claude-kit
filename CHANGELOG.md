@@ -9,6 +9,88 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`templates/local-llm/` prompt template (ADR-0016、計画 (b))** — path を受ける
+  3 tool 向けの prompt 本体。`config/local-llm-delegation.yaml` の
+  `system_prompt_ref` が kit 相対パスでここを指す。**apply は配布しない**
+  (`templates/` の subdir 明示列挙に入れない。委譲時に kit 側から読めばよく、
+  配布対象を増やさない。PR #100 の `audience: [kit]` と同じ思想)。
+  - `log-summary.md` -> `local_llm__summarize_log` (4 節固定の構造化要約)
+  - `commit-message.md` -> `local_llm__draft_commit_message` (Conventional Commits)
+  - `review-file.md` -> `local_llm__review_file` (security / quality / style、focus 対応)
+  - 想定 model は **`qwen2.5-coder:7b`** (Phase 1、`hx99g-local-llm/config/ollama-models.yaml`
+    の `7b-instruct-q4_K_M` alias)。7B 前提で指示を短くし、出力骨格を固定で与え、
+    **推測で理由を書かせない**ことを各 template で明示した。diff や log に無い why を
+    もっともらしく捏造するのが 7B で最も害のある失敗
+  - `commit-message.md` はモデルに **what (事実) のみ**書かせる。commit body の
+    **why は diff から読み取れない**ため、why は main agent が追記する
+    (commit-convention rule の「body に why」は main agent 側の責務として残る)
+  - `review-file.md` は編集させない (`apply_edits: self`)。7B に repo 全体の文脈が
+    無く、無条件適用は file-granularity / commit-convention に反する変更を入れる
+  - frontmatter に `target_tool` / `audience` / `description` / `model` / `delivery` /
+    `output_contract` / `output_sections` / `contract_markers` を宣言。
+    **prompt 本文は日本語だが、PS 5.1 で日本語リテラルが parse を壊すため**
+    test は本文を引用せず、ASCII の frontmatter marker だけを検証する
+- `tests/local-llm-templates.tests.ps1` (15 件) — frontmatter の必須キー、tool 名の
+  重複なし、`no-invention` / `no-rewrite` / `no-edit` / `no-footer` marker、
+  UTF-8 no BOM、`output_sections` と骨格の節数の一致を固定。
+- **`config/local-llm-delegation.yaml` (ADR-0016 決定 A)** — 委譲先の定義。MCP tool
+  名を CLAUDE.md に直書きすると local-llm を持たない利用者に無効な指示が常時
+  ロードされるため (ADR-0016 未解決の問い 5)、tool 名は config に置き §3 は
+  参照だけにした。`enabled` 既定 false で upstream は inert。
+  - **判定基準は 1 つ: 大きな入力を自分の context に載せずに済むか。** したがって
+    **path を受ける tool だけが委譲先**。本文を inline で受ける tool (`chat` 等) は
+    渡すために先に自分が読む必要があり、締め出しが成立しない。Haiku 委譲が損だった
+    構造と同じ。local-llm 側 repo の設計方針と一致する
+    (「path を渡して server 側で読ませる。context に載せてから渡すのでは目的が
+    達成できない」)
+  - `commit_msg` は `generate_commit_message` + **`diff_path`** で `status: available`
+    (実測で呼出 5 件中 4 件が `diff_path` 17-30 字)。diff が既に context にある場合は
+    委譲しない (`skip_when`)
+  - `log_summary` / `lint_fix` は path を受ける `summarize_log` / `review_file` を
+    指すが **`status: not_deployed`**。実機の deploy は `health` / `chat` /
+    `generate_commit_message` の 3 tool のみで、path を受ける 2 つは local-llm 側で
+    設計済・未 deploy。`chat` で代替はしない (締め出しが成立しないため)
+- `tests/local-llm-delegation.tests.ps1` (10 件) — 「inline 入力の tool を委譲先に
+  しない」「§3 に MCP tool 名を直書きしない」を回帰として固定。
+- **local-llm 委譲の計測 (ADR-0016 decision C)** — rule 指標が `Agent` / `Task` の
+  `subagent_type` しか見ておらず、`mcp__*` の呼出が完全に不可視だった。snapshot 3 の
+  7 日窓には local-llm への 9 件 (`generate_commit_message` 5 / `chat` 2 /
+  `health` 2) があったが、指標は「delegation 0%」と報告していた。この 0% は
+  「委譲が無かった」ではなく「知っている 2 つの tool 名への委譲が無かった」を
+  測っていた。
+  - `scripts/lib/mcp-metrics.ps1` — `Get-McpDelegationStats` が work 呼出を数え、
+    `health` は可用性 probe として work から除外する。tool 名の server 部分
+    (`mcp__<server>__`) は user 設定なので、tool 側の `local_llm__` 接頭辞で照合
+  - `DelegationDisplaced` — 軽作業を**どの model が処理したか**の内訳
+    (`Local` / `Haiku` / `Opus` / `Sonnet`)。ADR-0016 未解決の問い 3 のとおり
+    「local-llm が処理したので Opus が処理しなかった」は transcript から事後に
+    判定できないため、単一 snapshot の `Local` は上限値 (下限 0) として扱い、
+    点推定として報告しない。snapshot 間の差分として読む
+  - `DelegationHits` / `DelegationRate` は**意図的に変更しない**。local-llm を
+    既存の分子に合算すると delegation の定義が 3 度目の変更となり snapshot 3 と
+    比較できなくなるため、新しいフィールドとして追加する
+  - baseline schema は既存キーの**後ろに追記**。キーが無い snapshot は 0 ではなく
+    「未計測」として扱い、`compare-snapshots.ps1` は差分を出さず最初の計測点と
+    して報告する (0 -> 7 と描くと、指標が見始めただけの変化を増加と誤認させる)
+  - `scripts/lib/commit-subject.ps1` / `scripts/lib/baseline-io.ps1` — 500 行上限
+    対策の抽出。`rule-metrics.ps1` は PR #95 の時点で既に 528 行で上限を超えていた
+    (計画時の 499 行という計測が誤っていた) -> 433 行に低下
+  - `tests/mcp-metrics.tests.ps1` (23 件) / `tests/compare-snapshots.tests.ps1` (+5 件)
+- **local-llm 不達時の escalate rule (ADR-0016 決定 B)** —
+  `source/rules/common/local-llm-fallback.md`。**Phase 1 では配布しない**
+  (`audience` に `claude` を含めず build 出力から外す。ADR-0016 決定 C の注記 3)。
+  local-llm の不達は実測で 0 件のため、未観測の障害に常時ロードの指示を先回りで
+  足すのは ADR-0015 の「足す前に測る」に反し、snapshot 4 で測る常時ロード面
+  そのものを汚す。内容は先に固めて repo に残し、配布だけ保留する。常時ロード面は
+  **9,505 B で据え置き**。失敗が 1 件でも観測されたら配布へ切り替える
+  (ADR-0016 未解決の問い 6)。
+  不達なら Haiku へ振り直さず自分で処理する、という分岐を表で固定した。
+  `health` は委譲が必要になった時に 1 回だけ叩き、session 冒頭の先回り確認は
+  しない (往復が増え、委譲で浮いた分を食い潰す)。一度不達ならその session 中は
+  再確認しない。ADR-0016 未解決の問い 2 を本 PR で close。
+- **`templates/local-llm/`** — prompt template の置き場所 (placeholder)。中身は
+  PR (b) で作る。`apply-claude-kit.ps1` は `templates/` の各 subdir を明示列挙して
+  配布するため、本 dir は**配布されない** (意図どおり)。
 - **branch-protection 機能** — GitHub リポジトリに kit 標準の branch protection
   ruleset (`protect-main`: deletion / non_fast_forward / required_linear_history /
   pull_request を既定ブランチに適用) が入っているかを確認し、未適用なら適用を提案する。
@@ -57,6 +139,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`templates/CLAUDE.md` §3** — Haiku sub-agent (`commit-msg` / `lint-helper` /
+  `log-summary`) への委譲指示を削除し、委譲先を
+  `~/.claude-kit/config/local-llm-delegation.yaml` 参照に変更した。3,920 -> 4,191 B。
+- **`templates/skills/commit-helper/SKILL.md`** — `commit-msg` sub-agent (Haiku) を
+  Task tool で起動する手順を削除した。PR #95 で §3 から Haiku 委譲を外した時点で
+  **skill が指示と正反対のことを能動的に指示していた** ((c) の `HaikuZero` hint と
+  同種の drift)。config の `commit_msg` に従い、diff を一時ファイルへ書き出して
+  path を渡す経路と、自分で書く経路に分けた。
+- **`templates/skills/usage-insights/SKILL.md`** — `haiku-delegation` 指標の説明を
+  更新。定義は snapshot 3 時点で凍結しており、現 §3 が Haiku を委譲先にしないため
+  構造的に 0% に近づくが、これは遵守率の低下ではなく指示の変更である点を明記した
+  (ADR-0016 決定 C の注記 1)。存在しない `§3.1` 参照も修正。
+- **`scripts/lib/plain-language-hints.json`** — `HaikuZero` hint を**削除**し、
+  `OpusHeavy` を local-llm へ向け直した。`HaikuZero` は Haiku turn が 0 件のときに
+  「commit message やログ要約を別の AI に振れ」と助言していたが、CLAUDE.md §3 は
+  PR #95 以降「commit message は自分で書く」(委譲のほうが高い) としており、
+  **指標の助言が指示と正反対**になっていた。Haiku 0 件は現在は意図された状態なので
+  助言ごと削除し、`insights-report.ps1` の発火行も落とした。
+  test は hint の一覧を JSON から導出する形に変え (hard-code した一覧が drift の
+  原因だった)、`HaikuZero` が復活しないことを回帰として固定した。
 - **`apply-claude-kit.ps1`** — settings wizard で ANTHROPIC_SMALL_FAST_MODEL の backend 選択 default を `1` (Bedrock) から `s` (Skip) に変更 (G6j)。明示 opt-in 原則に整合。
 - **`scripts/usage-insights.ps1` (G6g)** — `Format-InsightsReport` に人間語併記を追加。
   技術メトリクスはそのまま残し、各 finding 直後に blockquote で対人類比を提示
@@ -145,6 +247,26 @@ ADR-0001~0012 による設計決定、自己ガバナンス (CI / lint / leak do
 
 ### Changed
 
+- **`templates/CLAUDE.md` §3** — Haiku sub-agent (`commit-msg` / `lint-helper` /
+  `log-summary`) への委譲指示を削除し、委譲先を
+  `~/.claude-kit/config/local-llm-delegation.yaml` 参照に変更した。3,920 -> 4,191 B。
+- **`templates/skills/commit-helper/SKILL.md`** — `commit-msg` sub-agent (Haiku) を
+  Task tool で起動する手順を削除した。PR #95 で §3 から Haiku 委譲を外した時点で
+  **skill が指示と正反対のことを能動的に指示していた** ((c) の `HaikuZero` hint と
+  同種の drift)。config の `commit_msg` に従い、diff を一時ファイルへ書き出して
+  path を渡す経路と、自分で書く経路に分けた。
+- **`templates/skills/usage-insights/SKILL.md`** — `haiku-delegation` 指標の説明を
+  更新。定義は snapshot 3 時点で凍結しており、現 §3 が Haiku を委譲先にしないため
+  構造的に 0% に近づくが、これは遵守率の低下ではなく指示の変更である点を明記した
+  (ADR-0016 決定 C の注記 1)。存在しない `§3.1` 参照も修正。
+- **`scripts/lib/plain-language-hints.json`** — `HaikuZero` hint を**削除**し、
+  `OpusHeavy` を local-llm へ向け直した。`HaikuZero` は Haiku turn が 0 件のときに
+  「commit message やログ要約を別の AI に振れ」と助言していたが、CLAUDE.md §3 は
+  PR #95 以降「commit message は自分で書く」(委譲のほうが高い) としており、
+  **指標の助言が指示と正反対**になっていた。Haiku 0 件は現在は意図された状態なので
+  助言ごと削除し、`insights-report.ps1` の発火行も落とした。
+  test は hint の一覧を JSON から導出する形に変え (hard-code した一覧が drift の
+  原因だった)、`HaikuZero` が復活しないことを回帰として固定した。
 - `/apply` 中心の Quick Start 再構成 + skill / command の責務分離明記 (#45)。
 - pwsh 専用前提を解消し PS 5.1 互換を hard rule 化 (install-deps は opt-in, #46)。
 - config / model 解決を `lib/models-config.ps1` に抽出し apply を 508 -> 393 行に

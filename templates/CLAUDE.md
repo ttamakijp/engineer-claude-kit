@@ -17,14 +17,17 @@ engineer-claude-kit が `~/.claude/CLAUDE.md` へ配置します。変更は
 
 ## 3. モデル使い分け
 
-main agent は Opus 5。**大きな入力を自分の context に載せたくない**ときに Haiku
-sub-agent へ委譲する: 8,000 字を超える build / test / lint 出力の要約 →
-`log-summary`。単純な事実確認は直接 Haiku。
+main agent は Opus 5。委譲の判定基準は 1 つ: **大きな入力を自分の context に載せずに
+済むか**。載せずに済むなら委譲し、載せる必要があるなら自分で処理する。
 
-commit message と小さな整形 (typo・フォーマット・import 整理) は **自分で書く**。
-diff は既に context にあるので委譲しても締め出せる入力が無く、sub-agent は
-self-contained prompt のため cache を作り直す。実測で委譲は 1 回 $0.082-0.120、
-自分で書くと $0.023-0.060 (`docs/step-6-items/item-4-subagent-cost-measurement.md`)。
+委譲先は `~/.claude-kit/config/local-llm-delegation.yaml` に定義する。`enabled: false`
+または該当する定義が `status: available` でない場合は **自分で処理する**。
+`skip_when` / `fallback` / `apply_edits` の指定に従う。
+
+**Haiku sub-agent へは委譲しない。** 本文を prompt に載せ直すため締め出しが成立せず、
+self-contained prompt で cache も作り直す。実測で委譲は 1 回 $0.082-0.120、自分で書くと
+$0.023-0.060 (`docs/step-6-items/item-4-subagent-cost-measurement.md`)。同じ理由で、
+本文を inline で受ける委譲先 (`chat` 等) も使わない。**path を受ける宛先だけが委譲先**。
 
 設計判断・バグ調査・複数ファイル横断・因果推論を伴う議論も自分で処理する
 (`architect` / `debug-analyze` / `review` sub-agent も可)。迷ったら自分で処理する
