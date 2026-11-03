@@ -245,7 +245,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `paths` なし = 無条件ロード、1,271 B)。§3 と重複する内容 (コスト実測値 / path 宛先
   限定 / 迷ったら自分で / commit は自分で) は書かず、**§3 に無いものだけ**を持つ:
   (1) 該当場面の列挙 (2) 出力を先にファイルへ落として path を渡す手順 (3) config を
-  1 回読む。常時ロード面は 9,505 → 10,776 B (+13.4%)。ADR-0015 の「足す前に測る」に
+  1 回読む。常時ロード面は 9,772 → 11,043 B
+  (+13.0%、実測)。9,505 B は PR #101 で §3 が 4,187 B に増える前の値。ADR-0015 の
+  「足す前に測る」に
   対しては **§3 の指示が実測 0 件で発火していない**ことが追加根拠。効果は snapshot 5 で判定
 - **`templates/local-llm/` → `config/local-llm/`** (git mv)。`system_prompt_ref` を
   `local-llm/<name>.md` とし、基準を **yaml があるディレクトリ** と定義した。これで
