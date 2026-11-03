@@ -60,7 +60,7 @@ Describe "config/local-llm-delegation.yaml" {
             $line | Should Match 'fallback\s*:\s*self\s*$'
         }
     }
-    It "keeps every system_prompt_ref kit-relative" {
+    It "keeps every system_prompt_ref relative to the yaml directory" {
         $text = Read-Utf8NoBom -Path $ConfigPath
         $refs = @()
         foreach ($line in ($text -split "`r?`n")) {
@@ -70,7 +70,10 @@ Describe "config/local-llm-delegation.yaml" {
         foreach ($r in $refs) {
             # An absolute path would not survive a clone to another machine.
             $r | Should Not Match '^([A-Za-z]:|/|~)'
-            $r | Should Match '^templates/local-llm/[a-z-]+\.md$'
+            # Relative to the directory holding the yaml, so one line resolves
+            # both in the repo (config/) and after deploy (~/.claude/config/).
+            # See ADR-0017 decision B.
+            $r | Should Match '^local-llm/[a-z-]+\.md$'
         }
     }
     # Every ref must name a file that actually ships. The config and the templates
@@ -79,7 +82,7 @@ Describe "config/local-llm-delegation.yaml" {
     # check therefore runs only once the templates are present, and becomes
     # effective on the branch where both have merged.
     It "points every system_prompt_ref at a template that exists" {
-        $templateDir = Join-Path (Join-Path $repoRoot "templates") "local-llm"
+        $templateDir = Join-Path (Join-Path $repoRoot "config") "local-llm"
         $missing = @()
         # Gate on a prompt template actually being present, NOT on the directory:
         # PR (c) created templates/local-llm/ holding only a placeholder README,
@@ -94,7 +97,7 @@ Describe "config/local-llm-delegation.yaml" {
             $text = Read-Utf8NoBom -Path $ConfigPath
             foreach ($line in ($text -split "`r?`n")) {
                 if ($line -match '^\s*system_prompt_ref\s*:\s*(\S+)\s*$') {
-                    if (-not (Test-Path (Join-Path $repoRoot $Matches[1]))) { $missing += $Matches[1] }
+                    if (-not (Test-Path (Join-Path (Split-Path -Parent $ConfigPath) $Matches[1]))) { $missing += $Matches[1] }
                 }
             }
         }
@@ -122,6 +125,15 @@ Describe "templates/CLAUDE.md section 3" {
     It "points at the config instead" {
         $text = Read-Utf8NoBom -Path $ClaudeMd
         $text | Should Match 'local-llm-delegation\.yaml'
+    }
+    # ADR-0017 cause 2: pointing at the kit checkout makes a session follow
+    # whatever branch happens to be checked out there.
+    It "points at the deployed config, not the kit checkout" {
+        $text = Read-Utf8NoBom -Path $ClaudeMd
+        $deployed = [regex]::Escape('~/.claude/config/local-llm-delegation.yaml')
+        $checkout = [regex]::Escape('~/.claude-kit/config/local-llm-delegation.yaml')
+        $text | Should Match $deployed
+        $text | Should Not Match $checkout
     }
     # PR #95 withdrew Haiku delegation; a skill or hint that still recommends it
     # contradicts the instruction the agent is given.

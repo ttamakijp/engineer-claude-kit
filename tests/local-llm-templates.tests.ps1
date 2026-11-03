@@ -1,7 +1,7 @@
 # local-llm-templates.tests.ps1
 # Pester v3.4 tests (Windows PowerShell 5.1 + PS 7). ASCII only.
 #
-# Lints templates/local-llm/*.md (ADR-0016, PR (b)). These prompts are consumed
+# Lints config/local-llm/*.md (ADR-0016 / ADR-0017). These prompts are consumed
 # by a 7B quantised model, so the contract that matters is structural: every
 # template declares which tool it targets, which model it was written for, and
 # the fixed output shape the kit reads the result back as. A template that drifts
@@ -16,14 +16,14 @@
 
 $here = if ($PSScriptRoot) { $PSScriptRoot } elseif ($MyInvocation.MyCommand.Path) { Split-Path -Parent $MyInvocation.MyCommand.Path } else { (Get-Location).Path }
 $repoRoot = Join-Path $here ".."
-$TemplateDir = Join-Path (Join-Path $repoRoot "templates") "local-llm"
+$TemplateDir = Join-Path (Join-Path $repoRoot "config") "local-llm"
 . (Join-Path (Join-Path (Join-Path $repoRoot "scripts") "lib") "encoding-helper.ps1")
 
 # README carries no frontmatter; it documents the directory.
 $script:PromptFiles = @(Get-ChildItem -LiteralPath $TemplateDir -Filter "*.md" -File |
     Where-Object { $_.Name -ne 'README.md' })
 
-Describe "templates/local-llm" {
+Describe "config/local-llm" {
     It "ships the three prompt templates plus a README" {
         Test-Path (Join-Path $TemplateDir "README.md") | Should Be $true
         @($script:PromptFiles).Count | Should Be 3
@@ -46,7 +46,7 @@ Describe "templates/local-llm" {
     }
 }
 
-Describe "templates/local-llm frontmatter" {
+Describe "config/local-llm frontmatter" {
     It "declares the required keys in every prompt template" {
         $missing = @()
         foreach ($f in $script:PromptFiles) {
@@ -103,7 +103,7 @@ Describe "templates/local-llm frontmatter" {
     }
 }
 
-Describe "templates/local-llm output contracts" {
+Describe "config/local-llm output contracts" {
     # The failure mode that matters most on a small model: inventing a rationale
     # that is not in the diff or the log. Every template must forbid it.
     It "carries the no-invention marker in every template" {

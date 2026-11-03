@@ -67,6 +67,19 @@ Describe "apply-claude-kit.ps1 Global-mode rule distribution" {
         $state = Get-LinkState -Path $md
         $state.IsLink | Should Be $false
     }
+    # ADR-0017: the firing conditions have to reach the machine-wide rules dir.
+    # Section 3 carries the criterion but the rule carries the trigger list, and
+    # snapshot 4 measured 0 local-llm calls with the rule deployed nowhere.
+    It "deploys the local-llm firing rule" {
+        Test-Path (Join-Path $MockRules "local-llm-delegation.md") | Should Be $true
+    }
+    It "deploys the local-llm delegation config and its prompts" {
+        $cfgDir = Join-Path $MockClaude "config"
+        Test-Path (Join-Path $cfgDir "local-llm-delegation.yaml") | Should Be $true
+        foreach ($n in @('log-summary.md', 'commit-message.md', 'review-file.md')) {
+            Test-Path (Join-Path (Join-Path $cfgDir "local-llm") $n) | Should Be $true
+        }
+    }
     It "leaves no backup directory when nothing was overwritten" {
         # A first-time Global apply overwrites nothing, so New-KitBackup must not
         # have created an empty timestamped folder.
