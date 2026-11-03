@@ -79,6 +79,11 @@ Assert-NonElevated -AllowElevated:$AllowElevated
 # New-KitBackup above. Extracted for the same 500-line reason as models-config.
 . (Join-Path (Join-Path $PSScriptRoot "lib") "rules-deploy.ps1")
 
+# Global-only config payloads: Install-KitWorkSchedule (ADR-0006) and
+# Install-KitLocalLlmConfig (ADR-0017). Depends on the encoding helpers and
+# on New-KitBackup above.
+. (Join-Path (Join-Path $PSScriptRoot "lib") "config-deploy.ps1")
+
 # Project-type detection + skill suggestion. Replaces the project-skill-recommend
 # rule, which re-derived this every session unverifiably. See ADR-0015 section C.
 . (Join-Path (Join-Path $PSScriptRoot "lib") "skill-recommend.ps1")
@@ -378,29 +383,12 @@ if ($mode -eq "Project") {
     }
 }
 
-# Work schedule config (Global mode only)
-# config/work-schedule.yaml powers the work-end-reminder rule (ADR-0006). A
-# single global copy at ~/.claude/work-schedule.yaml covers every project, so
-# it is intentionally skipped in Project mode. It is preserved when it already
-# exists so the user's edited schedule is never clobbered (same policy as the
-# Group C root config files above).
+# Global-only config payloads (ADR-0006 work schedule, ADR-0017 local-llm).
+# Both describe the machine rather than a project, so Project mode skips them.
 if ($mode -eq "Global") {
-    $scheduleSource = Join-Path (Join-Path $KitRoot "config") "work-schedule.yaml"
-    $scheduleDest = Join-Path $homeClaude "work-schedule.yaml"
-    if ((Test-Path $scheduleSource) -and -not (Test-Path $scheduleDest)) {
-        if ($DryRun) {
-            Write-Host "[dry-run] $scheduleSource -> $scheduleDest"
-        } else {
-            # Plain YAML, no role placeholders: verbatim UTF-8 (no BOM) copy.
-            $scheduleContent = Read-Utf8NoBom -Path $scheduleSource
-            Write-Utf8NoBom -Path $scheduleDest -Content $scheduleContent
-            Write-Host "[apply] $scheduleSource -> $scheduleDest"
-            Write-Host "[hint] To enable work-end reminder, edit ~/.claude/work-schedule.yaml with your work schedule."
-        }
-        $appliedFiles += $scheduleDest
-    } elseif (Test-Path $scheduleDest) {
-        Write-Host "[skip] $scheduleDest already exists (preserving user customization)"
-    }
+    $appliedFiles += Install-KitWorkSchedule -KitRoot $KitRoot -HomeClaude $homeClaude -IsDryRun:$DryRun
+    $appliedFiles += Install-KitLocalLlmConfig -KitRoot $KitRoot -HomeClaude $homeClaude `
+        -BackupRoot $backupRoot -BackupStamp $backupStamp -IsDryRun:$DryRun
 }
 
 # Cleanup-orphan-processes scheduled task (Global mode, opt-in only -- ADR-0011)
