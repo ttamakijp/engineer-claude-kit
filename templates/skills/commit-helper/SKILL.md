@@ -19,7 +19,7 @@ Conventional Commits 形式 (`<type>(<scope>): <subject>`) のコミットメッ
 
 ## 実行手順
 
-1. `~/.claude-kit/config/local-llm-delegation.yaml` の `delegation.commit_msg` を見る
+1. `~/.claude/config/local-llm-delegation.yaml` の `delegation.commit_msg` を見る
 2. `enabled: true` かつ `status: available` で、**diff をまだ自分の context に
    読み込んでいない** 場合のみ委譲する:
    - diff を一時ファイルへ書き出し、その **path** を `input` の指定どおり渡す
