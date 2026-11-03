@@ -21,6 +21,10 @@ enabled: true
 # Haiku 委譲が損だった理由と同じ構造 (実測 1 回 $0.082-0.120 vs 自分で $0.023-0.060、
 # docs/step-6-items/item-4-subagent-cost-measurement.md)。
 #
+# system_prompt_ref は **このファイルがあるディレクトリからの相対パス**。
+# repo では config/local-llm/<name>.md、配布後は ~/.claude/config/local-llm/<name>.md
+# に解決される。どちらでも同じ 1 行で届くようにするための相対指定 (ADR-0017)。
+#
 # status:
 #   available     - 実機で確認済。使ってよい
 #   not_deployed  - local-llm 側で設計済だが未 deploy。fallback に従う
@@ -39,7 +43,7 @@ delegation:
     skip_when: diff_already_in_context
     # 実機で deploy 済なのは generate_commit_message (server 内蔵 prompt) で、
     # 下記 prompt は path 版 draft_commit_message が deploy された時点で効く。
-    system_prompt_ref: templates/local-llm/commit-message.md
+    system_prompt_ref: local-llm/commit-message.md
 
   log_summary:
     # 8,000 字を超える build / test / lint 出力の要約。
@@ -48,7 +52,7 @@ delegation:
     input: path
     status: not_deployed
     fallback: self
-    system_prompt_ref: templates/local-llm/log-summary.md
+    system_prompt_ref: local-llm/log-summary.md
     # 実機の deploy は health / chat / generate_commit_message の 3 tool のみ
     # (local-llm 側 docs/deployment-guide.md、および transcript の実測と一致)。
     # chat で代替しないこと: 本文を prompt に inline するため締め出しが成立せず、
@@ -61,7 +65,7 @@ delegation:
     input: path
     status: not_deployed
     fallback: self
-    system_prompt_ref: templates/local-llm/review-file.md
+    system_prompt_ref: local-llm/review-file.md
     blocked_by: local-llm 側に review_file が未 deploy
     # 指摘を受けても **編集は自分で行う**。local 側に repo 全体の文脈が無く、
     # 無条件に適用すると file-granularity / commit-convention に反する変更が入る。

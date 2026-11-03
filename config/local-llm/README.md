@@ -1,12 +1,13 @@
-# templates/local-llm/
+# config/local-llm/
 
 local-llm MCP の各 tool に渡す prompt。`config/local-llm-delegation.yaml` の
-`system_prompt_ref` がここを指す (kit 相対パス。絶対パスにしない)。
+`system_prompt_ref` がここを指す。参照は **yaml があるディレクトリからの相対**
+なので、repo では `config/local-llm/<name>.md`、配布後は
+`~/.claude/config/local-llm/<name>.md` に同じ 1 行で解決される。
 
-**apply は配布しない。** `apply-claude-kit.ps1` は `templates/` の各 subdir を明示列挙
-して配布しており、本 dir はその列挙に入っていない。prompt は `~/.claude/` に置く必要が
-なく、委譲時に kit 側 (`~/.claude-kit/templates/local-llm/`) から読めばよい。
-配布対象を増やさない方針は PR #100 の `audience: [kit]` と同じ考え方。
+**apply が `~/.claude/config/local-llm/` へ配布する** (ADR-0017)。従来は kit の
+checkout から読む前提だったが、それでは checkout の branch で runtime の挙動が
+変わる。配布後は最後に apply した内容だけが効く。
 
 ## 一覧
 
