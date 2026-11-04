@@ -27,7 +27,6 @@ CLAUDE.md §3 の判定基準 (大きな入力を context に載せずに済む�
 
 - 本文を読んでから渡さない。読んだ時点で締め出しが成立せず往復だけ増える
 - `status: available` でない定義へ委譲しない (`fallback: self` に従う)
-- `commit-msg` / `log-summary` / `lint-helper` sub-agent へ振り直さない
 
 ## 関連
 
