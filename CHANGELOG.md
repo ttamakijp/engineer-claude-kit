@@ -227,6 +227,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   opt-in 数と一致)、`tests/global-mode.tests.ps1`「Update-KitRulesBuild」(dist が
   source より新しくても build する / `[clean]` 転送と `[build]` 抑制 / dry-run skip)。
   修正前の build-rules.ps1 で新規 2 件が fail することを確認済み。
+- **local-llm 委譲が runtime に届いていなかった問題を修正 (ADR-0017)** — snapshot 4
+  (2026-10-28〜11-03) の Local call = 0 / Health probe = 0 は、repo が正しい一方で
+  `~/.claude/` に何も配布されていなかったことによる。原因は 3 つあり、どれも単独で
+  委譲をゼロにする。
+  - **配布経路が無い**: `config/local-llm-delegation.yaml` は `templates/` 配下でも
+    dist の rule でも root config でもなく、apply の配布対象に入っていなかった
+  - **§3 が kit checkout を指していた**: `~/.claude-kit/config/...` は install 先の
+    **慣習**であって保証ではなく、開発機では working checkout への symlink。つまり
+    **branch を切り替えると session が従う指示が変わる**。参照を配布版
+    `~/.claude/config/local-llm-delegation.yaml` に変更した
+  - **判定基準はあるが発火条件が無い**: §3 は基準を書き宛先は config を読めと書くが、
+    該当場面の列挙が常時ロード面に無い。一方 `~/.claude/agents/` には Haiku 委譲先
+    3 本が配布済で description が毎 session 載る。local-llm 側だけ「ファイルを読みに
+    行かないと存在を知れない」非対称があった
+- **`source/rules/common/local-llm-delegation.md` 新設** (`audience: [claude]`、
+  `paths` なし = 無条件ロード、1,271 B)。§3 と重複する内容 (コスト実測値 / path 宛先
+  限定 / 迷ったら自分で / commit は自分で) は書かず、**§3 に無いものだけ**を持つ:
+  (1) 該当場面の列挙 (2) 出力を先にファイルへ落として path を渡す手順 (3) config を
+  1 回読む。常時ロード面は 9,772 → 11,043 B
+  (+13.0%、実測)。9,505 B は PR #101 で §3 が 4,187 B に増える前の値。ADR-0015 の
+  「足す前に測る」に
+  対しては **§3 の指示が実測 0 件で発火していない**ことが追加根拠。効果は snapshot 5 で判定
+- **`templates/local-llm/` → `config/local-llm/`** (git mv)。`system_prompt_ref` を
+  `local-llm/<name>.md` とし、基準を **yaml があるディレクトリ** と定義した。これで
+  repo (`config/`) と配布後 (`~/.claude/config/`) の両方で同じ 1 行が解決し、配布時に
+  内容を書き換える必要が無くなる (書き換えは drift の原因になるため採らない)
+- **`scripts/lib/config-deploy.ps1` 新設** — `Install-KitLocalLlmConfig` /
+  `Install-KitWorkSchedule`。`apply-claude-kit.ps1` が 500 行上限に達していたため、
+  work-schedule の配布も含めて抽出した (500 → 488 行)。local-llm config は生成物
+  なので上書き配布、ただし差分がある配布済 copy は先に backup する。Project mode は
+  対象外 (local-llm は machine の属性でプロジェクトの属性でない)
+- **`scripts/check-kit-deployment.ps1` 新設** — **repo ではなく `~/.claude/` を**
+  検証する self-check。本件と PR #103 (dist に stale が残る) はどちらも「source は
+  正しいが target が違う」形で、repo 内からは見えなかった。rule の配布漏れ / 配布
+  保留 rule の残存 / config と prompt の解決 / §3 と配布 path の一致を確認し、
+  失敗で exit 1。Haiku agent との矛盾は **warning** (Phase 2 の判断待ちで、gate と
+  しては通す)
+- test: `tests/config-deploy.tests.ps1` (12 件)、`tests/global-mode.tests.ps1` に
+  配布 2 件、`tests/local-llm-delegation.tests.ps1` に配布 path 1 件。実機検証は
+  apply 前が 8 件 FAIL、apply 後が 20 件 PASS + 3 warning
 
 ## [0.1.0] - 2026-06-10
 

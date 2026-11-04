@@ -20,7 +20,7 @@ engineer-claude-kit が `~/.claude/CLAUDE.md` へ配置します。変更は
 main agent は Opus 5。委譲の判定基準は 1 つ: **大きな入力を自分の context に載せずに
 済むか**。載せずに済むなら委譲し、載せる必要があるなら自分で処理する。
 
-委譲先は `~/.claude-kit/config/local-llm-delegation.yaml` に定義する。`enabled: false`
+委譲先は `~/.claude/config/local-llm-delegation.yaml` に定義する。`enabled: false`
 または該当する定義が `status: available` でない場合は **自分で処理する**。
 `skip_when` / `fallback` / `apply_edits` の指定に従う。
 
