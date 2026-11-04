@@ -119,16 +119,24 @@ prompt 本体を `templates/local-llm/` から **`config/local-llm/`** へ移し
 
 ## 未解決の問い (Phase 2)
 
-1. **`~/.claude/agents/` の Haiku 委譲先 3 本をどうするか**。§3 は Haiku 委譲を
-   禁止しているのに、`commit-msg` / `log-summary` / `lint-helper` は配布され
-   description が毎 session 載る。削除するには orphan 削除を `rules/` から
-   `agents/` へ拡張する必要がある (しないと配布済 copy が残り続ける = PR #103 と
-   同型)。本 ADR では self-check の **warning** として報告するだけに留めた
+1. ~~**`~/.claude/agents/` の Haiku 委譲先 3 本をどうするか**~~ → **解決済 (Phase 2)**。
+   `commit-msg` / `log-summary` / `lint-helper` を `templates/agents/` から削除し、
+   orphan 削除を `rules/` から `agents/` へ一般化した (`scripts/lib/orphan-cleanup.ps1`)。
+   agent file は不活性ではなく description が毎 session の agent 一覧に載るため、
+   配布を止めるだけでは不足で、**配布済 copy の削除**まで必要だった (PR #103 と同型)。
+   self-check は warning ではなく FAIL で判定する (apply で解消できる = gate として
+   使える)。実測で agent 一覧から約 577 B/session が消え、常時ロード面は
+   11,043 → 11,018 B
 2. `log_summary` / `lint_fix` は `status: not_deployed` のまま。HX99G 側で
    `summarize_log` / `review_file` が deploy されるまで発火し得ない。Phase 1 の
    配布だけで発火が期待できるのは `commit_msg` のみ
 3. snapshot 5 (apply 後 1 週間) で Local call > 0 を確認する。0 のままなら原因は
-   配布ではなく発火条件そのものであり、未解決の問い 1 が本命になる
+   配布ではなく発火条件そのものであり、未解決の問い 2 (宛先が未 deploy) が本命になる
+4. **kit 管理外の agent 6 本** (`commit-writer` / `log-summarizer` / `code-reviewer` /
+   `boilerplate-gen` / `checkpoint` / `resume`) が `~/.claude/agents/` に残る。
+   marker の `applied_files` に無いため kit は削除せず報告のみ行う。うち
+   `commit-writer` / `log-summarizer` の description は "MUST BE USED proactively"
+   であり §3 と正面から矛盾する。削除は user の判断に委ねる
 
 ## 関連
 

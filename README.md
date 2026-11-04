@@ -131,9 +131,6 @@ bootstrap 実行後、以下の 2 層構造で配置される。
 ~/.claude/
 |-- CLAUDE.md                 # 全プロジェクト共通指示 (Haiku/Sonnet 4.5 自動使い分け含む)
 |-- agents/                   # sub-agent 定義 (ADR-0004)
-|   |-- commit-msg.md         # Haiku 委譲: コミットメッセージ生成
-|   |-- lint-helper.md        # Haiku 委譲: typo / フォーマット / 軽微 refactor
-|   |-- log-summary.md        # Haiku 委譲: build / test ログ要約
 |   |-- review.md             # Sonnet 4.5: コードレビュー (設計判断含む)
 |   |-- architect.md          # Sonnet 4.5: 設計判断・ADR 起票
 |   `-- debug-analyze.md      # Sonnet 4.5: 因果推論・根本原因分析
@@ -273,7 +270,7 @@ engineer-claude-kit/
 |   `-- rules/                # Claude rules の single source
 |-- templates/                # ~/.claude へ配布する素材 (apply-claude-kit が参照)
 |   |-- CLAUDE.md             # 共通 CLAUDE.md 素材
-|   |-- agents/               # commit-msg / lint-helper / log-summary / review / architect / debug-analyze
+|   |-- agents/               # review / architect / debug-analyze
 |   |-- skills/               # apply-claude-kit / commit-helper / leak-check / propose-adr
 |   `-- commands/             # apply.md (/apply slash command)
 |-- scripts/
@@ -305,14 +302,11 @@ engineer-claude-kit/
 | `CLAUDE.md` | 全プロジェクト共通の指示、Haiku/Sonnet 4.5 自動使い分けルール (ADR-0004) | ✅ Phase 2 |
 | `work-schedule.yaml` | 終業時刻リマインダ用の **曜日別フォールバック** (interactive 質問が無い場合に使用。初回 apply 時に配置・既存なら skip、user 編集可) | ✅ Phase 4 |
 | `.work-end-today` | 今日の終業時刻 marker (印・記録ファイル)。朝の初回ターン interactive 質問への回答を日次記録し、当日の reminder を制御 (ADR-0006、Claude が runtime 生成・自動更新) | ✅ Phase 4 |
-| `agents/commit-msg.md` | コミットメッセージ生成 (Haiku 委譲) | ✅ Phase 2 |
-| `agents/lint-helper.md` | 軽微修正 (Haiku 委譲) | ✅ Phase 2 |
-| `agents/log-summary.md` | ビルド/テストログ要約 (Haiku 委譲) | ✅ Phase 2 |
 | `agents/review.md` | コードレビュー (Sonnet 4.5) | ✅ Phase 2 |
 | `agents/architect.md` | 設計判断・ADR 起票 (Sonnet 4.5) | ✅ Phase 2 |
 | `agents/debug-analyze.md` | 因果推論・根本原因分析 (Sonnet 4.5) | ✅ Phase 2 |
 | `skills/apply-claude-kit/` | プロジェクトへ kit を配布する skill | ✅ Phase 2 |
-| `skills/commit-helper/` | Conventional Commits 補助 (Haiku 委譲) | ✅ Phase 3.1 |
+| `skills/commit-helper/` | Conventional Commits 補助 (委譲先は `config/local-llm-delegation.yaml`) | ✅ Phase 3.1 |
 | `skills/leak-check/` | PII / credentials / 機密ファイル 検出 | ✅ Phase 3.1 |
 | `skills/propose-adr/` | ADR draft 起票 (architect sub-agent 連携) | ✅ Phase 3.1 |
 | `skills/android-build/` | Android ビルド・ADB 操作支援 (Group F project-recommend 候補) | ✅ Phase 4 |
@@ -502,7 +496,7 @@ safety filter は **全て満たすもののみ kill**: 起動から 10 分以�
 - main agent: **Sonnet 4.5** (`us.anthropic.claude-sonnet-4-5-20250929-v1:0`)
 - small fast model: **Haiku 4.5** (`us.anthropic.claude-haiku-4-5-20251001-v1:0`)
 - Bedrock 経由: `ENABLE_PROMPT_CACHING_1H_BEDROCK=1` + `AWS_MAX_ATTEMPTS=2`
-- 軽作業 (commit-msg / lint / log-summary) は Haiku sub-agent に自動委譲
+- 軽作業の Haiku sub-agent 委譲は**撤回済** (ADR-0016 決定 B)。本文を prompt に載せ直すため締め出しが成立せず、自分で書くより高い。委譲先は `config/local-llm-delegation.yaml` (ADR-0017)
 - model ID は `config/models.yaml` SSoT で管理。`~/.claude/settings.json` は user 自身が `docs/setup/` の example から設定 (ADR-0007 hands-off policy)
 - コスト観測: `scripts/cost-observe-bedrock.ps1` が AWS Cost Explorer から weekly report を生成、`config/cost-budget.yaml` のしきい値で予算監視 (Phase 3.2)
 
