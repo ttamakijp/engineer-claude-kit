@@ -35,25 +35,19 @@ if (-not $TargetRoot) {
 
 $script:Failures = @()
 $script:Checked = 0
-$script:Warnings = @()
-
 function Assert-KitState {
     param(
         [Parameter(Mandatory)][string]$What,
         [Parameter(Mandatory)][bool]$Condition,
-        [string]$Detail,
-        # A -Warn assertion reports but does not fail the run. Used for
-        # findings that need a decision rather than a re-apply.
-        [switch]$Warn
+        [string]$Detail
     )
     $script:Checked++
     if ($Condition) {
         Write-Host "  [ok]   $What"
     } else {
-        $label = if ($Warn) { "warn" } else { "FAIL" }
-        Write-Host "  [$label] $What"
+        Write-Host "  [FAIL] $What"
         if ($Detail) { Write-Host "         $Detail" }
-        if ($Warn) { $script:Warnings += $What } else { $script:Failures += $What }
+        $script:Failures += $What
     }
 }
 
@@ -132,25 +126,35 @@ Assert-KitState -What "deployed: rules/local-llm-delegation.md (firing condition
     -Condition (Test-Path $triggerRule) `
     -Detail "without it a session has the criterion but no trigger; snapshot 4 measured 0 calls"
 
-# --- 4. nothing still advertises the delegation targets section 3 forbids
-# Reported, not failed: removing these templates also needs the orphan-removal
-# machinery extended from rules/ to agents/, or the deployed copies survive
-# forever (PR #103 one directory over). That is its own change -- see ADR-0017
-# phase 2.
-Write-Host "contradictions"
+# --- 4. agents: the shipped set has to be deployed, the withdrawn set absent
+# Claude Code offers every file in <target>/agents/ as a delegation target and
+# shows its description in the session's agent roster, so this directory decides
+# what a session believes it may delegate to. The three Haiku delegation agents
+# were withdrawn (ADR-0016 decision B) while CLAUDE.md section 3 already forbade
+# Haiku delegation; a surviving copy contradicts the instruction every session.
+# Failing rather than warning is the point: apply now removes them, so a hit
+# here means the deploy did not take, which is exactly what a re-apply fixes.
+Write-Host "agents"
 $agentsDir = Join-Path $TargetRoot "agents"
-foreach ($stale in @("commit-msg.md", "log-summary.md", "lint-helper.md")) {
-    $p = Join-Path $agentsDir $stale
-    Assert-KitState -Warn -What "no Haiku delegation agent: agents/$stale" -Condition (-not (Test-Path $p)) `
-        -Detail "CLAUDE.md section 3 forbids Haiku delegation, but this agent advertises it every session"
+$templateAgents = @()
+$templateAgentDir = Join-Path (Join-Path $KitRoot "templates") "agents"
+if (Test-Path $templateAgentDir) {
+    $templateAgents = @(Get-ChildItem -LiteralPath $templateAgentDir -Filter "*.md" -File |
+        ForEach-Object { $_.Name })
+}
+foreach ($name in $templateAgents) {
+    Assert-KitState -What "deployed: agents/$name" -Condition (Test-Path (Join-Path $agentsDir $name)) `
+        -Detail "run apply-claude-kit.ps1 -Global"
+}
+# Named explicitly, not derived: these three are gone from templates/, so a
+# check derived only from what the kit ships could never notice them again.
+foreach ($withdrawn in @("commit-msg.md", "log-summary.md", "lint-helper.md")) {
+    Assert-KitState -What "withdrawn, so absent: agents/$withdrawn" `
+        -Condition (-not (Test-Path (Join-Path $agentsDir $withdrawn))) `
+        -Detail "CLAUDE.md section 3 forbids Haiku delegation, but this agent advertises it every session; re-run apply"
 }
 
 Write-Host ""
-if ($script:Warnings.Count -gt 0) {
-    Write-Host "$($script:Warnings.Count) warning(s) - a decision is pending, not a re-apply:"
-    foreach ($w in $script:Warnings) { Write-Host "  - $w" }
-    Write-Host ""
-}
 if ($script:Failures.Count -eq 0) {
     Write-Host "PASS - $($script:Checked) check(s), no issues"
     exit 0

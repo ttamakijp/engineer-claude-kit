@@ -162,6 +162,13 @@ Describe "check-kit-deployment.ps1" {
         foreach ($r in (Get-ChildItem -LiteralPath $DistRules -Filter "*.md" -File)) {
             Write-Utf8NoBom -Path (Join-Path $rules $r.Name) -Content (Read-Utf8NoBom -Path $r.FullName)
         }
+        # The agent payload is checked too: every agent the kit ships has to be
+        # deployed, and the three withdrawn Haiku ones absent.
+        $agents = Join-Path $claude "agents"
+        New-Item -ItemType Directory -Force -Path $agents | Out-Null
+        foreach ($a in (Get-ChildItem -LiteralPath (Join-Path (Join-Path $KitRoot "templates") "agents") -Filter "*.md" -File)) {
+            Write-Utf8NoBom -Path (Join-Path $agents $a.Name) -Content (Read-Utf8NoBom -Path $a.FullName)
+        }
         $null = Install-KitLocalLlmConfig -KitRoot $KitRoot -HomeClaude $claude
         $md = '## 3.' + [Environment]::NewLine + '~/.claude/config/local-llm-delegation.yaml'
         Write-Utf8NoBom -Path (Join-Path $claude "CLAUDE.md") -Content $md
@@ -174,10 +181,11 @@ Describe "check-kit-deployment.ps1" {
         Remove-Item -Recurse -Force $target
     }
 
-    # The Haiku-agent contradiction is a pending decision (ADR-0017 phase 2), so
-    # it has to report without failing the run -- otherwise the script could
-    # never be used as a gate.
-    It "reports a Haiku delegation agent as a warning, not a failure" {
+    # Was a warning while removing the three agents was still a pending decision
+    # (ADR-0017 phase 2). It is a failure now that apply removes them: a hit
+    # means the deploy did not take, which a re-apply fixes, so the script can
+    # still be used as a gate.
+    It "fails when a withdrawn Haiku delegation agent is still deployed" {
         $target = New-HomeFixture
         $claude = Join-Path $target ".claude"
         $agents = Join-Path $claude "agents"
@@ -186,9 +194,11 @@ Describe "check-kit-deployment.ps1" {
         Write-Utf8NoBom -Path (Join-Path $agents "commit-msg.md") -Content "# haiku"
 
         $output = (& powershell -NoProfile -File $CheckScript -TargetRoot $claude -KitRoot $KitRoot 2>&1) -join "`n"
+        $code = $LASTEXITCODE
 
-        $output | Should Match 'warn'
-        $output | Should Match 'commit-msg'
+        $code | Should Be 1
+        $output | Should Match 'withdrawn, so absent: agents/commit-msg\.md'
+        $output | Should Not Match 'warn'
         Remove-Item -Recurse -Force $target
     }
 }
