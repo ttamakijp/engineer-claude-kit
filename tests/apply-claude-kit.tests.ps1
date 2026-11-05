@@ -42,12 +42,16 @@ Describe "apply-claude-kit.ps1" {
         (Get-ChildItem $agentDir -Filter "*.md").Count | Should BeGreaterThan 0
     }
 
+    # Was asserted on commit-msg.md until ADR-0016 decision B withdrew the three
+    # Haiku delegation agents. architect.md resolves {{role:heavy}} instead, and
+    # 'claude-sonnet' is the part both the Bedrock and the Anthropic-direct id
+    # share, so the assertion survives a models.yaml adapted to either.
     It "substitutes placeholders" {
-        $commitMsgAgent = Join-Path (Join-Path (Join-Path $MockProject ".claude") "agents") "commit-msg.md"
-        Test-Path $commitMsgAgent | Should Be $true
-        $content = Get-Content -LiteralPath $commitMsgAgent -Raw
+        $architectAgent = Join-Path (Join-Path (Join-Path $MockProject ".claude") "agents") "architect.md"
+        Test-Path $architectAgent | Should Be $true
+        $content = Get-Content -LiteralPath $architectAgent -Raw
         $content | Should Not Match '\{\{role:'
-        $content | Should Match 'claude-haiku-4-5'
+        $content | Should Match 'claude-sonnet'
     }
 
     It "applies skills in Project mode" {
@@ -105,6 +109,39 @@ Describe "apply-claude-kit.ps1" {
     It "writes applied marker" {
         $marker = Join-Path $MockProject ".engineer-claude-kit-applied"
         Test-Path $marker | Should Be $true
+    }
+
+    # ADR-0016 decision B withdrew three agents. Deploy only writes what the kit
+    # ships now, so without orphan removal the already-deployed copies would stay
+    # in <target>/agents/ and keep appearing in every session's agent roster.
+    # Driven with a name the kit never shipped, so the test does not break the
+    # next time the shipped set changes.
+    It "removes an agent it deployed before but no longer ships" {
+        $agentsDir = Join-Path (Join-Path $MockProject ".claude") "agents"
+        $withdrawn = Join-Path $agentsDir "zz-withdrawn.md"
+        Set-Content -LiteralPath $withdrawn -Value "# withdrawn agent" -Encoding ASCII
+
+        # Attribution: only files the previous run's marker lists are removed, so
+        # the fixture has to appear in applied_files the way apply would have left
+        # it. A hand-written agent is never listed, and the test below covers it.
+        $marker = Join-Path $MockProject ".engineer-claude-kit-applied"
+        $json = (Get-Content -LiteralPath $marker -Raw) | ConvertFrom-Json
+        $files = @()
+        $json.applied_files | ForEach-Object { $files += [string]$_ }
+        $files += $withdrawn
+        $json.applied_files = $files
+        [System.IO.File]::WriteAllText($marker, ($json | ConvertTo-Json -Depth 5),
+            (New-Object System.Text.UTF8Encoding $false))
+
+        $mine = Join-Path $agentsDir "zz-my-own.md"
+        Set-Content -LiteralPath $mine -Value "# hand written" -Encoding ASCII
+
+        & powershell -NoProfile -File $ScriptPath -AllowElevated -Project $MockProject 2>&1 | Out-Null
+
+        Test-Path $withdrawn | Should Be $false
+        Test-Path $mine | Should Be $true
+        Test-Path (Join-Path $agentsDir "architect.md") | Should Be $true
+        Remove-Item -LiteralPath $mine -Force
     }
 
     It "applies pre-commit hook in Project mode" {

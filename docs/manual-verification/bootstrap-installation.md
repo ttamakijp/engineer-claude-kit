@@ -89,15 +89,15 @@ pwsh -NoProfile -File scripts/apply-claude-kit.ps1 -Project $mockDir
 
 **期待結果**:
 - `$mockDir/CLAUDE.md`
-- `$mockDir/.claude/agents/{commit-msg,lint-helper,log-summary,review,architect,debug-analyze}.md` (6 種)
+- `$mockDir/.claude/agents/{architect,debug-analyze,review}.md` (3 種。Haiku 委譲 agent 3 本は ADR-0016 決定 B で撤回済)
 - `$mockDir/.claude/skills/{commit-helper,leak-check,propose-adr}/SKILL.md` (3 種)
 - `$mockDir/.engineer-claude-kit-applied` (JSON marker)
 
 **placeholder 検証**:
 
 ```powershell
-Get-Content (Join-Path $mockDir ".claude" "agents" "commit-msg.md") | Select-String -Pattern "model:"
-# 期待: model: "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+Get-Content (Join-Path $mockDir ".claude" "agents" "architect.md") | Select-String -Pattern "model:"
+# 期待: model: "<config/models.yaml の heavy の id>" (placeholder が解決済であること)
 
 Get-ChildItem $mockDir -Recurse -Include *.md | Select-String -Pattern '\{\{role:'
 # 期待: 出力空 (全 placeholder が substitution されている)
@@ -173,7 +173,7 @@ claude
 
 **期待結果**:
 - Claude MAX 経由で Sonnet 4.5 / Haiku 4.5 が応答
-- CLAUDE.md のルーティング指示が認識される (「コミットメッセージ作って」で commit-msg sub-agent が呼ばれる等)
+- CLAUDE.md のルーティング指示が認識される (設計判断の相談で `architect` sub-agent が呼ばれる等)
 - agents の各 sub-agent が機能する
 
 **MAX 環境**: WARN 実施可だが、**Anthropic API 形式での Claude Code 動作は要実機検証**。MAX 契約での API access の仕様によって挙動が変わる可能性あり
@@ -280,7 +280,7 @@ dry-run まで動作確認するだけでも以下が確認可能:
 | `/apply` slash command | Claude Code で `/apply` 入力 | apply-claude-kit.ps1 が起動、配布実行 |
 | `/checkpoint` (Group B) | Claude Code で `/checkpoint` | `.claude/checkpoints/<YYYYMMDD-HHMMSS>-<slug>.md` 生成、要約は Haiku で実行 |
 | `/resume` (Group B) | `/resume` または `/resume <slug>` | 最近 5 件提示 → 選択 → context 復元 |
-| agents 6 種 (commit-msg / lint-helper / log-summary / review / architect / debug-analyze) | 各種タスク依頼 → 自動委譲 | sub-agent 起動、適切な model に routing |
+| agents 3 種 (architect / debug-analyze / review) | 各種タスク依頼 → 自動委譲 | sub-agent 起動、適切な model に routing |
 | skills 3 種 (commit-helper / leak-check / propose-adr) | 関連トリガで起動確認 | skill 起動、期待動作 |
 | **work-end-reminder rule** | 朝 1 番に Claude 起動 | 「今日は何時に仕事を終わりますか?」と質問 |
 | **interactive 質問の回答 parse** | `17:30` / `休み` / `yaml` / `skip` 入力 | `~/.claude/.work-end-today` に書込、次ターンで動作確認 |

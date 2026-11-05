@@ -2,6 +2,12 @@
 
 **関連**: `docs/manual-verification/bootstrap-installation.md` (機械的動作検証)、ADR-0001 (clean start), ADR-0003 (bootstrap), ADR-0004 (auto model routing)
 
+> **注記 (ADR-0016 決定 B 以降)**: 本書の観察ポイントのうち `commit-msg` sub-agent の
+> 発火を見る項目は**無効**。Haiku 委譲 agent 3 本 (`commit-msg` / `log-summary` /
+> `lint-helper`) は配布停止済で、委譲先は `~/.claude/config/local-llm-delegation.yaml`
+> に移った。委譲の発火は本書の目視ではなく `scripts/usage-insights.ps1` の
+> snapshot 比較で測る (ADR-0015 / ADR-0016)。本書の再設計は未実施。
+
 本書は engineer-claude-kit の **実効果** を測定するため、グローバル / プロジェクト適用の有無で 4 シナリオ (A-D) を比較する。
 
 ## 必要環境

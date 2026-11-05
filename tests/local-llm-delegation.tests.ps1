@@ -154,3 +154,32 @@ Describe "templates/skills/commit-helper" {
         $text | Should Match 'local-llm-delegation\.yaml'
     }
 }
+
+Describe "templates/agents" {
+    # ADR-0016 decision B withdrew Haiku delegation. An agent file is not inert:
+    # Claude Code puts its description in the session's agent roster, so shipping
+    # one that advertises Haiku delegation contradicts CLAUDE.md section 3 in
+    # every session. Asserted on the templates, because that is what apply
+    # deploys.
+    $AgentDir = Join-Path (Join-Path $repoRoot "templates") "agents"
+
+    It "ships no Haiku delegation agent" {
+        foreach ($n in @('commit-msg.md', 'log-summary.md', 'lint-helper.md')) {
+            Test-Path (Join-Path $AgentDir $n) | Should Be $false
+        }
+    }
+
+    It "still ships the sub-agents section 3 allows" {
+        foreach ($n in @('architect.md', 'debug-analyze.md', 'review.md')) {
+            Test-Path (Join-Path $AgentDir $n) | Should Be $true
+        }
+    }
+
+    # The remaining three resolve {{role:heavy}}. A small-fast agent would be a
+    # Haiku delegation target reintroduced under another name.
+    It "declares no small-fast model" {
+        foreach ($f in (Get-ChildItem -LiteralPath $AgentDir -Filter "*.md" -File)) {
+            (Read-Utf8NoBom -Path $f.FullName) | Should Not Match 'role:small-fast'
+        }
+    }
+}

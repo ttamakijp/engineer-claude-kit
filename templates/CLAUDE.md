@@ -30,8 +30,8 @@ $0.023-0.060 (`docs/step-6-items/item-4-subagent-cost-measurement.md`)。同じ�
 本文を inline で受ける委譲先 (`chat` 等) も使わない。**path を受ける宛先だけが委譲先**。
 
 設計判断・バグ調査・複数ファイル横断・因果推論を伴う議論も自分で処理する
-(`architect` / `debug-analyze` / `review` sub-agent も可)。迷ったら自分で処理する
-(品質 > コスト)。
+(`architect` / `debug-analyze` / `review` sub-agent も可。**配布される sub-agent は
+この 3 つだけ**)。迷ったら自分で処理する (品質 > コスト)。
 
 - sub-agent が「不明」を返した / 出力が疑わしい場合は自分が引き取る
 - **commit / push / branch 操作は必ず自分で実行する**

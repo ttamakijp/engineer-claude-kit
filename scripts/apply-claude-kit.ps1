@@ -75,6 +75,12 @@ Assert-NonElevated -AllowElevated:$AllowElevated
 # points at. Depends on Write-Utf8NoBom above. See ADR-0015 step 3.
 . (Join-Path (Join-Path $PSScriptRoot "lib") "link-safety.ps1")
 
+# Previous-run attribution + orphan removal: Get-KitPreviousAppliedFiles,
+# Remove-OrphanedKitFiles. Deploy writes what the kit ships now, so a payload it
+# has STOPPED shipping has to be removed explicitly. Depends on the encoding
+# helpers and on New-KitBackup above.
+. (Join-Path (Join-Path $PSScriptRoot "lib") "orphan-cleanup.ps1")
+
 # Rule build + deploy: Install-KitRules. Depends on the encoding helpers and on
 # New-KitBackup above. Extracted for the same 500-line reason as models-config.
 . (Join-Path (Join-Path $PSScriptRoot "lib") "rules-deploy.ps1")
@@ -230,6 +236,11 @@ $appliedFiles = @()
 $backupRoot = Join-Path $markerRoot "backups"
 $backupStamp = (Get-Date).ToString('yyyyMMdd-HHmmss')
 
+# What the previous run deployed, read BEFORE Write-AppliedMarker overwrites the
+# marker with this run's list. Every payload that removes its own orphans needs
+# it, so it is read once here rather than per payload.
+$previousApplied = @(Get-KitPreviousAppliedFiles -MarkerRoot $markerRoot)
+
 # Copy CLAUDE.md
 # Global mode: ~/.claude/CLAUDE.md is kit-managed, so overwriting it on re-apply
 # is expected. Project mode: <project>/CLAUDE.md is the project own reference
@@ -264,13 +275,22 @@ if ($mode -eq "Project" -and (Test-Path $targetClaudeMd)) {
 
 
 # Copy agents/*.md
+# Claude Code offers every file in this directory as a delegation target and puts
+# its description in the session's agent roster, so an agent the kit has STOPPED
+# shipping keeps advertising itself until the file is gone. ADR-0016 decision B
+# withdrew the three Haiku delegation agents; hence the orphan removal below.
 $agentFiles = Get-ChildItem -LiteralPath $sourceAgentsDir -Filter "*.md" -File
+$appliedAgents = @()
 foreach ($agentFile in $agentFiles) {
     $destAgent = Join-Path $targetAgentsDir $agentFile.Name
     $null = Copy-Template -SourceFile $agentFile.FullName -DestFile $destAgent `
         -ModelsConfig $modelsConfig -IsDryRun:$DryRun
-    $appliedFiles += $destAgent
+    $appliedAgents += $destAgent
 }
+$appliedFiles += $appliedAgents
+Remove-OrphanedKitFiles -TargetDir $targetAgentsDir -CurrentApplied $appliedAgents `
+    -PathSegment "agents" -Kind "agent" -PreviousAppliedFiles $previousApplied `
+    -BackupRoot $backupRoot -BackupStamp $backupStamp -IsDryRun:$DryRun
 
 # Copy skills/<name>/SKILL.md
 # Each skill source lives at templates/skills/<name>/SKILL.md. We deploy it to
@@ -316,19 +336,6 @@ if (Test-Path $sourceCommandsDir) {
 # Claude rules (both modes). Global deploys ~/.claude/rules/, Project deploys
 # <project>/.claude/rules/; see lib/rules-deploy.ps1 for the double-load caveat.
 if ($targetRulesDir) {
-    # Read the previous run's marker BEFORE Write-AppliedMarker overwrites it, so
-    # a rule the kit has stopped shipping can be attributed and removed. Without
-    # this, deploy is additive only and a deleted rule keeps loading forever.
-    $previousApplied = @()
-    $prevMarker = Join-Path $markerRoot ".engineer-claude-kit-applied"
-    if (Test-Path -LiteralPath $prevMarker) {
-        try {
-            $prevJson = (Read-Utf8NoBom -Path $prevMarker) | ConvertFrom-Json
-            if ($prevJson.applied_files) { $prevJson.applied_files | ForEach-Object { $previousApplied += [string]$_ } }
-        } catch {
-            $previousApplied = @()
-        }
-    }
     $appliedFiles += Install-KitRules -KitRoot $KitRoot -TargetRulesDir $targetRulesDir `
         -Mode $mode -BackupRoot $backupRoot -BackupStamp $backupStamp `
         -PreviousAppliedFiles $previousApplied -IsDryRun:$DryRun

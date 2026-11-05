@@ -38,21 +38,26 @@
 # read zero on one of them.
 $script:RuleMetricsAgentTools = @('Agent', 'Task')
 
-# Sub-agents whose use CLAUDE.md section 3 actually recommends, i.e. the ones
-# that keep a large input OUT of the main context.
+# Haiku sub-agents counted as a "recommended" delegation, i.e. the ones that
+# were held to keep a large input OUT of the main context.
 #
-# commit-msg and lint-helper were here until the delegation cost was measured.
-# They are gone because delegating them is more expensive than doing the work in
-# main: the diff is already in the main context, so the sub-agent shuts nothing
-# out while paying cacheCreate on a cold self-contained prompt (76% of its cost;
-# $0.082-0.120 per launch against $0.023-0.060 to write it directly). Counting
-# them would reward a behaviour the kit no longer asks for.
-# See docs/step-6-items/item-4-subagent-cost-measurement.md.
+# The kit no longer ships ANY of the three Haiku delegation agents: ADR-0016
+# decision B withdrew Haiku delegation, and apply now removes the deployed
+# copies. On an up-to-date machine this count is therefore expected to be zero.
+# The names stay because snapshot 4 and snapshot 5 have to remain comparable --
+# emptying the set mid-experiment would make the delta unreadable -- and because
+# a nonzero value is now a useful signal in itself: a stale agent file survived
+# somewhere, which is exactly what the removal was for.
+#
+# commit-msg and lint-helper moved to the legacy set below when the delegation
+# cost was measured: the diff is already in the main context, so the sub-agent
+# shuts nothing out while paying cacheCreate on a cold self-contained prompt
+# (76% of its cost; $0.082-0.120 per launch against $0.023-0.060 to write it
+# directly). See docs/step-6-items/item-4-subagent-cost-measurement.md.
 $script:RuleMetricsHaikuAgents = @('log-summary')
 
-# Sub-agents the kit ships but no longer recommends by default. Tracked
-# separately so an explicit, deliberate use stays visible instead of being
-# lumped into "other".
+# Haiku sub-agents the kit used to ship and no longer does. Tracked separately
+# so a launch stays visible instead of being lumped into "other".
 $script:RuleMetricsLegacyHaikuAgents = @('commit-msg', 'lint-helper')
 
 # Shell tools whose command text is inspected for 'git commit'.

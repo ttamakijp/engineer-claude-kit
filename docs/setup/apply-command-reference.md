@@ -71,8 +71,8 @@ powershell -NoProfile -File "$env:USERPROFILE\.claude-kit\scripts\apply-claude-k
 ```
 Applying engineer-claude-kit (Global mode) -> C:\Users\<you>\.claude\
   [copy] CLAUDE.md
-  [copy] agents\commit-msg.md
-  [copy] agents\lint-helper.md
+  [copy] agents\architect.md
+  [copy] agents\debug-analyze.md
   ...
   [copy] commands\apply.md
   [skip] work-schedule.yaml (already exists)
@@ -85,7 +85,7 @@ Done. 23 files placed, 1 skipped.
 ```
 Applying engineer-claude-kit (Global mode, DRY RUN) -> C:\Users\<you>\.claude\
   [would copy] CLAUDE.md
-  [would copy] agents\commit-msg.md
+  [would copy] agents\architect.md
   ...
   [would skip] work-schedule.yaml (already exists)
 DRY RUN: no files written. 23 would be placed, 1 would be skipped.

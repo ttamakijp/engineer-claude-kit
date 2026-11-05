@@ -136,6 +136,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `bootstrap.ps1` は `-Update` を `apply -Global` へ伝播。`/apply --update` で
   Claude Code からも起動可能。実装は `scripts/lib/kit-updater.ps1`
   (`Test-KitBehind` / `Invoke-KitUpdate`、injection-point ベースの Pester 19 件)。
+- **`scripts/lib/orphan-cleanup.ps1` (ADR-0017 Phase 2)** — 前回 apply の marker
+  (`applied_files`) から配布済ファイルを同定し、kit が配らなくなった payload を
+  削除する汎用処理。`rules/` 専用だった `Remove-OrphanedKitRules` を
+  `Remove-OrphanedKitFiles` (`-PathSegment` / `-Kind`) へ一般化し `agents/` にも
+  適用した。marker の読み出しも `Get-KitPreviousAppliedFiles` として共有化し、
+  apply が payload ごとに marker を読み直す構造を解消。marker に無いファイル
+  (user 作成) は削除せず報告する
 
 ### Changed
 
@@ -185,6 +192,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub Actions を Node24 対応版に更新: `actions/checkout@v4` -> `@v5`、
   `gitleaks/gitleaks-action@v2` -> `@v3` (2026-06-16 の runner Node24 強制切替に
   伴う deprecation 対応, #60)。
+- **`scripts/check-kit-deployment.ps1`** — agents payload の検証を追加した。kit が
+  配る agent が全て配布済であること、および撤回した 3 本が**不在**であることを検査
+  する。撤回 3 本は ADR-0017 時点では warning だったが **FAIL** に変更 (apply で
+  解消できる = gate として使えるため)。これに伴い未使用になった `-Warn` 機構を削除
+
+### Removed
+
+- **Haiku 委譲 sub-agent 3 本 (ADR-0016 決定 B / ADR-0017 Phase 2)** —
+  `templates/agents/{commit-msg,log-summary,lint-helper}.md` を削除し、**apply が
+  配布済 copy も削除する**ようにした。CLAUDE.md §3 は Haiku 委譲を禁止していたが、
+  agent file は不活性ではない: description が毎 session の agent 一覧に載るため、
+  kit が配り続ける限り main agent からは「使ってよい委譲先」として見えていた
+  (snapshot 4 の Local call = 0 に対する有力な説明の 1 つ)。実測で agent 一覧から
+  約 577 B/session が消え、常時ロード面は 11,043 → 11,018 B。
+  `architect` / `debug-analyze` / `review` は維持。
+  `~/.claude/agents/` にある kit 管理外の agent (marker の `applied_files` に無い
+  もの) は削除せず報告のみ
 
 ### Fixed
 
